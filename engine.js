@@ -254,8 +254,9 @@ function drawPortrait(cv,L,face,open){
 }
 function lookFor(who){ // speaker name → look: an NPC of this chapter with that name
  if(!who||who==='…')return null;
- for(const n of Object.values(C.NPC||{}))if(n.name===who&&n.look)return n.look;
- if(C.FOLLOW&&C.FOLLOW.name===who)return C.FOLLOW.look;
+ const ok=L=>L&&(L.art||(L.skin&&L.hair&&L.shirt))?L:null;  // humans and custom sprites get a portrait; simple robots (kind:'andy') don't
+ for(const n of Object.values(C.NPC||{}))if(n.name===who&&ok(n.look))return n.look;
+ if(C.FOLLOW&&C.FOLLOW.name===who)return ok(C.FOLLOW.look);
  return null;
 }
 function faceFor(s,text){ // expression for a line: explicit face, else a guess from the punctuation

@@ -703,7 +703,7 @@ function openPanel(){
   $('cardSpk')?.addEventListener('click',()=>speak(logSel+'. '+d.ex));
   $('enBtn')?.addEventListener('click',()=>{showEn=true;openPanel()});
  }else $('card').innerHTML='<span class="def">아직 단어가 없어요.</span><span class="ex">사람들한테 말을 걸면 일지에 단어가 생겨요.</span>';
- $('items').innerHTML=state.items.length?state.items.map(i=>`<li title="${C.ITEMS[i]||''}">${i}</li>`).join(''):'<li class="none">비어 있어요.</li>';
+ $('items').innerHTML=state.items.length?state.items.map(i=>`<li title="${String(C.ITEMS[i]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(i).replace(/</g,'&lt;')}</li>`).join(''):'<li class="none">비어 있어요.</li>';
  $('panel').hidden=false;
 }
 

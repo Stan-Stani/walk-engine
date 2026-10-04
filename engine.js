@@ -545,7 +545,7 @@ function pickTile(s,b){
   const line=s.build.join(' ');sfx('ok');
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';$('build').hidden=true;
-  show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+line+'.'});
+  if(s.who==='나'){toast(okWord(s));show({who:'나',say:line+'.'})}else show({who:s.who,say:okWord(s)+' '+line+'.'});  // your own line: it's yours, praise is a toast
   if(readOn)speak(line);
  }else{sel=-1;markSel()}
 }
@@ -569,10 +569,10 @@ function choose(s,i){
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';
   const line=s.ask.includes('___')?s.ask.replace('___',o[0]):o[0];
-  show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line)});
+  if(s.who==='나'&&!s.listenOnly){toast(okWord(s));show({who:'나',say:line})}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line)});
  }else{
   sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);
-  dlg.next=s;show({who:s.who==='나'?dlg.name:s.who,say:o[2]||'다시 해 봐요.'});
+  dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||'다시 해 봐요.'});  // after your own line, the hint is narration
  }
 }
 function advance(){

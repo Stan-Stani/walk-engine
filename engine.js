@@ -384,7 +384,7 @@ function render(t){
  cx=Math.round(cx);cy=Math.round(cy);CAM={x:cx,y:cy};
  const x0=Math.floor(cx/TS),y0=Math.floor(cy/TS);
  for(let y=y0;y<=y0+VH;y++)for(let x=x0;x<=x0+VW;x++)tile(x,y,x*TS-cx,y*TS-cy,t);
- const ents=live().map(n=>{const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):drawChar(n.look,X,Y,n.dir,0);marker(X,Y-artLift(n.look),t,status(n))}}});
+ const ents=live().map(n=>{const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):drawChar(n.look,X,Y,n.dir,0);if(!(player.x===nx&&player.y===ny-1))marker(X,Y-artLift(n.look),t,status(n))}}});  // no ! over the player standing just above
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
   if(!pet.on){petReset();pet.on=true}
@@ -526,9 +526,10 @@ function renderChoices(s){
  sel=-1;choicesAt=performance.now();markSel();  // nothing selected: A can't answer by accident
 }
 function markSel(){const bs=choosing()?choiceBtns():tileBtns();bs.forEach((b,i)=>b.classList.toggle('sel',i===sel));bs[sel]?.focus({preventScroll:true});bs[sel]?.scrollIntoView({block:'nearest'})}
-function moveSel(d){const n=(choosing()?choiceBtns():tileBtns()).length;if(!n)return;sel=sel<0?(d>0?0:n-1):(sel+d+n)%n;markSel();sfx('move')}
+function moveSel(d){if(performance.now()-choicesAt<450)return;  // keys still held from walking don't move a fresh question's selection
+ const n=(choosing()?choiceBtns():tileBtns()).length;if(!n)return;sel=sel<0?(d>0?0:n-1):(sel+d+n)%n;markSel();sfx('move')}
 let choicesAt=0;
-function confirmSel(){if(sel<0||performance.now()-choicesAt<350)return;const b=(choosing()?choiceBtns():tileBtns())[sel];if(b)b.click()}
+function confirmSel(){if(sel<0||performance.now()-choicesAt<450)return;const b=(choosing()?choiceBtns():tileBtns())[sel];if(b)b.click()}
 
 function renderBuild(s){
  s.got=0;$('build').hidden=false;
@@ -677,7 +678,7 @@ function award(words){
 }
 function finish(){
  $('fade').classList.add('on');sfx('star');
- setTimeout(()=>{$('fade').classList.remove('on');openDialog(LOGNAME,says(C.DONE))},900);
+ setTimeout(()=>{$('fade').classList.remove('on');openDialog('…',says(C.DONE))  /* the ending is narration */},900);
 }
 let toastT;function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2400)}
 

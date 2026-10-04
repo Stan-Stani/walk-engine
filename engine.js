@@ -372,7 +372,7 @@ function showRoom(force){
 function update(dt,t){
  if(player.moving){player.t+=dt/(170*(Z.slow||1)); /* Z.slow > 1 = heavy gravity */if(player.t>=1){player.t=0;player.moving=false;if(!arrive())tryMove()}}
  else tryMove();
- if(!dlg)live().forEach(n=>{if(n.still||n.pos)return;if(t>n.turnAt){const ds=['down','left','right',n.home,n.home];n.dir=ds[Math.random()*ds.length|0];n.turnAt=t+2500+Math.random()*3500}});
+ if(!dlg)live().forEach(n=>{if(n.still||n.pos||n.walk)return;if(t>n.turnAt){const ds=['down','left','right',n.home,n.home];n.dir=ds[Math.random()*ds.length|0];n.turnAt=t+2500+Math.random()*3500}});
  $('btnA').classList.toggle('ready',!dlg&&!player.moving&&!!facing());
 }
 const dark=document.createElement('canvas');dark.width=cv.width;dark.height=cv.height;const dg=dark.getContext('2d');
@@ -384,7 +384,8 @@ function render(t){
  cx=Math.round(cx);cy=Math.round(cy);CAM={x:cx,y:cy};
  const x0=Math.floor(cx/TS),y0=Math.floor(cy/TS);
  for(let y=y0;y<=y0+VH;y++)for(let x=x0;x<=x0+VW;x++)tile(x,y,x*TS-cx,y*TS-cy,t);
- const ents=live().map(n=>{const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):drawChar(n.look,X,Y,n.dir,0);if(!(player.x===nx&&player.y===ny-1))marker(X,Y-artLift(n.look),t,status(n))}}});  // no ! over the player standing just above
+ const ents=live().map(n=>{const wk=walkAt(n,t);if(wk){const [wx,wy,wd,wf]=wk;return {y:wy,f:()=>drawChar(n.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)}}
+  const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):drawChar(n.look,X,Y,n.dir,0);if(!(player.x===nx&&player.y===ny-1))marker(X,Y-artLift(n.look),t,status(n))}}});  // no ! over the player standing just above
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
   if(!pet.on){petReset();pet.on=true}
@@ -407,6 +408,27 @@ function render(t){
   if(Math.floor(t/600)%2){r(a*TS-cx+2,b*TS-cy+1,3,2,'#D2533F');r(c*TS-cx+11,b*TS-cy+1,3,2,'#D2533F')}
  }
 }
+/* scripted walk: an NPC appears at `from` and walks to its own spot (e.g. the class president going back to her desk) */
+let walks=[];const WALK_MS=230;
+function walkPath(n,[fx,fy]){
+ const [tx,ty]=[n.x,n.y],k=(x,y)=>x+','+y,prev={[k(fx,fy)]:null},q=[[fx,fy]];
+ while(q.length){const [x,y]=q.shift();if(x===tx&&y===ty)break;
+  for(const [dx,dy] of Object.values(D)){const a=x+dx,b=y+dy,kk=k(a,b);if(kk in prev)continue;
+   if(!(a===tx&&b===ty)&&(!walkable(a,b)||live().some(o=>o!==n&&npcPos(o)[0]===a&&npcPos(o)[1]===b)))continue;prev[kk]=[x,y];q.push([a,b])}}
+ if(!(k(tx,ty) in prev))return null;
+ const path=[];for(let c=[tx,ty];c;c=prev[k(...c)])path.unshift(c);return path;
+}
+function startWalks(){
+ walks.splice(0).forEach(w=>{const n=C.NPC[w.npc];if(!n||(n.hide&&n.hide()))return;
+  const path=walkPath(n,w.from);if(path&&path.length>1)n.walk={path,t0:performance.now(),end:n.dir}});
+}
+function walkAt(n,t){ // → [x,y,dir,frame] while walking, null when arrived
+ const w=n.walk;if(!w)return null;const p=(t-w.t0)/WALK_MS,i=Math.floor(p);
+ if(i>=w.path.length-1){n.walk=null;n.dir=w.end;return null}
+ const [ax,ay]=w.path[i],[bx,by]=w.path[i+1],f=p-i;
+ const dir=bx>ax?'right':bx<ax?'left':by>ay?'down':'up';
+ return [ax+(bx-ax)*f,ay+(by-ay)*f,dir,f<.5?(i%2?1:2):0];
+}
 let last=performance.now();
 function loop(t){const dt=Math.min(50,t-last);last=t;if(Z){update(dt,t);render(t)}requestAnimationFrame(loop)}
 
@@ -420,6 +442,7 @@ function openDialog(name,steps,opts={}){
 function show(s){
  dlg.cur=s;hideGloss();
  if(s.set){s.set();save()}
+ if(s.walk)walks.push(s.walk);
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
  if(s.award)award(s.award);
@@ -590,7 +613,7 @@ function advance(){
  show(dlg.steps[dlg.i]);
 }
 function closeDialog(){
- dlg=null;clearInterval(typing?.id);$('dlg').hidden=true;hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
+ dlg=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
 }

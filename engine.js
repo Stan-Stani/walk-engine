@@ -247,8 +247,10 @@ function portraitGrid(L,face,open){
 function drawPortrait(cv,L,face,open){
  const c=cv.getContext('2d');c.clearRect(0,0,48,48);
  if(L.art){ // custom sprite: its own down frame, enlarged
-  const rows=(L.art.down||[]),h=rows.length,w=rows[0]?.length||16,k=Math.max(1,Math.floor(Math.min(44/w,44/h)));
-  rows.forEach((r,y)=>[...r].forEach((ch,x)=>{const col=L.art.pal[ch];if(col&&ch!=='.'){c.fillStyle=col;c.fillRect(24-w*k/2+x*k|0,46-h*k+y*k,k,k)}}));return}
+  // custom sprite: a bust — scale it to fill the width and show the top (head and shoulders), cut at the frame's bottom
+  const all=(L.art.down||[]),w=all[0]?.length||16,k=Math.max(1,Math.floor(48/w)),rows=all.slice(0,Math.min(all.length,Math.ceil(48/k)));
+  const top=Math.max(0,48-rows.length*k);
+  rows.forEach((r,y)=>[...r].forEach((ch,x)=>{const col=L.art.pal[ch];if(col&&ch!=='.'){c.fillStyle=col;c.fillRect(24-w*k/2+x*k|0,top+y*k,k,k)}}));return}
  const g=portraitGrid(L,face,open);
  for(let y=0;y<48;y++)for(let x=0;x<48;x++)if(g[y][x]){c.fillStyle=g[y][x];c.fillRect(x,y,1,1)}
 }

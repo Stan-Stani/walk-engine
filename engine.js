@@ -423,7 +423,7 @@ function show(s){
  if(s.listen)s=prepListen(s);
  $('who').textContent=s.who||dlg.name;
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;
- const text=s.say||s.ask||(s.build?'단어를 순서대로 골라요.':'');
+ const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
  if(!s.build)logTalk(s.who||dlg.name,text);
  typeText(text,()=>{if(s.ask)renderChoices(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);

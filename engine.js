@@ -415,8 +415,9 @@ function walkPath(n,[fx,fy]){
  while(q.length){const [x,y]=q.shift();if(x===tx&&y===ty)break;
   for(const [dx,dy] of Object.values(D)){const a=x+dx,b=y+dy,kk=k(a,b);if(kk in prev)continue;
    if(!(a===tx&&b===ty)&&(!walkable(a,b)||live().some(o=>o!==n&&npcPos(o)[0]===a&&npcPos(o)[1]===b)))continue;prev[kk]=[x,y];q.push([a,b])}}
- if(!(k(tx,ty) in prev))return null;
- const path=[];for(let c=[tx,ty];c;c=prev[k(...c)])path.unshift(c);return path;
+ let end=[tx,ty];  // blocked (someone stands in the doorway)? walk as close as possible, then step in
+ if(!(k(tx,ty) in prev)){let best=1e9;for(const kk in prev){const [a,b]=kk.split(',').map(Number),d=Math.abs(a-tx)+Math.abs(b-ty);if(d<best){best=d;end=[a,b]}}}
+ const path=[];for(let c=end;c;c=prev[k(...c)])path.unshift(c);return path;
 }
 function startWalks(){
  walks.splice(0).forEach(w=>{const n=C.NPC[w.npc];if(!n||(n.hide&&n.hide()))return;

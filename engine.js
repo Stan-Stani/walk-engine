@@ -516,10 +516,26 @@ function openTaps(){
  $('tapCount').textContent=rows.length?rows.length+'개':'';
  $('tapList').innerHTML=rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}</b><span class="tpm">${r.n}번 · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
   :'<p class="tl-empty">아직 찾아본 말이 없어요.</p>';
+ if(!$('tapCopy')){const b=document.createElement('button');b.className='btn';b.id='tapCopy';b.textContent='복사';b.style.marginLeft='auto';b.addEventListener('click',copyTaps);$('tapSortN').after(b)}
+ $('tapCopy').hidden=!rows.length;if($('tapText'))$('tapText').hidden=true;
  $('tapSortT').classList.toggle('on',tapSort==='t');$('tapSortN').classList.toggle('on',tapSort==='n');
  $('tapPanel').hidden=false;document.body.classList.add('talkopen');$('tapList').scrollTop=0;
 }
 function closeTaps(){$('tapPanel').hidden=true;document.body.classList.remove('talkopen')}
+/* 복사: every looked-up word as plain text (word | times | last day | meaning | English), to paste into a chat and practise */
+function tapsText(){
+ const d=t=>{const x=new Date(t);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
+ const rows=Object.entries(taps).sort((a,b)=>tapSort==='n'?(b[1].n-a[1].n||b[1].t-a[1].t):b[1].t-a[1].t);
+ return `${G.title||document.title} · 찾아본 말 ${rows.length}개 (${d(Date.now())})\n단어 | 찾은 횟수 | 마지막으로 찾은 날 | 뜻 | English\n`
+  +rows.map(([h,r])=>[h,r.n,d(r.t),r.k||'',r.e||''].map(x=>String(x).replace(/\s*\|\s*/g,' / ')).join(' | ')).join('\n')+'\n';
+}
+function copyTaps(){
+ const txt=tapsText();
+ const show=()=>{  // no clipboard (some embeds block it): show the text selected, ready for the phone's own copy
+  let ta=$('tapText');if(!ta){ta=document.createElement('textarea');ta.id='tapText';ta.readOnly=true;ta.style.cssText='width:100%;height:9em;font-size:.8rem;margin:6px 0;box-sizing:border-box';$('tapList').before(ta)}
+  ta.hidden=false;ta.value=txt;ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}if(ok)toast('복사했어요!')};
+ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>toast('복사했어요!'),show);else show();
+}
 function hideGloss(){$('gloss').hidden=true}
 /* ---------- conversation log: every line shown, scrollable, words tappable like in the dialogue box ---------- */
 let talk=[];

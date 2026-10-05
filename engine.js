@@ -421,15 +421,18 @@ function walkPath([fx,fy],[tx,ty],self){
  if(!(k(tx,ty) in prev)){let best=1e9;for(const kk in prev){const [a,b]=kk.split(',').map(Number),d=Math.abs(a-tx)+Math.abs(b-ty);if(d<best){best=d;end=[a,b]}}}
  const path=[];for(let c=end;c;c=prev[k(...c)])path.unshift(c);return path;
 }
+function queueWalks(s){  // one or a list each; until the conversation closes they stand where they start (no pop to the end spot first)
+ [].concat(s.walk||[]).forEach(w=>{const n=C.NPC[w.npc];if(!n)return;walks.push(w);n.walk={path:[w.from],hold:1,end:n.dir}});
+ [].concat(s.leave||[]).forEach(w=>{const n=C.NPC[w.npc];if(!n||!NPCS.includes(n))return;const g={look:n.look,from:npcPos(n),walk:{path:[npcPos(n)],hold:1,dir:n.dir}};leaves.push([w,g]);ghosts.push(g)});
+}
 function startWalks(){
  const t0=performance.now();
- walks.splice(0).forEach(w=>{const n=C.NPC[w.npc];if(!n||(n.hide&&n.hide()))return;
+ walks.splice(0).forEach(w=>{const n=C.NPC[w.npc];if(!n)return;n.walk=null;if(n.hide&&n.hide())return;
   const path=walkPath(w.from,[n.x,n.y],n);if(path.length>1)n.walk={path,t0,end:n.dir}});
- leaves.splice(0).forEach(w=>{const n=C.NPC[w.npc];if(!n||!NPCS.includes(n))return;
-  const path=walkPath(npcPos(n),w.to,n);if(path.length>1)ghosts.push({look:n.look,walk:{path,t0}})});
+ leaves.splice(0).forEach(([w,g])=>{const path=walkPath(g.from,w.to,null);if(path.length>1)g.walk={path,t0};else ghosts=ghosts.filter(x=>x!==g)});
 }
 function walkAt(n,t){ // → [x,y,dir,frame] while walking, null when arrived
- const w=n.walk;if(!w)return null;const p=Math.max(0,(t-w.t0)/WALK_MS),i=Math.floor(p);  // a frame can be stamped just before the walk began
+ const w=n.walk;if(!w)return null;if(w.hold)return [w.path[0][0],w.path[0][1],w.dir||w.end||n.dir||'down',0];const p=Math.max(0,(t-w.t0)/WALK_MS),i=Math.floor(p);  // a frame can be stamped just before the walk began
  if(i>=w.path.length-1){n.walk=null;if(w.end)n.dir=w.end;return null}
  const [ax,ay]=w.path[i],[bx,by]=w.path[i+1],f=p-i;
  const dir=bx>ax?'right':bx<ax?'left':by>ay?'down':'up';
@@ -448,8 +451,7 @@ function openDialog(name,steps,opts={}){
 function show(s){
  dlg.cur=s;hideGloss();
  if(s.set){s.set();save()}
- if(s.walk)walks.push(...[].concat(s.walk));
- if(s.leave)leaves.push(...[].concat(s.leave));  // one or a list
+ if(s.walk||s.leave)queueWalks(s);
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
  if(s.award)award(s.award);

@@ -335,7 +335,7 @@ const warpAt=(x,y)=>Z.warps&&Z.warps[x+','+y];
 const walkable=(x,y)=>{const c=at(x,y);return c!=null&&!!(Z.legend[c]||{}).walk};
 const blocked=(x,y)=>!walkable(x,y)||!!npcAt(x,y);
 const CREATOR=!!document.getElementById('mePanel');  // 나 꾸미기 only where the page has the panel
-const panelOpen=()=>(CREATOR&&!$('mePanel').hidden)||!$('startPanel').hidden||!$('panel').hidden||!$('chPanel').hidden||!$('talkPanel').hidden||!$('tapPanel').hidden;
+const panelOpen=()=>(CREATOR&&!$('mePanel').hidden)||!$('startPanel').hidden||!$('panel').hidden||!$('chPanel').hidden||!$('talkPanel').hidden||!$('tapPanel').hidden||(!!$('repPanel')&&!$('repPanel').hidden);
 
 function tryMove(){
  if(player.moving||!held||dlg||panelOpen()||warping)return;
@@ -450,6 +450,7 @@ function openDialog(name,steps,opts={}){
 }
 function show(s){
  dlg.cur=s;hideGloss();
+ lastLines.push(((s.who||dlg.name||'')+': '+plain(s.say||s.ask||'')).slice(0,300));if(lastLines.length>3)lastLines.shift();
  if(s.set){s.set();save()}
  if(s.walk||s.leave)queueWalks(s);
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
@@ -506,7 +507,7 @@ function typeText(text,done){
  typing.id=setInterval(()=>{i++;el.textContent=p.slice(0,i);if(i>=p.length)fin()},26);
 }
 function showGloss(k){const d=C.DICT[k];if(d){noteTap([[k,d]]);popGloss([[k,d]])}}
-function showWord(w){const rows=lexLookup(w);noteTap(rows);popGloss(rows)}
+function showWord(w){const rows=lexLookup(w);noteTap(rows);popGloss(rows);lastWord=(w+(rows.length?' → '+rows.map(([h,d])=>h+': '+d.k).join(' / '):' (사전에 없음)')).slice(0,400)}
 /* ---------- 찾아본 말: every tap that finds a definition — how many times, and when last (all chapters, one list) ---------- */
 const TAPS_KEY=KEY('taps');let taps={},tapSort='t';
 try{taps=JSON.parse(store.get(TAPS_KEY)||'{}')||{}}catch(e){taps={}}
@@ -645,6 +646,7 @@ function closeDialog(){
 function cancel(){
  if(CREATOR&&!$('mePanel').hidden){if(me)closeMe(false);return}  // first time: you must pick (no B)
  if(!$('startPanel').hidden){$('startPanel').hidden=true;return}
+ if($('repPanel')&&!$('repPanel').hidden){closeReport();return}
  if(!$('tapPanel').hidden){closeTaps();return}
  if(!$('talkPanel').hidden){if(!$('gloss').hidden)hideGloss();else closeTalk();return}
  if(panelOpen()){$('panel').hidden=true;$('chPanel').hidden=true;return}
@@ -816,7 +818,40 @@ if(CREATOR)$('meRandom').addEventListener('click',()=>{const pick=a=>a[Math.rand
 if(CREATOR)$('meOk').addEventListener('click',()=>closeMe(true));
 if(CREATOR)$('meBtn').addEventListener('click',()=>openMe());
 /* START: everything that isn't the game itself (logs, dictionary, chapters, reading aloud, sound) */
+/* 문제 알리기: a report goes to the word-reports inbox on seldoncortex.com. Artifacts can't call other sites, so 보내기 is a
+   plain link that carries the report after the # (never in server logs); the page there posts it once and says thanks. */
+const REPORT_URL='https://seldoncortex.com/word-reports/';let lastLines=[],repKind='game',lastWord='';
+function reportCtx(){
+ return {chapter:CH.n+' '+CH.title,place:roomName||Z.name,zone:ZID,pos:player.x+','+player.y,objective:(C.questText&&C.questText())||'',
+  line:dlg&&dlg.cur?lastLines[lastLines.length-1]:'',lines:lastLines.join('\n'),word:lastWord}
+}
+function reportHref(){
+ const r={game:G.prefix,kind:repKind,note:$('repNote').value.trim().slice(0,1000),build:CH.id,ctx:reportCtx()};
+ const b=new TextEncoder().encode(JSON.stringify(r));let bin='';b.forEach(x=>bin+=String.fromCharCode(x));
+ return REPORT_URL+'#'+btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function openReport(){
+ if(!$('repPanel')){
+  const P=document.createElement('div');P.className='panel';P.id='repPanel';P.hidden=true;
+  P.innerHTML=`<div class="sheet talksheet" role="dialog" aria-label="문제 알리기"><h2><span>문제 알리기</span><button class="btn" id="repClose">닫기</button></h2>
+   <div class="row tapsort"><button class="btn" id="repGame">게임이 이상해요</button><button class="btn" id="repKo">한국어가 이상해요</button></div>
+   <div id="repCtx" style="font-size:.85rem;opacity:.75;white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0"></div>
+   <textarea id="repNote" rows="3" maxlength="1000" placeholder="무엇이 이상해요?" style="width:100%;box-sizing:border-box;font:inherit;padding:8px;border-radius:8px"></textarea>
+   <div class="row" style="justify-content:flex-end;margin-top:8px"><a class="btn" id="repSend" target="_blank" rel="noopener" style="text-decoration:none">보내기</a></div></div>`;
+  document.body.append(P);
+  P.addEventListener('click',e=>{if(e.target===P)closeReport()});$('repClose').addEventListener('click',closeReport);
+  $('repGame').addEventListener('click',()=>setRepKind('game'));$('repKo').addEventListener('click',()=>setRepKind('korean'));
+  $('repNote').addEventListener('input',()=>{$('repSend').href=reportHref()});
+  $('repSend').addEventListener('click',()=>{$('repSend').href=reportHref();setTimeout(()=>{closeReport();$('repNote').value='';toast('고마워요!')},300)});
+ }
+ const c=reportCtx();$('repCtx').textContent=[c.chapter+' · '+c.place,c.line||lastLines[lastLines.length-1]||'',c.word?'단어: '+c.word:''].filter(Boolean).join('\n');
+ setRepKind(repKind);$('repPanel').hidden=false;document.body.classList.add('talkopen');hideGloss();
+}
+function setRepKind(k){repKind=k;$('repGame').classList.toggle('on',k==='game');$('repKo').classList.toggle('on',k==='korean');$('repSend').href=reportHref()}
+function closeReport(){$('repPanel').hidden=true;document.body.classList.remove('talkopen')}
 function toggleStart(){const P=$('startPanel');if(P.hidden&&panelOpen())return;P.hidden=!P.hidden;hideGloss()}
+{const g=$('startPanel').querySelector('.mgrid'),odd=g.querySelectorAll('.mi:not(.wide)').length%2;  // fill the gap next to a lone item, else a full row
+ const b=document.createElement('button');b.className=odd?'mi':'mi wide';b.id='repBtn';b.textContent='문제 알리기';b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});$('startPanel').querySelector('.mgrid').append(b)}
 $('startBtn').addEventListener('click',toggleStart);$('startClose').addEventListener('click',()=>$('startPanel').hidden=true);
 $('startPanel').addEventListener('click',e=>{if(e.target.id==='startPanel'){$('startPanel').hidden=true;return}
  const mi=e.target.closest('.mi');if(mi&&!mi.classList.contains('toggle'))$('startPanel').hidden=true},true);  // capture: close the menu before the item opens its panel
@@ -842,6 +877,7 @@ document.addEventListener('contextmenu',e=>e.preventDefault());
 document.querySelector('.pad').addEventListener('touchstart',e=>{if(e.cancelable)e.preventDefault()},{passive:false});
 const KEYS={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right'};
 addEventListener('keydown',e=>{
+ if(e.target.closest&&e.target.closest('textarea,input'))return;  // typing a note, not playing
  if(KEYS[e.key]){e.preventDefault();if(dirPress(KEYS[e.key]))return;held=KEYS[e.key];return}
  if(choosing()&&/^[1-4]$/.test(e.key)){const b=choiceBtns()[+e.key-1];if(b){e.preventDefault();b.click()}return}
  if([' ','Enter','z','Z'].includes(e.key)){e.preventDefault();if(!e.repeat)interact();return}

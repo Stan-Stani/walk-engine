@@ -424,7 +424,7 @@ function startWalks(){
   const path=walkPath(n,w.from);if(path&&path.length>1)n.walk={path,t0:performance.now(),end:n.dir}});
 }
 function walkAt(n,t){ // → [x,y,dir,frame] while walking, null when arrived
- const w=n.walk;if(!w)return null;const p=(t-w.t0)/WALK_MS,i=Math.floor(p);
+ const w=n.walk;if(!w)return null;const p=Math.max(0,(t-w.t0)/WALK_MS),i=Math.floor(p);  // a frame can be stamped just before the walk began
  if(i>=w.path.length-1){n.walk=null;n.dir=w.end;return null}
  const [ax,ay]=w.path[i],[bx,by]=w.path[i+1],f=p-i;
  const dir=bx>ax?'right':bx<ax?'left':by>ay?'down':'up';

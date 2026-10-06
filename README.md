@@ -16,14 +16,30 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - Sitting: an NPC with `sit:true` (or a function) is drawn seated and doesn't turn to talk; `chair:` names a look (custom art) to sit on.
   A dialogue step `sit:{npc:'chairId'}` sits the player on that chair facing its direction (`sit:{x,y,dir,chair}` anywhere); the first
   arrow key stands them up, and the save keeps where they stood. Chair art options: `back` (bottom rows redrawn over the sitter: the
-  backrest of a chair facing away), `keep` (sitter rows kept, default 12 = head to belt), `drop` (px the sitter sinks, default 2).
+  backrest of a chair facing away), `keep` (sitter rows kept, default 12 = head to belt), `drop` (px the sitter sinks, default 2),
+  `lift` (px the whole seat rises, e.g. a stool pulled up to the table in the row above).
 - Camera: a step with `cam:[x,y]` glides the camera to that tile; `cam:null` (or the end of the conversation) brings it back.
+  During any conversation the camera also glides (never jumps) so the player and the speaker stay above the dialogue box. It
+  only moves when they would be covered, only ever further (no bobbing as the box grows line to line), may scroll past the
+  bottom map edge by what the box covers, and holds for a moment after the end so a follow-up note doesn't make it dip.
+- The ! / ? marker of the character you're talking to is hidden while you talk.
+- Review questions (the ? marker) are asked by the narrator, not in the NPC's voice: the sentences are generic examples.
+- Word-order tiles never start in the solved order.
+- Art transforms: `ART.rot(rows, q)` turns a pixel grid (array of strings of palette keys) clockwise by quarter turns (`-1` =
+  counter-clockwise), `ART.flipH` / `ART.flipV` mirror it, `ART.put(rows, pal, X, Y)` draws it top-down (no bottom-alignment, for
+  pieces of a tile). Draw a picture once, upright, and turn it to fit: e.g. 방과 후's 방송실 east windows show an upright street
+  turned with `ART.rot(street, 1)` (sky to the outer edge, road to the room); a west wall would use `-1`.
 - Word help (tap a word) stays open until ×, A, B or the next line. Word-order tiles: after a 4 s pause or a wrong tile, the next right
   tile gets the `hint` class (bobbing, via each game's shell CSS); no instruction text.
 - 디버그 (START menu, saved per game): adds a 건너뛰기 button to every conversation. It runs the conversation to the end with right
   answers and all its effects, and stops at a real choice (`choose`). For testing.
 
 ## Tools
+- `tools/ctl.mjs`: hands-on controller for playing a game like a player would (one phone-sized Chrome; each command presses keys,
+  walks, taps, or looks, then saves a screenshot and prints the visible text). From a game's repo root:
+  `node ../walk-engine/tools/ctl.mjs start ch1`, then `walk`, `key`, `tap`, `tapword`, `shot`, `stop`. `look` (around the player),
+  `look all`, or `look <col> <row> [w] [h]` save a close-up of the live game screen, pixel for pixel, unsmoothed: what a player
+  sees by holding the phone closer. Blind playtesters get this, not zoom.mjs (whose save-state specs need the chapter's internals).
 - `tools/zoom.mjs`: pixel inspector for sprite and tile art. From a game's repo root, after its build:
   `node ../walk-engine/tools/zoom.mjs spec.json out/`. The spec lists scenes (a chapter save to load, optional setup JS, a tile
   rectangle); each is read straight off the game canvas and blown up without smoothing (default 8×), plus a labelled `sheet.png`.

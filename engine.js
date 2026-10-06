@@ -128,6 +128,14 @@ function tile(x,y,X,Y,t){const c=at(x,y);const L=c!=null&&Z.legend[c];const fn=L
    A sprite is an array of equal-length strings; each char is a palette key ('.' = transparent).
    drawArt draws it with its feet on the tile's bottom edge, so tall sprites (16×24, 16×32) grow upward. */
 function shade(hex,k){const n=parseInt(hex.slice(1),16);const f=c=>Math.max(0,Math.min(255,Math.round(c*k)));return '#'+[(n>>16)&255,(n>>8)&255,n&255].map(c=>f(c).toString(16).padStart(2,'0')).join('')}
+/* art transforms: draw a picture once, upright, and turn it to fit (a view out of an east or west window, a chair turned around).
+   rows = an array of equal-length strings of palette keys. rot turns clockwise by quarter turns (q: 1, 2, 3, or -1 = counter-clockwise). */
+const ART={
+ rot:(rows,q=1)=>{q=((q%4)+4)%4;let a=rows;for(let i=0;i<q;i++){const h=a.length,w=a[0].length,o=[];for(let x=0;x<w;x++){let row='';for(let y=h-1;y>=0;y--)row+=a[y][x];o.push(row)}a=o}return a},
+ flipH:rows=>rows.map(r=>[...r].reverse().join('')),
+ flipV:rows=>rows.slice().reverse(),
+ /* draw rows top-down from (X,Y), no bottom-alignment: for pieces of tiles */
+ put:(rows,pal,X,Y)=>{for(let y=0;y<rows.length;y++)for(let x=0;x<rows[y].length;x++){const c=pal[rows[y][x]];if(c){g.fillStyle=c;g.fillRect(X+x,Y+y,1,1)}}}};
 function drawArt(rows,pal,X,Y,flip){
  const h=rows.length,w=rows[0].length,top=Y+16-h;
  for(let y=0;y<h;y++){const row=rows[y];for(let x=0;x<w;x++){const c=row[flip?w-1-x:x];if(c==='.')continue;const col=pal[c];if(col){g.fillStyle=col;g.fillRect(X+x,top+y,1,1)}}}
@@ -290,6 +298,7 @@ function drawChar(L,X,Y,dir,step){
 function artLift(L){const A=L&&L.art;if(!A)return 0;const rows=A.down||A.left||A.up;return Math.max(0,rows.length-16)}
 /* sitting: chair = a look whose art draws under the sitter. The sitter keeps its top art.keep rows (default 12: head to belt; 14
    adds the lap of someone facing the camera) and sinks art.drop px (default 2; facing a table, enough for the lap to meet it).
+   art.lift raises the whole seat, sitter included (a stool pulled up to the table in the row above).
    The chair's bottom art.back rows (backrest and legs of a chair facing away from the camera) draw again over the sitter.
    Chair art is bottom-aligned in the tile like every sprite, so it never reaches into the next row. */
 function drawSeated(L,X,Y,dir,chair){
@@ -297,6 +306,7 @@ function drawSeated(L,X,Y,dir,chair){
  const rows=A?(A[view]||A.down):humanArt(L,dir,0);
  let pal=A?A.pal:palCache.get(L);if(!pal){pal=humanPal(L);palCache.set(L,pal)}
  const C=chair&&chair.art,cr=C&&(C.down||C.up),cx=C?X+Math.floor((16-cr[0].length)/2):0,d=C&&C.drop!=null?C.drop:2,k=C&&C.keep||12;
+ if(C&&C.lift)Y-=C.lift;  /* lift: the whole seat sits higher, e.g. pulled up to the edge of the table above */
  if(C)drawArt(cr,C.pal,cx,Y,false);else shadow(X,Y);
  drawArt(rows.slice(0,k),pal,X+Math.floor((16-rows[0].length)/2),Y-16+k+d,dir==='right');
  if(C&&C.back)drawArt(cr.slice(-C.back),C.pal,cx,Y,false);
@@ -402,22 +412,41 @@ function update(dt,t){
 const dark=document.createElement('canvas');dark.width=cv.width;dark.height=cv.height;const dg=dark.getContext('2d');
 /* a scene can point the camera at a tile (step cam:[x,y]); it glides there, and back to the player when the step says cam:null
    or the conversation ends */
-let camT=null,camF=null,camLast=0;
+let camT=null,camF=null,camLast=0,talkCy=null,talkAt=0,talkExtra=0;
+/* during a conversation: the camera y that keeps the player and the speaker above the dialogue box, or null when they already
+   are. It only ever moves further (never back and forth as the box grows and shrinks line to line) until the conversation ends.
+   Near the bottom of a map it may scroll past the edge by as much as the box covers: that strip is behind the box. */
+function talkLift(cy,py){
+ const box=$('dlg');if(!dlg||box.hidden)return null;
+ const k=cv.clientHeight/cv.height;if(!k)return null;
+ /* the plain box: answer choices and word tiles make it taller only for a moment, and following them would leave the camera
+    high (off the map) once they close */
+ let extra=0;for(const id of ['choices','build']){const e=$(id);if(e&&!e.hidden)extra+=e.offsetHeight+7}
+ const top=(box.offsetTop+extra)/k-6;  // canvas px where the plain box starts, with a little air
+ talkExtra=Math.max(talkExtra,Math.round(VH*TS-top));
+ const rows=[py],n=dlg.npc;if(n&&NPCS.includes(n)&&(!n.hide||!n.hide()))rows.push(npcPos(n)[1]);
+ const y0=Math.min(...rows)*TS-10,y1=Math.max(...rows)*TS+16;  // the marker above the heads … the feet
+ if(y1-cy<=top)return null;
+ return y1-y0>top?y0:(y0+y1)/2-top/2;  // centred in the space above the box (or, if they don't fit, the top of them)
+}
 function render(t){
  const px=player.moving?player.fx+(player.x-player.fx)*player.t:player.x;
  const py=player.moving?player.fy+(player.y-player.fy)*player.t:player.y;
  const [fx,fy]=camT||[px,py];
  let cx=fx*TS+8-VW*TS/2,cy=fy*TS+8-VH*TS/2;
- cx=Math.max(0,Math.min(cx,MW*TS-VW*TS));cy=Math.max(0,Math.min(cy,MH*TS-VH*TS));
+ if(dlg)talkAt=t;else if(t-talkAt>700){talkCy=null;talkExtra=0}  /* held a moment after it ends: a follow-up note (단어 일지) doesn't make it dip and rise */
+ const cyMap=Math.max(0,Math.min(cy,MH*TS-VH*TS));  // where the camera would be without a conversation (inside the map)
+ if(!camT&&talkCy!=null||!camT&&dlg){const l=dlg?talkLift(cyMap,py):null;if(l!=null)talkCy=Math.max(talkCy??-1e9,l);if(talkCy!=null)cy=Math.max(cyMap,talkCy)}
+ cx=Math.max(0,Math.min(cx,MW*TS-VW*TS));cy=Math.max(0,Math.min(cy,MH*TS-VH*TS+(talkCy!=null?talkExtra:0)));
  const dt=Math.min(50,t-camLast);camLast=t;
- if(camT||camF){if(!camF)camF={...CAM};const k=1-Math.exp(-dt/180);camF.x+=(cx-camF.x)*k;camF.y+=(cy-camF.y)*k;
+ if(camT||camF||talkCy!=null){if(!camF)camF={...CAM};const k=1-Math.exp(-dt/(camT?180:260));  /* talk shifts glide a little slower */camF.x+=(cx-camF.x)*k;camF.y+=(cy-camF.y)*k;
   if(!camT&&Math.abs(cx-camF.x)<.5&&Math.abs(cy-camF.y)<.5)camF=null;else{cx=camF.x;cy=camF.y}}
  cx=Math.round(cx);cy=Math.round(cy);CAM={x:cx,y:cy};
  const x0=Math.floor(cx/TS),y0=Math.floor(cy/TS);
  for(let y=y0;y<=y0+VH;y++)for(let x=x0;x<=x0+VW;x++)tile(x,y,x*TS-cx,y*TS-cy,t);
  // the chair the player sits on is drawn with the player
  const ents=live().filter(n=>!(player.sit&&player.sit.npc===n)).map(n=>{const wk=walkAt(n,t);if(wk){const [wx,wy,wd,wf]=wk;return {y:wy,f:()=>drawChar(n.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)}}
-  const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):sitting(n)?drawSeated(n.look,X,Y,n.dir,n.chair):drawChar(n.look,X,Y,n.dir,0);if(!(player.x===nx&&player.y===ny-1))marker(X,Y-artLift(n.look),t,status(n))}}});  // no ! over the player standing just above
+  const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):sitting(n)?drawSeated(n.look,X,Y,n.dir,n.chair):drawChar(n.look,X,Y,n.dir,0);if(!(player.x===nx&&player.y===ny-1)&&!(dlg&&dlg.npc===n))marker(X,Y-artLift(n.look),t,status(n))}}});  // no ! over the player standing just above, nor over the one you're talking to
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
@@ -633,7 +662,7 @@ function confirmSel(){if(sel<0||performance.now()-choicesAt<450)return;const b=(
 function renderBuild(s){
  s.got=0;$('build').hidden=false;
  $('slots').innerHTML='<span class="ph">· · ·</span>';
- const order=shuffle(s.build.map((_,i)=>i));
+ let order;do order=shuffle(s.build.map((_,i)=>i));while(s.build.length>1&&order.every((v,i)=>v===i));  /* never start already solved */
  $('tiles').innerHTML=order.map(i=>`<button class="tile" data-i="${i}">${s.build[i]}</button>`).join('');
  $('tiles').querySelectorAll('.tile').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();pickTile(s,b)}));
  sel=-1;choicesAt=performance.now();markSel();hintTile(s,4000);
@@ -719,8 +748,9 @@ function reviewFor(words){ // pick a question for the weakest of these words
  const ws=[...words].sort((a,b)=>(isDue(b)-isDue(a))||(lv(a).b-lv(b).b));
  const w=ws[0];
  const qs=allQuestions().filter(q=>q.w===w);
- if(canSpeak()&&Math.random()<.35)return {listen:w,review:true};
- return {...qs[Math.random()*qs.length|0],review:true};
+ const narr={review:true,who:'…',ok:'맞아요!'};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
+ if(canSpeak()&&Math.random()<.35)return {listen:w,...narr};
+ return {...qs[Math.random()*qs.length|0],...narr};
 }
 function terminal(){
  const due=dueWords();

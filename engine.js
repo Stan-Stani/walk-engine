@@ -139,7 +139,7 @@ const HEAD={ // rows 0–7 by style and view (left view is flipped for right)
         left:['................','.....OOOOOO.....','....OHHHHHHO....','...OHHHHHhHHO...','...OSSHHHHHHO...','..OSESSSHHhHO...','...OSSSSSHHHO...','....OMSSSSSO....']},
  long:{down:['................','.....OOOOOO.....','....OHHHHHHO....','...OHHhHHhHHO...','..OHHSSSSSSHHO..','..OHSSESSESSHO..','..OHSSSSSSSSHO..','..OHHSSMMSSHHO..'],
         up:  ['................','.....OOOOOO.....','....OHHHHHHO....','...OHHhHHhHHO...','...OHHHHHHHHO...','..OHHhHHHHhHHO..','..OHHHHHHHHHHO..','..OHHHHHHHHHHO..'],
-        left:['................','.....OOOOOO.....','....OHHHHHHO....','...OHHHHHhHHO...','...OSSHHHHHHO...','..OSESSSHHhHHO..','...OSSSSHHHHHO..','....OMSSSOHHHO..']},
+        left:['................','.....OOOOOO.....','....OHHHHHHO....','...OHHHHHHHHO...','...OHHHHHhHHO...','..OSESSHHHhHO...','...OSSSSHHHHO...','....OMSSOHHHO...']},
  bald:{down:['................','.....OOOOOO.....','....OSSSSSSO....','...OSSWSSSSSO...','...OHSSSSSSHO...','...OSSESSESSO...','...OSSSSSSSSO...','....OSSMMSSO....'],
         up:  ['................','.....OOOOOO.....','....OSSSSSSO....','...OSSWSSSSSO...','...OHSSSSSSHO...','...OHHSSSSHHO...','...OHHHHHHHHO...','....OSSSSSSO....'],
         left:['................','.....OOOOOO.....','....OSSSSSSO....','...OSSSSSWSSO...','...OSSSSSSHHO...','..OSESSSSHHHO...','...OSSSSSHHHO...','....OMSSSSSO....']},
@@ -148,7 +148,7 @@ const HEAD={ // rows 0–7 by style and view (left view is flipped for right)
         left:['.........OHO....','.....OOOOHHO....','....OHHHHHHO....','...OHHHHHhHHO...','...OSSHHHHHHO...','..OSESSSHHhHO...','...OSSSSSHHHO...','....OMSSSSSO....']},
  bob:{down:['................','.....OOOOOO.....','....OHHHHHHO....','...OHHHHHHHHO...','...OHHhHHhHHO...','..OHSSESSESSHO..','..OHSSSSSSSSHO..','..OHHSSMMSSHHO..'],
         up:  ['................','.....OOOOOO.....','....OHHHHHHO....','...OHHhHHhHHO...','...OHHHHHHHHO...','..OHHhHHHHhHHO..','..OHHHHHHHHHHO..','..OHHHHHHHHHHO..'],
-        left:['................','.....OOOOOO.....','....OHHHHHHO....','...OHHHHHHHHO...','...OHHHHHhHHO...','..OSESSHHHhHHO..','...OSSSSHHHHHO..','....OMSSSOHHHO..']},
+        left:['................','.....OOOOOO.....','....OHHHHHHO....','...OHHHHHHHHO...','...OHHHHHhHHO...','..OSESSHHHhHO...','...OSSSSHHHHO...','....OMSSOHHHO...']},
  spiky:{down:['....O..O..O.....','...OHOOHOOHO....','...OHHHHHHHHO...','...OHHhHHhHHO...','...OHSSSSSSHO...','...OSSESSESSO...','...OSSSSSSSSO...','....OSSMMSSO....'],
         up:  ['....O..O..O.....','...OHOOHOOHO....','...OHHHHHHHHO...','...OHHhHHhHHO...','...OHHHHHHHHO...','...OHhHHHHhHO...','...OHHHHHHHHO...','....OSSSSSSO....'],
         left:['.....O..O..O....','....OHOOHOOHO...','....OHHHHHHHO...','...OHHHHHhHHO...','...OSSHHHHHHO...','..OSESSSHHhHO...','...OSSSSSHHHO...','....OMSSSSSO....']},
@@ -173,8 +173,8 @@ function humanArt(L,dir,step){
  if(L.coat){for(const y of [4,5])body[y]=body[y].replace(/P/g,'C').replace(/p/g,'c')}
  if(!L.belt)body=body.map(rw=>rw.replace(/B/g,'C'));
  if(style==='bob'&&view!=='left'){set(body,0,3,'H');set(body,0,12,'H');if(view==='up')for(let x=4;x<12;x++)set(body,0,x,'H')}
- if(style==='long'&&view!=='left'){for(const y of [0,1]){set(body,y,3,'H');set(body,y,12,'H')}if(view==='up')for(let x=4;x<12;x++){set(body,0,x,'H');set(body,1,x,'H')}}
- if(style==='long'&&view==='left'){set(body,0,10,'H');set(body,1,10,'H')}
+ if(style==='long'&&view!=='left'){for(const y of [0,1,2]){set(body,y,3,'H');set(body,y,12,'H')}if(view==='down'){set(body,0,4,'H');set(body,0,11,'H')}if(view==='up')for(let x=4;x<12;x++){set(body,0,x,'H');set(body,1,x,'H')}}
+ if(style==='long'&&view==='left'){for(const y of [0,1])for(const x of [9,10])set(body,y,x,'H');set(body,2,10,'H')}
  if(L.lashes&&view==='down')head=head.map(rw=>rw.replace(/SESSES/,'EESSEE'));
  if(L.lips)head=head.map(rw=>rw.replace(/M/g,'L'));
  if(L.beard){if(view==='down'){head[6]='...OSDDDDDDSO...';head[7]='....ODDDDDDO....';body[0]='...OODDDDDDOO...'}else if(view==='left'){head[6]='...ODDDDSHHHO...';head[7]='....ODDDDSO.....'}}

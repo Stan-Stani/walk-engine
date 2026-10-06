@@ -288,6 +288,19 @@ function drawChar(L,X,Y,dir,step){
 /* custom sprites: look.art = {pal:{key:color}, down:[rows], up:[rows], left:[rows], walk?:{down:[[rows],[rows]],…}} — any height ≤ 32 */
 /* how far above a 16px head the quest marker must sit for a taller custom sprite */
 function artLift(L){const A=L&&L.art;if(!A)return 0;const rows=A.down||A.left||A.up;return Math.max(0,rows.length-16)}
+/* sitting: chair = a look whose art draws under the sitter. The sitter keeps its top art.keep rows (default 12: head to belt; 14
+   adds the lap of someone facing the camera) and sinks art.drop px (default 2; facing a table, enough for the lap to meet it).
+   The chair's bottom art.back rows (backrest and legs of a chair facing away from the camera) draw again over the sitter.
+   Chair art is bottom-aligned in the tile like every sprite, so it never reaches into the next row. */
+function drawSeated(L,X,Y,dir,chair){
+ const view=dir==='right'?'left':dir,A=L.art;
+ const rows=A?(A[view]||A.down):humanArt(L,dir,0);
+ let pal=A?A.pal:palCache.get(L);if(!pal){pal=humanPal(L);palCache.set(L,pal)}
+ const C=chair&&chair.art,cr=C&&(C.down||C.up),cx=C?X+Math.floor((16-cr[0].length)/2):0,d=C&&C.drop!=null?C.drop:2,k=C&&C.keep||12;
+ if(C)drawArt(cr,C.pal,cx,Y,false);else shadow(X,Y);
+ drawArt(rows.slice(0,k),pal,X+Math.floor((16-rows[0].length)/2),Y-16+k+d,dir==='right');
+ if(C&&C.back)drawArt(cr.slice(-C.back),C.pal,cx,Y,false);
+}
 function drawCustom(L,X,Y,dir,step){
  const A=L.art,view=dir==='right'?'left':dir;
  const rows=(step&&A.walk&&A.walk[view]&&A.walk[view][step-1])||A[view]||A.down;
@@ -332,6 +345,13 @@ const myLook=(base=CREW_LOOK)=>me?{...base,...me}:base;   // a chapter's PLAYER 
 const player={x:0,y:0,dir:'down',moving:false,t:0,fx:0,fy:0,step:0,look:myLook()};
 let held=null,warping=false,lockMsgAt=0;
 function npcPos(n){return n.pos?n.pos():[n.x,n.y]}
+const sitting=n=>typeof n.sit==='function'?n.sit():!!n.sit;  // NPC sit: true | fn → drawn seated (on n.chair, a look, if given), and doesn't turn to talk
+/* step sit:{npc} sits the player on that NPC's tile (a chair), facing its dir; sit:{x,y,dir,chair} anywhere. The first arrow key stands
+   them up. The saved position stays where they stood, so a reload never puts them inside the chair. */
+function sitDown(o){
+ const n=o.npc?C.NPC[o.npc]:null,[x,y]=n?npcPos(n):[o.x,o.y];
+ Object.assign(player,{x,y,dir:o.dir||(n&&(n.home||n.dir))||player.dir,moving:false,t:0,sit:{npc:n,chair:o.chair||(n&&n.look)||null}});
+}
 const live=()=>NPCS.filter(n=>!n.hide||!n.hide());
 const npcAt=(x,y)=>live().find(n=>{const [a,b]=npcPos(n);return a===x&&b===y});
 const warpAt=(x,y)=>Z.warps&&Z.warps[x+','+y];
@@ -342,6 +362,7 @@ const panelOpen=()=>(CREATOR&&!$('mePanel').hidden)||!$('startPanel').hidden||!$
 
 function tryMove(){
  if(player.moving||!held||dlg||panelOpen()||warping)return;
+ player.sit=null;
  player.dir=held;const [dx,dy]=D[held];const nx=player.x+dx,ny=player.y+dy;
  const w=warpAt(nx,ny);const lock=w&&w.lock&&w.lock();
  if(lock){if(performance.now()-lockMsgAt>1500){lockMsgAt=performance.now();sfx('lock');toast(lock)}return}
@@ -363,7 +384,7 @@ function loadZone(id,x,y,dir){
  ZID=id;Z=C.ZONES[id];state.zone=id;
  MAP=Z.map.map(row=>row.split(''));MW=MAP[0].length;MH=MAP.length;
  NPCS=Z.npcs.map(k=>C.NPC[k]);NPCS.forEach(n=>{n.home=n.home||n.dir;n.turnAt=performance.now()+2000+Math.random()*3000});
- Object.assign(player,{x,y,dir,moving:false,t:0});state.x=x;state.y=y;state.dir=dir;
+ Object.assign(player,{x,y,dir,moving:false,t:0,sit:null});camT=null;camF=null;state.x=x;state.y=y;state.dir=dir;
  petReset();pet.on=false;ghosts=[];
  $('reg').textContent=`${Z.reg} · ${CH.n} ${CH.title}`;showRoom(true);
 }
@@ -375,20 +396,28 @@ function showRoom(force){
 function update(dt,t){
  if(player.moving){player.t+=dt/(170*(Z.slow||1)); /* Z.slow > 1 = heavy gravity */if(player.t>=1){player.t=0;player.moving=false;if(!arrive())tryMove()}}
  else tryMove();
- if(!dlg)live().forEach(n=>{if(n.still||n.pos||n.walk)return;if(t>n.turnAt){const ds=['down','left','right',n.home,n.home];n.dir=ds[Math.random()*ds.length|0];n.turnAt=t+2500+Math.random()*3500}});
+ if(!dlg)live().forEach(n=>{if(n.still||n.pos||n.walk||sitting(n))return;if(t>n.turnAt){const ds=['down','left','right',n.home,n.home];n.dir=ds[Math.random()*ds.length|0];n.turnAt=t+2500+Math.random()*3500}});
  $('btnA').classList.toggle('ready',!dlg&&!player.moving&&!!facing());
 }
 const dark=document.createElement('canvas');dark.width=cv.width;dark.height=cv.height;const dg=dark.getContext('2d');
+/* a scene can point the camera at a tile (step cam:[x,y]); it glides there, and back to the player when the step says cam:null
+   or the conversation ends */
+let camT=null,camF=null,camLast=0;
 function render(t){
  const px=player.moving?player.fx+(player.x-player.fx)*player.t:player.x;
  const py=player.moving?player.fy+(player.y-player.fy)*player.t:player.y;
- let cx=px*TS+8-VW*TS/2,cy=py*TS+8-VH*TS/2;
+ const [fx,fy]=camT||[px,py];
+ let cx=fx*TS+8-VW*TS/2,cy=fy*TS+8-VH*TS/2;
  cx=Math.max(0,Math.min(cx,MW*TS-VW*TS));cy=Math.max(0,Math.min(cy,MH*TS-VH*TS));
+ const dt=Math.min(50,t-camLast);camLast=t;
+ if(camT||camF){if(!camF)camF={...CAM};const k=1-Math.exp(-dt/180);camF.x+=(cx-camF.x)*k;camF.y+=(cy-camF.y)*k;
+  if(!camT&&Math.abs(cx-camF.x)<.5&&Math.abs(cy-camF.y)<.5)camF=null;else{cx=camF.x;cy=camF.y}}
  cx=Math.round(cx);cy=Math.round(cy);CAM={x:cx,y:cy};
  const x0=Math.floor(cx/TS),y0=Math.floor(cy/TS);
  for(let y=y0;y<=y0+VH;y++)for(let x=x0;x<=x0+VW;x++)tile(x,y,x*TS-cx,y*TS-cy,t);
- const ents=live().map(n=>{const wk=walkAt(n,t);if(wk){const [wx,wy,wd,wf]=wk;return {y:wy,f:()=>drawChar(n.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)}}
-  const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):drawChar(n.look,X,Y,n.dir,0);if(!(player.x===nx&&player.y===ny-1))marker(X,Y-artLift(n.look),t,status(n))}}});  // no ! over the player standing just above
+ // the chair the player sits on is drawn with the player
+ const ents=live().filter(n=>!(player.sit&&player.sit.npc===n)).map(n=>{const wk=walkAt(n,t);if(wk){const [wx,wy,wd,wf]=wk;return {y:wy,f:()=>drawChar(n.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)}}
+  const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):sitting(n)?drawSeated(n.look,X,Y,n.dir,n.chair):drawChar(n.look,X,Y,n.dir,0);if(!(player.x===nx&&player.y===ny-1))marker(X,Y-artLift(n.look),t,status(n))}}});  // no ! over the player standing just above
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
@@ -397,7 +426,7 @@ function render(t){
   ents.push({y:qy-.01,f:()=>drawChar(C.FOLLOW.look,Math.round(qx*TS-cx),Math.round(qy*TS-cy-2),pet.dir,walk?3-walk:0)});
  }else pet.on=false;
  const plook=typeof C.PLAYER==='function'?(C.PLAYER()||myLook()):player.look; // PLAYER may be a function → the look can change mid-chapter (disguises)
- ents.push({y:py,f:()=>drawChar(plook,Math.round(px*TS-cx),Math.round(py*TS-cy-2),player.dir,walk)});
+ ents.push({y:py,f:()=>{const X=Math.round(px*TS-cx),Y=Math.round(py*TS-cy-2);player.sit?drawSeated(plook,X,Y,player.dir,player.sit.chair):drawChar(plook,X,Y,player.dir,walk)}});
  ents.sort((a,b)=>a.y-b.y).forEach(e=>e.f());
  // a legend entry's `front` tile (tree canopies) draws after the characters, unclipped: it overhangs and covers whoever walks behind it
  for(let y=y0-4;y<=y0+VH;y++)for(let x=x0-4;x<=x0+VW;x++){const c=at(x,y),L=c!=null&&Z.legend[c];if(L&&L.front&&TILES[L.front])TILES[L.front](x*TS-cx,y*TS-cy,x,y,t)}
@@ -458,6 +487,8 @@ function show(s){
  lastLines.push(((s.who||dlg.name||'')+': '+plain(s.say||s.ask||'')).slice(0,300));if(lastLines.length>3)lastLines.shift();
  if(s.set){s.set();save()}
  if(s.walk||s.leave)queueWalks(s);
+ if(s.sit)sitDown(s.sit);
+ if('cam' in s)camT=s.cam||null;
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
  if(s.award)award(s.award);
@@ -495,12 +526,11 @@ function lexLookup(w){ // word as written → [[lemma,{k,e}],…]; falls back to
   if(L.map[pre])ls=L.map[pre];else{const t=tries.find(x=>hit(x));if(t)ls=[t]}}
  return (ls||[]).map(hit).filter(Boolean);
 }
-function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; English only behind the ? button
+function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; English only behind the ? button. Stays until ×, A, B or the next line
  if(!rows.length){hideGloss();toast('사전에 없는 말이에요.');return}
  const el=$('gloss');
  el.innerHTML=rows.map(([h,d])=>`<div class="gr"><b>${h}</b>${d.k}<span class="en" hidden>${d.e||''}</span></div>`).join('')+'<button class="q" type="button" aria-label="영어로 보기">?</button><button class="gx" type="button" aria-label="닫기">×</button>';
- el.classList.remove('pinned');el.hidden=false;el.querySelector('.q').addEventListener('click',e=>{e.stopPropagation();el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden);if(!el.classList.contains('pinned')){clearTimeout(popGloss.t);popGloss.t=setTimeout(hideGloss,8000)}});
- clearTimeout(popGloss.t);popGloss.t=setTimeout(hideGloss,6000);
+ el.hidden=false;el.querySelector('.q').addEventListener('click',e=>{e.stopPropagation();el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden)});
 }
 function typeText(text,done){
  clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.textContent='';let i=0;
@@ -606,12 +636,18 @@ function renderBuild(s){
  const order=shuffle(s.build.map((_,i)=>i));
  $('tiles').innerHTML=order.map(i=>`<button class="tile" data-i="${i}">${s.build[i]}</button>`).join('');
  $('tiles').querySelectorAll('.tile').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();pickTile(s,b)}));
- sel=-1;choicesAt=performance.now();markSel();
+ sel=-1;choicesAt=performance.now();markSel();hintTile(s,4000);
+}
+/* stuck on a word-order question? after a pause (or a wrong tile) the next right tile bobs: a hint without instruction text */
+function hintTile(s,ms){
+ clearTimeout(hintTile.t);$('tiles').querySelectorAll('.hint').forEach(b=>b.classList.remove('hint'));
+ if(s.got>=s.build.length)return;
+ hintTile.t=setTimeout(()=>{if(dlg&&dlg.cur===s&&building())$('tiles').querySelector(`.tile[data-i="${s.got}"]`)?.classList.add('hint')},ms);
 }
 function pickTile(s,b){
  const i=+b.dataset.i;
- if(i!==s.got){sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);b.classList.remove('bad');void b.offsetWidth;b.classList.add('bad');return}
- sfx('move');s.got++;b.classList.add('used');b.classList.remove('sel');
+ if(i!==s.got){sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);b.classList.remove('bad');void b.offsetWidth;b.classList.add('bad');hintTile(s,1200);return}
+ sfx('move');s.got++;b.classList.add('used');b.classList.remove('sel');hintTile(s,4000);
  if(s.got===1)$('slots').innerHTML='';
  $('slots').insertAdjacentHTML('beforeend',`<span class="t">${s.build[i]}</span>`);
  if(s.got===s.build.length){
@@ -659,7 +695,7 @@ function advance(){
  show(dlg.steps[dlg.i]);
 }
 function closeDialog(){
- dlg=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
+ dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
 }
@@ -720,7 +756,7 @@ function interact(){
  const F=facing();if(!F)return;
  if(F.n){
   const n=F.n;
-  if(!n.pos){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}
+  if(!n.pos&&!sitting(n)){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}
   let steps=n.script?n.script():null,isReview=false;
   if(!steps){
    if(n.badge&&n.badge.every(has)){steps=[...says(n.after),reviewFor(n.badge)];isReview=true}
@@ -802,9 +838,7 @@ $('btnA').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
 $('btnB').addEventListener('pointerdown',e=>{e.preventDefault();cancel()});
 $('dlg').addEventListener('click',e=>{const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.textContent);return}if(e.target.closest('#spk'))return;advance()});
 $('spk').addEventListener('click',e=>{e.stopPropagation();if(dlg)speak(dlg.cur.listen||dlg.cur.say||dlg.cur.ask||'')});
-$('gloss').addEventListener('click',e=>{ // tap the definition to keep it (× closes); B closes too
- if(e.target.closest('.gx')){hideGloss();return}if(e.target.closest('.q'))return;
- clearTimeout(popGloss.t);$('gloss').classList.add('pinned')});
+$('gloss').addEventListener('click',e=>{if(e.target.closest('.gx'))hideGloss()});  // × closes; A and B close too
 $('choices').addEventListener('pointerdown',e=>{const b=e.target.closest('.choice');if(b){sel=choiceBtns().indexOf(b);markSel()}});
 $('logBtn').addEventListener('click',()=>{showEn=false;openPanel()});
 $('talkBtn').addEventListener('click',openTalk);
@@ -879,6 +913,28 @@ $('tapBtn').addEventListener('click',openTaps);$('tapClose').addEventListener('c
 $('tapSortT').addEventListener('click',()=>{tapSort='t';openTaps()});$('tapSortN').addEventListener('click',()=>{tapSort='n';openTaps()});
 $('tapPanel').addEventListener('click',e=>{if(e.target.id==='tapPanel'){closeTaps();return}const p=e.target.closest('.tp');if(p){const en=p.querySelector('.tpe');en.hidden=!en.hidden}});$('talkClose').addEventListener('click',closeTalk);
 $('talkPanel').addEventListener('click',e=>{if(e.target.id==='talkPanel'){closeTalk();return}const gl=e.target.closest('.gl');if(gl){showGloss(gl.dataset.k);return}const w=e.target.closest('.w');if(w)showWord(w.textContent)});
+/* debug (START → 디버그, saved per game): a 건너뛰기 button on every conversation runs it to the end — right answers, finished word
+   orders, every flag / item / word it sets, quietly — and stops at a real decision (a plain choice like "2교시로 갈까요?"). For testing. */
+let debugOn=store.get(KEY('debug'))==='1';
+function skipTalk(){
+ const snd=soundOn;soundOn=false;
+ for(let n=0;dlg&&n<500;n++){
+  if(typing&&!typing.finished)typing.fin();
+  const s=dlg.cur;
+  if(s.choose)break;
+  if(s.ask&&!dlg.next){choose(s,s.opts.findIndex(o=>o[1]));continue}
+  if(s.build&&!dlg.next){for(let i=s.got;i<s.build.length;i++)pickTile(s,$('tiles').querySelector(`.tile[data-i="${i}"]`));continue}
+  advance();
+ }
+ soundOn=snd;if(TTS)try{speechSynthesis.cancel()}catch(e){}
+}
+(()=>{const grid=document.querySelector('#startPanel .mgrid');if(!grid)return;
+ grid.insertAdjacentHTML('beforeend','<button class="mi toggle" id="dbgBtn" aria-pressed="false">디버그</button>');
+ $('spk').insertAdjacentHTML('beforebegin','<button class="spk" id="skipBtn" type="button" hidden style="width:auto;padding:0 8px;margin-left:auto;margin-right:6px;font-size:.8rem;font-weight:700">건너뛰기</button>');
+ const upd=()=>{$('dbgBtn').setAttribute('aria-pressed',debugOn?'true':'false');$('skipBtn').hidden=!debugOn};upd();
+ $('dbgBtn').addEventListener('click',()=>{debugOn=!debugOn;store.set(KEY('debug'),debugOn?'1':'0');upd();sfx('ok');toast(debugOn?'디버그: 대화에 건너뛰기 버튼':'디버그 꺼짐')});
+ $('skipBtn').addEventListener('click',e=>{e.stopPropagation();skipTalk()});
+})();
 $('sndBtn').addEventListener('click',()=>{soundOn=!soundOn;store.set(KEY('sound'),soundOn?'1':'0');updateSound();sfx('ok')});
 $('readBtn').addEventListener('click',()=>{
  if(!canSpeak()){toast('이 기기에는 한국어 음성이 없어요.');return}

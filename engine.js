@@ -217,7 +217,7 @@ function portraitGrid(L,face,open){
  if(style==='long'){top();rect(12,12,4,16,hr);rect(32,12,4,16,hr);rect(15,13,18,3,hr)}
  if(style==='bob'){top();rect(13,13,22,4,hr);rect(12,13,4,16,hr);rect(32,13,4,16,hr);rect(13,28,3,2,hrS);rect(32,28,3,2,hrS)}
  if(style==='bun'){top();oval(24,4.5,4.5,4,hr);rect(14,13,3,4,hr);rect(31,13,3,4,hr)}
- if(style==='spiky'){top();for(let k=0;k<6;k++){const x=13+k*4;for(let y=0;y<5;y++)rect(x+y/2|0,4+y,4-y,1,hr)}rect(13,13,22,2,hr)}
+ if(style==='spiky'){top();for(let k=0;k<6;k++){const x=13+k*4;for(let y=0;y<5;y++){const w=Math.min(4,y+1);rect(x+((4-w)/2|0),4+y,w,1,hr)}}rect(13,13,22,2,hr)}  // spikes point up: a 1px tip widening to the head
  if(style==='bald'){rect(12,17,3,7,hr);rect(33,17,3,7,hr)}
  if(L.cap){oval(24,12,12,7,L.cap,0,13);rect(12,12,24,2,L.cap);rect(24,13,14,2,shade(L.cap,.75))}
  // face
@@ -396,6 +396,8 @@ function render(t){
  const plook=typeof C.PLAYER==='function'?(C.PLAYER()||myLook()):player.look; // PLAYER may be a function → the look can change mid-chapter (disguises)
  ents.push({y:py,f:()=>drawChar(plook,Math.round(px*TS-cx),Math.round(py*TS-cy-2),player.dir,walk)});
  ents.sort((a,b)=>a.y-b.y).forEach(e=>e.f());
+ // a legend entry's `front` tile (tree canopies) draws after the characters, unclipped: it overhangs and covers whoever walks behind it
+ for(let y=y0-4;y<=y0+VH;y++)for(let x=x0-4;x<=x0+VW;x++){const c=at(x,y),L=c!=null&&Z.legend[c];if(L&&L.front&&TILES[L.front])TILES[L.front](x*TS-cx,y*TS-cy,x,y,t)}
  /* lights out in a broken room: everything goes dark except a small circle around the player */
  const dk=Z.dark&&Z.dark();
  if(dk){
@@ -872,7 +874,8 @@ $('resetBtn').addEventListener('click',()=>{
  const b=$('resetBtn');
  if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='한 번 더 누르면 지워져요';clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent='처음부터'},3000);return}
  b.classList.remove('armed');b.textContent='처음부터';
- state=fresh();state.seenIntro=true;save();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;toast('처음부터 시작해요.');
+ state=fresh();state.seenIntro=true;save();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
+ setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);  // starting over replays the intro, like a first start
 });
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.querySelector('.pad').addEventListener('touchstart',e=>{if(e.cancelable)e.preventDefault()},{passive:false});

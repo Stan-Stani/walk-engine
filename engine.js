@@ -466,7 +466,7 @@ function show(s){
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;
  const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
  if(!s.build)logTalk(s.who||dlg.name,text);
- typeText(text,()=>{if(s.ask)renderChoices(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
+ typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)renderChoices(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);
  if(readOn&&!s.listenOnly)speak(s.listen?'':text);
  if(s.listen)setTimeout(()=>speak(s.listen),readOn?1200:150);
@@ -580,6 +580,20 @@ function renderChoices(s){
   b.addEventListener('click',e=>{e.stopPropagation();if(defined){defined=false;return}choose(s,+b.dataset.i)})});
  sel=-1;choicesAt=performance.now();markSel();  // nothing selected: A can't answer by accident
 }
+/* a plain choice (not a quiz): each button closes the conversation and runs its action, e.g. going on to the next chapter */
+function renderPick(s){
+ const box=$('choices');box.hidden=false;
+ box.innerHTML=s.choose.map(([label],i)=>`<button class="choice" data-i="${i}">${label}</button>`).join('');
+ box.querySelectorAll('.choice').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const fn=s.choose[+b.dataset.i][1];
+  box.hidden=true;box.innerHTML='';sfx('ok');closeDialog();if(fn)setTimeout(fn,150)}));
+ sel=-1;choicesAt=performance.now();markSel();
+}
+/* the gate at the end of a chapter: "go on to the next one?" (nothing after the last chapter) */
+function nextChapterAsk(line){
+ const i=CHAPTERS.findIndex(c=>c.id===CH.id),nx=CHAPTERS[i+1];if(!nx)return line;
+ const ro=(w=>{const c=w.charCodeAt(w.length-1)-0xAC00,b=c>=0&&c<11172?c%28:0;return b===0||b===8?'로':'으로'})(nx.n);  // 2교시로, 2장으로
+ return {steps:[{say:(line?line+' ':'')+nx.n+ro+' 갈까요?',choose:[[nx.n+ro+' 가요',()=>{boot(nx.id);sfx('door')}],['아직이요',null]]}]};
+}
 function markSel(){const bs=choosing()?choiceBtns():tileBtns();bs.forEach((b,i)=>b.classList.toggle('sel',i===sel));bs[sel]?.focus({preventScroll:true});bs[sel]?.scrollIntoView({block:'nearest'})}
 function moveSel(d){if(performance.now()-choicesAt<450)return;  // keys still held from walking don't move a fresh question's selection
  const n=(choosing()?choiceBtns():tileBtns()).length;if(!n)return;sel=sel<0?(d>0?0:n-1):(sel+d+n)%n;markSel();sfx('move')}
@@ -637,7 +651,7 @@ function choose(s,i){
 function advance(){
  if(!dlg)return;
  if(typing&&!typing.finished){typing.fin();return}
- if(dlg.cur.ask||dlg.cur.build)return;
+ if(dlg.cur.ask||dlg.cur.build||dlg.cur.choose)return;
  if(dlg.next){const n=dlg.next;dlg.next=null;if(n!=='advance'){show(n);return}}
  if(dlg.cur.finale){closeDialog();finish();return}
  dlg.i++;
@@ -694,7 +708,7 @@ function facing(){
  const w=warpAt(tx,ty);if(w&&w.lock&&w.lock())return {spot:w.lock()};
  /* things: a line for every tile of a kind (Z.things[char] = text | [variants, picked by position] | fn(x,y) → either) */
  const th=Z.things&&Z.things[at(tx,ty)],tv=typeof th==='function'?th(tx,ty):th;
- if(tv)return {spot:Array.isArray(tv)?tv[(tx*7+ty*13)%tv.length]:tv};
+ if(tv)return {spot:Array.isArray(tv)?tv[(tx*7+ty*13)%tv.length]:tv};  // tv may also be {steps:[…]} (a conversation)
  return null;
 }
 function interact(){
@@ -716,7 +730,7 @@ function interact(){
  }
  if(F.pet){openDialog(C.FOLLOW.name,C.FOLLOW.talk());return}
  if(F.term){openDialog(TERM.name,terminal(),{review:true});return}
- if(F.spot){openDialog('…',says(F.spot))}
+ if(F.spot){openDialog('…',F.spot.steps||says(F.spot))}
 }
 
 function award(words){
@@ -734,7 +748,7 @@ function award(words){
 }
 function finish(){
  $('fade').classList.add('on');sfx('star');
- setTimeout(()=>{$('fade').classList.remove('on');openDialog('…',says(C.DONE))  /* the ending is narration */},900);
+ setTimeout(()=>{$('fade').classList.remove('on');const nx=nextChapterAsk('');openDialog('…',says(C.DONE).concat(nx.steps||[]))  /* the ending is narration, then: on to the next chapter? */},900);
 }
 let toastT;function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2400)}
 

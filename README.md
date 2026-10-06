@@ -12,3 +12,4 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   `to` (a door, the map edge, up a tree) and is gone. Both take one object or a list.
 - 문제 알리기 (START menu, added by the engine): game or Korean problem, plus a note. Context is attached automatically: chapter, room, position, objective, the last lines and the last looked-up word. 보내기 links to the word-reports inbox (`https://seldoncortex.com/word-reports/#…`); see the word-reports repo.
 - Front layer: a legend entry can name `front:'tileName'`. That tile function runs after the characters, without clipping, so a tree canopy can overhang the row above and cover the player walking behind it.
+- Choices that aren't quizzes: a step with `choose:[[label, fn|null], …]` shows buttons, closes the conversation and runs `fn`. An inspect line (spots/things) may be `{steps:[…]}`. `nextChapterAsk(line)` builds the end-of-chapter "go on to the next one?" prompt for a gate.

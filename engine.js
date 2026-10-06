@@ -257,6 +257,9 @@ function drawPortrait(cv,L,face,open){
 function lookFor(who){ // speaker name → look: an NPC of this chapter with that name
  if(!who||who==='…')return null;
  const ok=L=>L&&(L.art||(L.skin&&L.hair&&L.shirt))?L:null;  // humans and custom sprites get a portrait; simple robots (kind:'andy') don't
+ // the character you're talking to first (names like '1학년 학생' are shared), then one in this room, then anyone in the chapter
+ if(dlg&&dlg.npc&&dlg.npc.name===who&&ok(dlg.npc.look))return dlg.npc.look;
+ for(const n of live())if(n.name===who&&ok(n.look))return n.look;
  for(const n of Object.values(C.NPC||{}))if(n.name===who&&ok(n.look))return n.look;
  if(C.FOLLOW&&C.FOLLOW.name===who)return ok(C.FOLLOW.look);
  return null;

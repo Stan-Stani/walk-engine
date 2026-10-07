@@ -427,6 +427,9 @@ let camT=null,camF=null,camLast=0,talkCy=null,talkAt=0,talkExtra=0;
 /* during a conversation: the camera y that keeps the player and the speaker above the dialogue box, or null when they already
    are. It only ever moves further (never back and forth as the box grows and shrinks line to line) until the conversation ends.
    Near the bottom of a map it may scroll past the edge by as much as the box covers: that strip is behind the box. */
+/* canvas px where the plain dialogue box starts (choices and word tiles don't count), with air for one more line; null when no box */
+function boxTop(){const box=$('dlg');if(!dlg||box.hidden)return null;const k=cv.clientHeight/cv.height;if(!k)return null;
+ let extra=0;for(const id of ['choices','build']){const e=$(id);if(e&&!e.hidden)extra+=e.offsetHeight+7}return (box.offsetTop+extra)/k-6-14}
 function talkLift(cy,py){
  const box=$('dlg');if(!dlg||box.hidden)return null;
  const k=cv.clientHeight/cv.height;if(!k)return null;
@@ -448,7 +451,8 @@ function render(t){
  if(dlg)talkAt=t;else if(talkCy!=null&&t-talkAt>700){talkCy=null;talkExtra=0;camF={...CAM}}  // glide back, never snap  /* held a moment after it ends: a follow-up note (단어 일지) doesn't make it dip and rise */
  const cyMap=Math.max(0,Math.min(cy,MH*TS-VH*TS));  // where the camera would be without a conversation (inside the map)
  if(!camT&&talkCy!=null||!camT&&dlg){const l=dlg?talkLift(cyMap,py):null;if(l!=null)talkCy=Math.max(talkCy??-1e9,l);if(talkCy!=null)cy=Math.max(cyMap,talkCy)}
- cx=Math.max(0,Math.min(cx,MW*TS-VW*TS));cy=Math.max(0,Math.min(cy,MH*TS-VH*TS+(talkCy!=null?talkExtra:0)));
+ let camLift=false;if(camT&&dlg){const top=boxTop();if(top!=null){talkExtra=Math.max(talkExtra,Math.round(VH*TS-top));cy=fy*TS+8-top/2;camLift=true}}  // a scene's camera target sits in the space above the dialogue box, not behind it
+ cx=Math.max(0,Math.min(cx,MW*TS-VW*TS));cy=Math.max(0,Math.min(cy,MH*TS-VH*TS+(talkCy!=null||camLift?talkExtra:0)));
  const dt=Math.min(50,t-camLast);camLast=t;
  if(camT||camF||talkCy!=null){if(!camF)camF={...CAM};const k=1-Math.exp(-dt/(camT?180:260));  /* talk shifts glide a little slower */camF.x+=(cx-camF.x)*k;camF.y+=(cy-camF.y)*k;
   if(!camT&&Math.abs(cx-camF.x)<.5&&Math.abs(cy-camF.y)<.5)camF=null;else{cx=camF.x;cy=camF.y}}

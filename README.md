@@ -21,8 +21,11 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   `lift` (px the whole seat rises, e.g. a stool pulled up to the table in the row above).
 - Camera: a step with `cam:[x,y]` glides the camera to that tile; `cam:null` (or the end of the conversation) brings it back.
   During any conversation the camera also glides (never jumps) so the player and the speaker stay above the dialogue box. It
-  only moves when they would be covered, only ever further (no bobbing as the box grows line to line), may scroll past the
-  bottom map edge by what the box covers, and holds for a moment after the end so a follow-up note doesn't make it dip.
+  only moves when they would be covered, only ever further (no bobbing as the box grows line to line), and holds for a moment
+  after the end so a follow-up note doesn't make it dip. If keeping them above the box would scroll past the bottom of the map,
+  the box moves to the top of the screen for that conversation instead (`.dlg.attop`; toasts and word help move down) and the
+  camera stays in the room.
+- Answer choices (shell CSS): side by side when they fit, three short answers on one line, else two per row; toasts at the top edge.
 - The ! / ? marker of the character you're talking to is hidden while you talk.
 - Review questions (the ? marker) are asked by the narrator, not in the NPC's voice: the sentences are generic examples.
 - Praise after an answer: a question step's NPC repeats the line with "맞아요!" (or `ok:`) in front, as a reply to you. When the

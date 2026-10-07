@@ -442,6 +442,7 @@ function boxTop(){const box=$('dlg');if(!dlg||box.hidden)return null;const k=cv.
  let extra=0;for(const id of ['choices','build']){const e=$(id);if(e&&!e.hidden)extra+=e.offsetHeight+7}return (box.offsetTop+extra)/k-6-14}
 function talkLift(cy,py){
  const box=$('dlg');if(!dlg||box.hidden)return null;
+ if(dlg.atTop)return null;  // the box went to the top for this conversation: the camera stays put
  const k=cv.clientHeight/cv.height;if(!k)return null;
  /* the plain box: answer choices and word tiles make it taller only for a moment, and following them would leave the camera
     high (off the map) once they close */
@@ -451,7 +452,11 @@ function talkLift(cy,py){
  const rows=[py],n=dlg.npc;if(n&&NPCS.includes(n)&&(!n.hide||!n.hide()))rows.push(npcPos(n)[1]);
  const y0=Math.min(...rows)*TS-10,y1=Math.max(...rows)*TS+16;  // the marker above the heads … the feet
  if(y1-cy<=top)return null;
- return y1-y0>top?y0:(y0+y1)/2-top/2;  // centred in the space above the box (or, if they don't fit, the top of them)
+ const lift=y1-y0>top?y0:(y0+y1)/2-top/2;  // centred in the space above the box (or, if they don't fit, the top of them)
+ /* lifting that far would scroll past the bottom of the map (a black band under the room): instead the box moves to the top of the
+    screen for this conversation and the camera stays in the room, as Undertale does. The shell styles .dlg.attop. */
+ if(lift>MH*TS-VH*TS+.5){dlg.atTop=true;box.classList.add('attop');talkExtra=0;return null}
+ return lift;
 }
 function render(t){
  const px=player.moving?player.fx+(player.x-player.fx)*player.t:player.x;
@@ -779,7 +784,7 @@ function advance(){
 }
 let closedAt=0;
 function closeDialog(){
- closedAt=performance.now();dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
+ closedAt=performance.now();dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
 }

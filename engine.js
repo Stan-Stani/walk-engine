@@ -340,7 +340,7 @@ function petReset(){pet.x=pet.fx=player.x;pet.y=pet.fy=player.y;pet.dir=player.d
 
 function marker(X,Y,t,st){
  if(!st)return;
- if(Y<-12)return;Y=Math.max(Y,11);  // keep it on screen for someone in the top row (not for someone off it)
+ if(Y<-12)return;if(Y<11){X+=11;Y=11}  // someone half off the top: the marker beside their head (on screen, not on their face)
  const bob=Math.round(Math.sin(t/220)*1.5);
  if(st==='todo'){r(X+6,Y-9+bob,4,8,'#1B1E2B');r(X+7,Y-8+bob,2,4,'#E8962A');r(X+7,Y-3+bob,2,1,'#E8962A')}
  else if(st==='review'){const y=Y-10+bob;r(X+5,y,6,9,'#1B1E2B');r(X+6,y+1,4,7,'#69CFD8');r(X+7,y+2,2,1,'#0F141A');r(X+8,y+3,1,1,'#0F141A');r(X+7,y+4,1,1,'#0F141A');r(X+7,y+6,1,1,'#0F141A')}
@@ -411,7 +411,7 @@ function loadZone(id,x,y,dir){
 let roomName='';
 function showRoom(force){
  let nm=Z.name;(Z.rooms||[]).forEach(([a,b,c,d,n])=>{if(player.x>=a&&player.x<=c&&player.y>=b&&player.y<=d)nm=n});
- if(nm!==roomName||force){roomName=nm;const z=$('zone');z.textContent=nm;z.classList.remove('dim');clearTimeout(showRoom.t);showRoom.t=setTimeout(()=>z.classList.add('dim'),2500)}  // fades so it never hides a ! marker
+ if(nm!==roomName||force){roomName=nm;const z=$('zone');z.textContent=nm;z.classList.remove('dim');clearTimeout(showRoom.t);showRoom.t=setTimeout(()=>z.classList.add('dim'),1500)}  // fades so it never hides a ! marker
 }
 function update(dt,t){
  if(player.moving){player.t+=dt/(170*(Z.slow||1)); /* Z.slow > 1 = heavy gravity */if(player.t>=1){player.t=0;player.moving=false;if(!arrive())tryMove()}}

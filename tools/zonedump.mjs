@@ -23,7 +23,8 @@ if(!ws){console.log('chrome did not start');process.exit(2)}
 const sock=new WebSocket(ws);await new Promise(r=>sock.onopen=r);let id=0;const pend={};
 sock.onmessage=m=>{const d=JSON.parse(m.data);if(d.id&&pend[d.id]){pend[d.id](d.result||d);delete pend[d.id]}};
 const cdp=(m,p={})=>new Promise(r=>{const i=++id;pend[i]=r;sock.send(JSON.stringify({id:i,method:m,params:p}))});
-const ev=async e=>{const r=await cdp('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description||'eval failed');return r.result?.value};
+const ev=async e=>{const r=await Promise.race([cdp('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true}),wait(60000).then(()=>{throw new Error('page did not answer in 60 s')})]);  // a hung page fails loudly instead of holding the lock
+ if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description||'eval failed');return r.result?.value};
 await wait(1500);
 const chs=(await ev('CHAPTERS.map(c=>c.id)')).filter(c=>!only||only.split(',').includes(c));
 const ME={hair:'#2A2F4A',skin:'#F1C9A5',shirt:'#F4F2EA',pants:'#2B3A5C',belt:'#9B2D30',style:'short'};

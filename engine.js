@@ -244,11 +244,12 @@ function portraitGrid(L,face,open){
  else if(face==='sad'){px(ex[0]-1,17,brow);rect(ex[0],16,3,1,brow);rect(ex[1]-1,16,3,1,brow);px(ex[1]+2,17,brow);for(const x of ex){rect(x,eyeY+1,2,2,D)}}
  else if(face==='angry'){rect(ex[0]-1,17,2,1,brow);rect(ex[0]+1,18,2,1,brow);rect(ex[1]-1,18,2,1,brow);rect(ex[1]+1,17,2,1,brow);for(const x of ex)rect(x,eyeY,2,2,D)}
  else if(face==='think'){brows(0,-1);for(const x of ex){rect(x,eyeY,2,2,D);px(x,eyeY,WH)}}
+ else if(face==='sleep'){brows(1,1);for(const x of ex)rect(x-1,eyeY+1,4,1,D)}  // asleep: eyes closed
  else {brows(0,0);for(const x of ex){rect(x,eyeY,2,3,D);px(x,eyeY,WH)}}
  if(L.lashes){px(ex[0]-1,eyeY-1,D);px(ex[1]+2,eyeY-1,D)}
  // mouth
  const lip=L.lips||shade(L.skin,.68),mo='#5A2230';
- if(open){if(face==='surprised')rect(22,27,4,4,mo);else{rect(21,27,6,3,mo);rect(22,29,4,1,'#D9707F')}}
+ if(open){if(face==='surprised'||face==='sleep')rect(22,27,face==='sleep'?3:4,face==='sleep'?3:4,mo);else{rect(21,27,6,3,mo);rect(22,29,4,1,'#D9707F')}}
  else if(face==='happy'){px(20,27,lip);rect(21,28,6,1,lip);px(27,27,lip)}
  else if(face==='sad'){px(20,29,lip);rect(21,28,6,1,lip);px(27,29,lip)}
  else if(face==='surprised')rect(23,27,2,2,mo);
@@ -465,7 +466,7 @@ function render(t){
  if(petOn()){
   if(!pet.on){petReset();pet.on=true}
   const qx=player.moving?pet.fx+(pet.x-pet.fx)*player.t:pet.x,qy=player.moving?pet.fy+(pet.y-pet.fy)*player.t:pet.y;
-  ents.push({y:qy-.01,f:()=>drawChar(C.FOLLOW.look,Math.round(qx*TS-cx),Math.round(qy*TS-cy-2),pet.dir,walk?3-walk:0)});
+  if(player.moving||pet.x!==player.x||pet.y!==player.y)ents.push({y:qy-.01,f:()=>drawChar(C.FOLLOW.look,Math.round(qx*TS-cx),Math.round(qy*TS-cy-2),pet.dir,walk?3-walk:0)});  // not while it shares your square
  }else pet.on=false;
  const plook=typeof C.PLAYER==='function'?(C.PLAYER()||myLook()):player.look; // PLAYER may be a function → the look can change mid-chapter (disguises)
  ents.push({y:py,f:()=>{const X=Math.round(px*TS-cx),Y=Math.round(py*TS-cy-2);player.sit?drawSeated(plook,X,Y,player.dir,player.sit.chair):drawChar(plook,X,Y,player.dir,walk)}});
@@ -731,7 +732,8 @@ function choose(s,i){
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';
   const line=s.done||(s.ask.includes('___')?answered(s.ask,o[0]):o[0]);
-  if(s.who==='나'&&!s.listenOnly||s.own||s.who==='…'){  /* own:1 — the line is the speaker's own words, not a reply to you */
+  const quiz=/["“][^"”]*___[^"”]*["”]/.test(s.ask)||s.listenOnly;
+  if(s.who==='나'&&!s.listenOnly||s.own||s.who==='…'||!quiz){  /* own:1 — the line is the speaker's own words, not a reply to you */
    // the toast is always praise; an ok: that isn't praise ("뭐?", "…") is the other person's reaction, so they say it next
    const react=s.ok&&!/^(맞아|정답|좋아|딩동댕)/.test(s.ok)?s.ok:null;
    toast(react?(dlg.npc&&dlg.npc.banmal?'맞아!':'맞아요!'):okWord(s));show({who:s.who||dlg.name,say:line});
@@ -746,7 +748,7 @@ function advance(){
  if(typing&&!typing.finished){typing.fin();return}
  if(dlg.cur.ask||dlg.cur.build||dlg.cur.choose)return;
  if(dlg.next){const n=dlg.next;dlg.next=null;if(n!=='advance'){show(n);return}}
- if(dlg.cur.finale){closeDialog();finish();return}
+ if(dlg.cur.finale){const p=pending;pending=null;closeDialog();finish(p);return}  // a note still waiting (20/20 words!) goes before the ending, not under its fade
  dlg.i++;
  if(dlg.i>=dlg.steps.length){closeDialog();return}
  show(dlg.steps[dlg.i]);
@@ -767,7 +769,7 @@ function cancel(){
  if(choosing()||building()){speak(dlg.cur.listen||dlg.cur.ask||'');return} // B never throws away a question; it replays it
  if(dlg)closeDialog();
 }
-const says=a=>(Array.isArray(a)?a:[a]).map(t=>({say:t}));
+const says=a=>(Array.isArray(a)?a:[a]).map(t=>typeof t==='string'?{say:t}:t);  // a line, or a full step (set:, sfx:, …)
 
 function allQuestions(){
  const out=[...(C.BANK||[])];Object.keys(C.Q).forEach(k=>{if(k!=='cafe')out.push(...C.Q[k])});return out;
@@ -847,9 +849,9 @@ function award(words){
  if(firstTime(perfect.length===nw.length?'awardPerfect':'awardMissed'))dlg.steps.splice(dlg.i+1,0,note);
  if(state.badges.length>=C.WORDS.length&&!state.f.allWords){state.f.allWords=1;save();pending=says([`단어 ${C.WORDS.length}개를 다 모았어요!`,`이제 ${TERM.name}에서 복습하면 ★가 생겨요.`])}
 }
-function finish(){
+function finish(pre){
  $('fade').classList.add('on');sfx('star');
- setTimeout(()=>{$('fade').classList.remove('on');const nx=nextChapterAsk('');openDialog('…',says(C.DONE).concat(nx.steps||[]))  /* the ending is narration, then: on to the next chapter? */},900);
+ setTimeout(()=>{$('fade').classList.remove('on');const nx=nextChapterAsk('');openDialog('…',(pre||[]).map(s=>({who:LOGNAME,...s})).concat(says(C.DONE),nx.steps||[]))  /* the ending is narration, then: on to the next chapter? */},900);
 }
 let toastT;function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2400)}
 

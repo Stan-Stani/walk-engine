@@ -684,7 +684,8 @@ function confirmSel(){if(sel<0||performance.now()-choicesAt<450)return;const b=(
 function renderBuild(s){
  s.got=0;$('build').hidden=false;
  $('slots').innerHTML='<span class="ph">· · ·</span>';
- let order;do order=shuffle(s.build.map((_,i)=>i));while(s.build.length>1&&order.every((v,i)=>v===i));  /* never start already solved */
+ let order;const solved=o=>[s.build,...(s.alts||[])].some(a=>o.every((v,i)=>s.build[v]===a[i]));
+ do order=shuffle(s.build.map((_,i)=>i));while(s.build.length>1&&solved(order));  /* never start already solved (in any right order) */
  $('tiles').innerHTML=order.map(i=>`<button class="tile" data-i="${i}">${s.build[i]}</button>`).join('');
  $('tiles').querySelectorAll('.tile').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();pickTile(s,b)}));
  sel=-1;choicesAt=performance.now();markSel();hintTile(s,4000);

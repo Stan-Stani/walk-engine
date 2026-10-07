@@ -396,7 +396,7 @@ function arrive(){
 }
 function goZone(id,x,y,dir){
  warping=true;sfx('door');$('fade').classList.add('on');
- setTimeout(()=>{loadZone(id,x,y,dir);save();$('fade').classList.remove('on');setTimeout(()=>{warping=false;tryMove()},120)},230);
+ setTimeout(()=>{loadZone(id,x,y,dir);save();$('fade').classList.remove('on');if(held&&held!==dir)held=null;setTimeout(()=>{warping=false;tryMove()},120)},230);  // turned around by the warp: let go of the held direction
 }
 function loadZone(id,x,y,dir){
  ZID=id;Z=C.ZONES[id];state.zone=id;
@@ -535,6 +535,7 @@ function show(s){
  if(s.sit)sitDown(s.sit);
  [].concat(s.turn||[]).forEach(o=>{const n=C.NPC[o.npc];if(n){n.dir=o.dir;n.turnAt=performance.now()+60000}});
  if('cam' in s)camT=s.cam||null;
+ if(s.go){const [z,x,y,d]=s.go;loadZone(z,x,y,d||'down');save()}  // a scene that moves you ("다음 날 아침, 학교")
  if(s.sfx||/딩동댕동/.test(s.say||''))sfx(s.sfx||'bell');  /* a step can play a sound; the school bell rings on its own */
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
@@ -689,16 +690,18 @@ function renderBuild(s){
 function hintTile(s,ms){
  clearTimeout(hintTile.t);$('tiles').querySelectorAll('.hint').forEach(b=>b.classList.remove('hint'));
  if(s.got>=s.build.length)return;
- hintTile.t=setTimeout(()=>{if(dlg&&dlg.cur===s&&building())$('tiles').querySelector(`.tile[data-i="${s.got}"]`)?.classList.add('hint')},ms);
+ hintTile.t=setTimeout(()=>{if(!(dlg&&dlg.cur===s&&building()))return;const seq=s.seq||[],o=[s.build,...(s.alts||[])].find(o=>seq.every((w,j)=>o[j]===w))||s.build;
+  [...$('tiles').querySelectorAll('.tile:not(.used)')].find(b=>s.build[+b.dataset.i]===o[seq.length])?.classList.add('hint')},ms);
 }
 function pickTile(s,b){
- const i=+b.dataset.i;
- if(i!==s.got){sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);b.classList.remove('bad');void b.offsetWidth;b.classList.add('bad');hintTile(s,1200);return}
- sfx('move');s.got++;b.classList.add('used');b.classList.remove('sel');hintTile(s,4000);
+ const i=+b.dataset.i,seq=s.seq||(s.seq=[]),t=s.build[i];
+ const fits=o=>seq.every((w,j)=>o[j]===w)&&o[seq.length]===t;  // the order so far, plus this tile, is a prefix of a right order
+ if(!fits(s.build)&&!(s.alts||[]).some(fits)){sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);b.classList.remove('bad');void b.offsetWidth;b.classList.add('bad');hintTile(s,1200);return}
+ sfx('move');seq.push(t);s.got++;b.classList.add('used');b.classList.remove('sel');hintTile(s,4000);
  if(s.got===1)$('slots').innerHTML='';
  $('slots').insertAdjacentHTML('beforeend',`<span class="t">${s.build[i]}</span>`);
  if(s.got===s.build.length){
-  const line=s.build.join(' ');sfx('ok');
+  const line=seq.join(' ');sfx('ok');
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';$('build').hidden=true;
   toast(okWord(s));show({who:s.who||dlg.name,say:line+(/[.!?…]$/.test(line)?'':'.')});  // the assembled line is the speaker's own words: praise is a toast
@@ -718,14 +721,17 @@ function gradeStep(s){
 }
 /* praise after a right answer: a step's own `ok`, else 맞아! from a friend who speaks 반말 (NPC banmal:1), else 맞아요! */
 const okWord=s=>s.ok||(dlg.npc&&dlg.npc.banmal?'맞아!':'맞아요!');
+/* the asked line with its blank filled, minus a question after it that the answer has just settled ("…" 맞춤법에 맞는 건?) */
+function answered(ask,a){const f=ask.replace('___',a),i=ask.indexOf('___')+a.length;
+ const m=f.slice(i).match(/^([^"”]*["”][.!?]?)\s+([^"”]*\?)$/);return m?f.slice(0,i)+m[1]:f}  // only a quoted example's question
 function choose(s,i){
  const o=s.opts[i];
  if(o[1]){
   sfx('ok');
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';
-  const line=s.ask.includes('___')?s.ask.replace('___',o[0]):o[0];
-  if(s.who==='나'&&!s.listenOnly||s.own){  /* own:1 — the line is the speaker's own words, not a reply to you */
+  const line=s.done||(s.ask.includes('___')?answered(s.ask,o[0]):o[0]);
+  if(s.who==='나'&&!s.listenOnly||s.own||s.who==='…'){  /* own:1 — the line is the speaker's own words, not a reply to you */
    // the toast is always praise; an ok: that isn't praise ("뭐?", "…") is the other person's reaction, so they say it next
    const react=s.ok&&!/^(맞아|정답|좋아|딩동댕)/.test(s.ok)?s.ok:null;
    toast(react?(dlg.npc&&dlg.npc.banmal?'맞아!':'맞아요!'):okWord(s));show({who:s.who||dlg.name,say:line});

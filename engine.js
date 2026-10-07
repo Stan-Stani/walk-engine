@@ -410,7 +410,8 @@ function showRoom(force){
 function update(dt,t){
  if(player.moving){player.t+=dt/(170*(Z.slow||1)); /* Z.slow > 1 = heavy gravity */if(player.t>=1){player.t=0;player.moving=false;if(!arrive())tryMove()}}
  else tryMove();
- if(!dlg)live().forEach(n=>{if(n.still||n.pos||n.walk||sitting(n))return;if(t>n.turnAt){const ds=['down','left','right',n.home,n.home];n.dir=ds[Math.random()*ds.length|0];n.turnAt=t+2500+Math.random()*3500}});
+ if(!dlg)live().forEach(n=>{if(n.still||n.pos||n.walk||sitting(n))return;if(t>n.turnAt){if(chatPair(n)){n.dir=n.home;n.turnAt=t+3000;return}  /* mid-conversation: no glancing around */
+  const ds=['down','left','right',n.home,n.home];n.dir=ds[Math.random()*ds.length|0];n.turnAt=t+2500+Math.random()*3500}});
  $('btnA').classList.toggle('ready',!dlg&&!player.moving&&!!facing());
 }
 const dark=document.createElement('canvas');dark.width=cv.width;dark.height=cv.height;const dg=dark.getContext('2d');
@@ -808,14 +809,14 @@ function interact(){
  const F=facing();if(!F)return;
  if(F.n){
   let n=F.n;if(n.proxy){const p=n.proxy();if(p)n=p}
-  if(!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
+  const pair=chatPair(n);  // two people talking to each other: they keep facing each other, and the one who started speaks first
+  if(!pair&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
   let steps=n.script?n.script():null,isReview=false;
   if(!steps){
    if(n.badge&&n.badge.every(has)){steps=[...says(n.after),reviewFor(n.badge)];isReview=true}
    else steps=n.talk();
   }
-  const pair=!isReview&&chatPair(n);  // two people talking to each other: whoever you face, the one who started speaks first
-  if(pair){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
+  if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
   openDialog(n.name,steps,{npc:n,review:isReview});return;
  }
  if(F.pet){openDialog(C.FOLLOW.name,C.FOLLOW.talk());return}

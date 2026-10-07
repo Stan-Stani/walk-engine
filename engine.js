@@ -340,6 +340,7 @@ function petReset(){pet.x=pet.fx=player.x;pet.y=pet.fy=player.y;pet.dir=player.d
 
 function marker(X,Y,t,st){
  if(!st)return;
+ if(Y<-12)return;Y=Math.max(Y,11);  // keep it on screen for someone in the top row (not for someone off it)
  const bob=Math.round(Math.sin(t/220)*1.5);
  if(st==='todo'){r(X+6,Y-9+bob,4,8,'#1B1E2B');r(X+7,Y-8+bob,2,4,'#E8962A');r(X+7,Y-3+bob,2,1,'#E8962A')}
  else if(st==='review'){const y=Y-10+bob;r(X+5,y,6,9,'#1B1E2B');r(X+6,y+1,4,7,'#69CFD8');r(X+7,y+2,2,1,'#0F141A');r(X+8,y+3,1,1,'#0F141A');r(X+7,y+4,1,1,'#0F141A');r(X+7,y+6,1,1,'#0F141A')}
@@ -458,6 +459,7 @@ function render(t){
  const ents=live().filter(n=>!(player.sit&&player.sit.npc===n)).map(n=>{const wk=walkAt(n,t);if(wk){const [wx,wy,wd,wf]=wk;return {y:wy,f:()=>drawChar(n.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)}}
   const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;
    if(n.look)n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):sitting(n)?drawSeated(n.look,X,Y,n.dir,n.chair):drawChar(n.look,X,Y,n.dir,0);
+   if(n.sleep)for(let i=0;i<2;i++){const p=(t/900+i/2)%1,zx=X+11+Math.round(p*4),zy=Y-2-Math.round(p*10),c='#2E3550';g.globalAlpha=1-p*.7;r(zx,zy,4,1,c);r(zx+2,zy+1,1,1,c);r(zx+1,zy+2,1,1,c);r(zx,zy+3,4,1,c);g.globalAlpha=1}  // asleep: z's drifting up
    // no marker over the player standing just above, over the one you're talking to (or whoever a proxy stands for), or when nomark says so
    const talking=dlg&&(dlg.npc===n||(n.proxy&&dlg.npc===n.proxy())),off=typeof n.nomark==='function'?n.nomark():n.nomark;
    if(!(player.x===nx&&player.y===ny-1)&&!talking&&!off)marker(X+(n.markDx||0),Y-artLift(n.look)+(n.markDy||0),t,status(n))}}});
@@ -536,7 +538,7 @@ function show(s){
  if(s.sit)sitDown(s.sit);
  [].concat(s.turn||[]).forEach(o=>{const n=C.NPC[o.npc];if(n){n.dir=o.dir;n.turnAt=performance.now()+60000}});
  if('cam' in s)camT=s.cam||null;
- if(s.go){const [z,x,y,d]=s.go;loadZone(z,x,y,d||'down');save()}  // a scene that moves you ("다음 날 아침, 학교")
+ if(s.go){const [z,x,y,d]=s.go;loadZone(z,x,y,d||'down');talkCy=null;talkExtra=0;save()}  // a scene that moves you ("다음 날 아침, 학교")
  if(s.sfx||/딩동댕동/.test(s.say||''))sfx(s.sfx||'bell');  /* a step can play a sound; the school bell rings on its own */
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
@@ -753,8 +755,9 @@ function advance(){
  if(dlg.i>=dlg.steps.length){closeDialog();return}
  show(dlg.steps[dlg.i]);
 }
+let closedAt=0;
 function closeDialog(){
- dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
+ closedAt=performance.now();dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
 }
@@ -817,6 +820,7 @@ function interact(){
  if(panelOpen())return;
  if(choosing()||building()){confirmSel();return}
  if(dlg){advance();return}
+ if(performance.now()-closedAt<650)return;  // the tap that closed a talk, doubled, doesn't reopen it
  if(player.moving||warping)return;
  const F=facing();if(!F)return;
  if(F.n){

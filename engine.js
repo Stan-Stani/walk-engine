@@ -32,11 +32,15 @@ let readOn=store.get(KEY('read'))==='1';
 
 /* ---------- sound ---------- */
 let AC=null;
-const SFX={move:[[1040,.04,0]],ok:[[880,.07,0],[1320,.12,.07]],no:[[240,.12,0],[180,.18,.1]],badge:[[660,.09,0],[880,.09,.09],[1100,.09,.18],[1320,.25,.27]],star:[[1320,.07,0],[1760,.07,.07],[2200,.2,.14]],door:[[300,.1,0],[220,.16,.08]],item:[[990,.06,0],[1480,.14,.06]],lock:[[160,.08,0],[160,.08,.12]]};
+const SFX={move:[[1040,.04,0]],ok:[[880,.07,0],[1320,.12,.07]],no:[[240,.12,0],[180,.18,.1]],badge:[[660,.09,0],[880,.09,.09],[1100,.09,.18],[1320,.25,.27]],star:[[1320,.07,0],[1760,.07,.07],[2200,.2,.14]],door:[[300,.1,0],[220,.16,.08]],item:[[990,.06,0],[1480,.14,.06]],lock:[[160,.08,0],[160,.08,.12]],
+ /* the school bell: the Westminster chime Korean schools ring (딩동댕동), soft sine tones that ring on */
+ bell:[659.3,523.3,587.3,392,392,587.3,659.3,523.3].flatMap((fq,i)=>[[fq,1.5,i*.5,'sine',.07],[fq*2,.4,i*.5,'sine',.012]])};
+const SFXON={};
 function sfx(k){
  if(!soundOn)return;
  try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const t0=AC.currentTime;
-  SFX[k].forEach(([fq,d,st])=>{const o=AC.createOscillator(),gn=AC.createGain();o.type='square';o.frequency.value=fq;gn.gain.setValueAtTime(.035,t0+st);gn.gain.exponentialRampToValueAtTime(.0001,t0+st+d);o.connect(gn).connect(AC.destination);o.start(t0+st);o.stop(t0+st+d+.02)})}catch(e){}
+  (SFXON[k]||[]).forEach(g=>{g.gain.cancelScheduledValues(t0);g.gain.setTargetAtTime(.0001,t0,.05)});  /* a sound started again cuts the last one short */
+  SFXON[k]=SFX[k].map(([fq,d,st,type,vol])=>{const o=AC.createOscillator(),gn=AC.createGain();o.type=type||'square';o.frequency.value=fq;gn.gain.setValueAtTime(0,t0);gn.gain.setValueAtTime(vol||.035,t0+st);gn.gain.exponentialRampToValueAtTime(.0001,t0+st+d);o.connect(gn).connect(AC.destination);o.start(t0+st);o.stop(t0+st+d+.02);return gn})}catch(e){}
 }
 
 /* ---------- speech (Korean voice, if this device has one) ---------- */
@@ -526,6 +530,7 @@ function show(s){
  if(s.sit)sitDown(s.sit);
  [].concat(s.turn||[]).forEach(o=>{const n=C.NPC[o.npc];if(n){n.dir=o.dir;n.turnAt=performance.now()+60000}});
  if('cam' in s)camT=s.cam||null;
+ if(s.sfx||/딩동댕동/.test(s.say||''))sfx(s.sfx||'bell');  /* a step can play a sound; the school bell rings on its own */
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
  if(s.award)award(s.award);
@@ -863,6 +868,8 @@ function loadState(){
  try{const s=JSON.parse(store.get(CH.save)||'null');if(s)Object.assign(state,s)}catch(e){}
  if(!C.ZONES[state.zone]){const st=CH.start;Object.assign(state,{zone:st.zone,x:st.x,y:st.y,dir:st.dir})}
  if(CH.migrate)CH.migrate(state);
+ const Zs=C.ZONES[state.zone],c=Zs&&Zs.map[state.y]&&Zs.map[state.y][state.x];  /* a map changed under an old save: back to the start */
+ if(!c||!(Zs.legend[c]||{}).walk||(Zs.warps||{})[state.x+','+state.y]){const st=CH.start;Object.assign(state,{zone:st.zone,x:st.x,y:st.y,dir:st.dir})}
 }
 
 /* ---------- input ---------- */

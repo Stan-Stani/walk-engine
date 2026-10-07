@@ -8,8 +8,9 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - Scripted walks: a dialogue step with `walk:{npc:'id', from:[x,y]}` makes that NPC, once the conversation closes, appear at
   `from` and walk the shortest path to its own spot (`x`,`y`). It already counts as standing there for talking and collisions. If
   someone blocks the way in, it walks as close as it can and then steps in.
-- `leave:{npc:'id', to:[x,y]}` on the step whose flag hides that NPC: once the conversation closes it walks from its spot to
-  `to` (a door, the map edge, up a tree) and is gone. Both take one object or a list.
+- `leave:{npc:'id', to:[x,y]}` on the step whose flag hides that NPC (the line that narrates the exit): it walks from its spot to
+  `to` (a door, the map edge, up a tree) right away, during that line, and is gone. Put it on the line that says they leave, not
+  a later one, or they linger after the text says they left. Both take one object or a list.
 - 문제 알리기 (START menu, added by the engine): game or Korean problem, plus a note. Context is attached automatically: chapter, room, position, objective, the last lines and the last looked-up word. 보내기 links to the word-reports inbox (`https://seldoncortex.com/word-reports/#…`); see the word-reports repo.
 - Front layer: a legend entry can name `front:'tileName'`. That tile function runs after the characters, without clipping, so a tree canopy can overhang the row above and cover the player walking behind it.
 - Choices that aren't quizzes: a step with `choose:[[label, fn|null], …]` shows buttons, closes the conversation and runs `fn`. An inspect line (spots/things) may be `{steps:[…]}`. `nextChapterAsk(line)` builds the end-of-chapter "go on to the next one?" prompt for a gate.
@@ -24,7 +25,14 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   bottom map edge by what the box covers, and holds for a moment after the end so a follow-up note doesn't make it dip.
 - The ! / ? marker of the character you're talking to is hidden while you talk.
 - Review questions (the ? marker) are asked by the narrator, not in the NPC's voice: the sentences are generic examples.
+- Praise after an answer: a question step's NPC repeats the line with "맞아요!" (or `ok:`) in front, as a reply to you. When the
+  line is the speaker's own words (their question, their broadcast), mark the step `own:1`: the praise is a toast and the line
+  stays clean. Word-order tiles always work that way (the assembled sentence is someone speaking).
 - Word-order tiles never start in the solved order.
+- NPC options: `proxy:()=>npc` — talking to this one talks to another (e.g. a table that hands the conversation to whoever's turn
+  it is; it may stand on furniture); `look:null` — draw no body, only its marker; `nomark` (true or a function) — hide its
+  marker; `markDx` / `markDy` — move its marker (px), e.g. into the middle of a two-tile table.
+- Step `turn:{npc:'id', dir:'left'}` (or a list): turns an NPC to face that way and keeps it there (someone looks at the speaker).
 - Art transforms: `ART.rot(rows, q)` turns a pixel grid (array of strings of palette keys) clockwise by quarter turns (`-1` =
   counter-clockwise), `ART.flipH` / `ART.flipV` mirror it, `ART.put(rows, pal, X, Y)` draws it top-down (no bottom-alignment, for
   pieces of a tile). Draw a picture once, upright, and turn it to fit: e.g. 방과 후's 방송실 east windows show an upright street

@@ -341,7 +341,7 @@ function status(n){
  if(n.status){const v=n.status();if(v!==undefined)return v}
  if(!n.badge)return null;
  if(!n.badge.every(has))return 'todo';
- if(n.badge.some(isDue))return 'review';
+ if(n.badge.some(isDue))return n.script&&n.script()?null:'review';  // a ? only when talking reviews (their script lines come first and skip it)
  return n.badge.every(w=>lv(w).b>=3)?'star':null;
 }
 
@@ -422,7 +422,7 @@ function talkLift(cy,py){
  /* the plain box: answer choices and word tiles make it taller only for a moment, and following them would leave the camera
     high (off the map) once they close */
  let extra=0;for(const id of ['choices','build']){const e=$(id);if(e&&!e.hidden)extra+=e.offsetHeight+7}
- const top=(box.offsetTop+extra)/k-6;  // canvas px where the plain box starts, with a little air
+ const top=(box.offsetTop+extra)/k-6-14;  // canvas px where the plain box starts, with air for one more line (so it doesn't creep line by line)
  talkExtra=Math.max(talkExtra,Math.round(VH*TS-top));
  const rows=[py],n=dlg.npc;if(n&&NPCS.includes(n)&&(!n.hide||!n.hide()))rows.push(npcPos(n)[1]);
  const y0=Math.min(...rows)*TS-10,y1=Math.max(...rows)*TS+16;  // the marker above the heads … the feet
@@ -434,7 +434,7 @@ function render(t){
  const py=player.moving?player.fy+(player.y-player.fy)*player.t:player.y;
  const [fx,fy]=camT||[px,py];
  let cx=fx*TS+8-VW*TS/2,cy=fy*TS+8-VH*TS/2;
- if(dlg)talkAt=t;else if(t-talkAt>700){talkCy=null;talkExtra=0}  /* held a moment after it ends: a follow-up note (단어 일지) doesn't make it dip and rise */
+ if(dlg)talkAt=t;else if(talkCy!=null&&t-talkAt>700){talkCy=null;talkExtra=0;camF={...CAM}}  // glide back, never snap  /* held a moment after it ends: a follow-up note (단어 일지) doesn't make it dip and rise */
  const cyMap=Math.max(0,Math.min(cy,MH*TS-VH*TS));  // where the camera would be without a conversation (inside the map)
  if(!camT&&talkCy!=null||!camT&&dlg){const l=dlg?talkLift(cyMap,py):null;if(l!=null)talkCy=Math.max(talkCy??-1e9,l);if(talkCy!=null)cy=Math.max(cyMap,talkCy)}
  cx=Math.max(0,Math.min(cx,MW*TS-VW*TS));cy=Math.max(0,Math.min(cy,MH*TS-VH*TS+(talkCy!=null?talkExtra:0)));
@@ -446,7 +446,11 @@ function render(t){
  for(let y=y0;y<=y0+VH;y++)for(let x=x0;x<=x0+VW;x++)tile(x,y,x*TS-cx,y*TS-cy,t);
  // the chair the player sits on is drawn with the player
  const ents=live().filter(n=>!(player.sit&&player.sit.npc===n)).map(n=>{const wk=walkAt(n,t);if(wk){const [wx,wy,wd,wf]=wk;return {y:wy,f:()=>drawChar(n.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)}}
-  const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):sitting(n)?drawSeated(n.look,X,Y,n.dir,n.chair):drawChar(n.look,X,Y,n.dir,0);if(!(player.x===nx&&player.y===ny-1)&&!(dlg&&dlg.npc===n))marker(X,Y-artLift(n.look),t,status(n))}}});  // no ! over the player standing just above, nor over the one you're talking to
+  const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;
+   if(n.look)n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):sitting(n)?drawSeated(n.look,X,Y,n.dir,n.chair):drawChar(n.look,X,Y,n.dir,0);
+   // no marker over the player standing just above, over the one you're talking to (or whoever a proxy stands for), or when nomark says so
+   const talking=dlg&&(dlg.npc===n||(n.proxy&&dlg.npc===n.proxy())),off=typeof n.nomark==='function'?n.nomark():n.nomark;
+   if(!(player.x===nx&&player.y===ny-1)&&!talking&&!off)marker(X+(n.markDx||0),Y-artLift(n.look)+(n.markDy||0),t,status(n))}}});
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
@@ -484,9 +488,12 @@ function walkPath([fx,fy],[tx,ty],self){
  if(!(k(tx,ty) in prev)){let best=1e9;for(const kk in prev){const [a,b]=kk.split(',').map(Number),d=Math.abs(a-tx)+Math.abs(b-ty);if(d<best){best=d;end=[a,b]}}}
  const path=[];for(let c=end;c;c=prev[k(...c)])path.unshift(c);return path;
 }
-function queueWalks(s){  // one or a list each; until the conversation closes they stand where they start (no pop to the end spot first)
+function queueWalks(s){  // one or a list each
+ // arrivals wait for the conversation to close (until then they stand where they start, no pop to the end spot first)
  [].concat(s.walk||[]).forEach(w=>{const n=C.NPC[w.npc];if(!n)return;walks.push(w);n.walk={path:[w.from],hold:1,end:n.dir}});
- [].concat(s.leave||[]).forEach(w=>{const n=C.NPC[w.npc];if(!n||!NPCS.includes(n))return;const g={look:n.look,from:npcPos(n),walk:{path:[npcPos(n)],hold:1,dir:n.dir}};leaves.push([w,g]);ghosts.push(g)});
+ // a leave starts at once, on the line that narrates it ("후다닥 나갔어요"), so nobody lingers after the text says they left
+ [].concat(s.leave||[]).forEach(w=>{const n=C.NPC[w.npc];if(!n||!NPCS.includes(n))return;const from=npcPos(n),g={look:n.look,from};
+  const path=walkPath(from,w.to,null);if(path.length>1){g.walk={path,t0:performance.now()};ghosts.push(g)}});
 }
 function startWalks(){
  const t0=performance.now();
@@ -517,6 +524,7 @@ function show(s){
  if(s.set){s.set();save()}
  if(s.walk||s.leave)queueWalks(s);
  if(s.sit)sitDown(s.sit);
+ [].concat(s.turn||[]).forEach(o=>{const n=C.NPC[o.npc];if(n){n.dir=o.dir;n.turnAt=performance.now()+60000}});
  if('cam' in s)camT=s.cam||null;
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
@@ -683,7 +691,7 @@ function pickTile(s,b){
   const line=s.build.join(' ');sfx('ok');
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';$('build').hidden=true;
-  if(s.who==='나'){toast(okWord(s));show({who:'나',say:line+'.'})}else show({who:s.who,say:okWord(s)+' '+line+'.'});  // your own line: it's yours, praise is a toast
+  toast(okWord(s));show({who:s.who||dlg.name,say:line+(/[.!?…]$/.test(line)?'':'.')});  // the assembled line is the speaker's own words: praise is a toast
   if(readOn)speak(line);
  }else{sel=-1;markSel()}
 }
@@ -707,7 +715,11 @@ function choose(s,i){
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';
   const line=s.ask.includes('___')?s.ask.replace('___',o[0]):o[0];
-  if(s.who==='나'&&!s.listenOnly){toast(okWord(s));show({who:'나',say:line})}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line)});
+  if(s.who==='나'&&!s.listenOnly||s.own){  /* own:1 — the line is the speaker's own words, not a reply to you */
+   // the toast is always praise; an ok: that isn't praise ("뭐?", "…") is the other person's reaction, so they say it next
+   const react=s.ok&&!/^(맞아|정답|좋아|딩동댕)/.test(s.ok)?s.ok:null;
+   toast(react?(dlg.npc&&dlg.npc.banmal?'맞아!':'맞아요!'):okWord(s));show({who:s.who||dlg.name,say:line});
+   if(react)dlg.next={who:s.reactWho||dlg.name,say:react}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line)});
  }else{
   sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);
   dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||'다시 해 봐요.'});  // after your own line, the hint is narration
@@ -749,7 +761,7 @@ function reviewFor(words){ // pick a question for the weakest of these words
  const w=ws[0];
  const qs=allQuestions().filter(q=>q.w===w);
  const narr={review:true,who:'…',ok:'맞아요!'};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
- if(canSpeak()&&Math.random()<.35)return {listen:w,...narr};
+ if(canSpeak()&&soundOn&&Math.random()<.35)return {listen:w,...narr};  // a muted phone can't answer a listening question
  return {...qs[Math.random()*qs.length|0],...narr};
 }
 function terminal(){
@@ -785,7 +797,7 @@ function interact(){
  if(player.moving||warping)return;
  const F=facing();if(!F)return;
  if(F.n){
-  const n=F.n;
+  let n=F.n;if(n.proxy){const p=n.proxy();if(p)n=p}
   if(!n.pos&&!sitting(n)){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}
   let steps=n.script?n.script():null,isReview=false;
   if(!steps){

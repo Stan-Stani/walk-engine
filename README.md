@@ -32,6 +32,7 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - NPC options: `proxy:()=>npc` — talking to this one talks to another (e.g. a table that hands the conversation to whoever's turn
   it is; it may stand on furniture); `look:null` — draw no body, only its marker; `nomark` (true or a function) — hide its
   marker; `markDx` / `markDy` — move its marker (px), e.g. into the middle of a two-tile table.
+  `fixed:1` — never turns to face you when you talk to it (furniture: a chair keeps facing its desk).
 - Step `turn:{npc:'id', dir:'left'}` (or a list): turns an NPC to face that way and keeps it there (someone looks at the speaker).
 - Art transforms: `ART.rot(rows, q)` turns a pixel grid (array of strings of palette keys) clockwise by quarter turns (`-1` =
   counter-clockwise), `ART.flipH` / `ART.flipV` mirror it, `ART.put(rows, pal, X, Y)` draws it top-down (no bottom-alignment, for

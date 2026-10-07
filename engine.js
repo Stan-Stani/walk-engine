@@ -798,7 +798,7 @@ function interact(){
  const F=facing();if(!F)return;
  if(F.n){
   let n=F.n;if(n.proxy){const p=n.proxy();if(p)n=p}
-  if(!n.pos&&!sitting(n)){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}
+  if(!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
   let steps=n.script?n.script():null,isReview=false;
   if(!steps){
    if(n.badge&&n.badge.every(has)){steps=[...says(n.after),reviewFor(n.badge)];isReview=true}

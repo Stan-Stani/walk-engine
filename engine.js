@@ -285,7 +285,7 @@ function faceFor(s,text){ // expression for a line: explicit face, else a guess 
 }
 let portraitAnim=null;
 function setPortrait(s,text){
- clearInterval(portraitAnim);const cv=$('face');if(!cv)return;const L=lookFor(s.who||dlg.name);
+ clearInterval(portraitAnim);const cv=$('face');if(!cv)return;const L=s.look||lookFor(s.who||dlg.name);  // a line can bring its speaker's look (two people with the same name)
  $('dlg').classList.toggle('hasface',!!L);if(!L){cv.hidden=true;return}
  cv.hidden=false;const face=faceFor(s,text);let open=false;drawPortrait(cv,L,face,false);
  portraitAnim=setInterval(()=>{if(!typing||typing.finished){clearInterval(portraitAnim);drawPortrait(cv,L,face,false);return}
@@ -794,6 +794,11 @@ function facing(){
  if(tv)return {spot:Array.isArray(tv)?tv[(tx*7+ty*13)%tv.length]:tv};  // tv may also be {steps:[…]} (a conversation)
  return null;
 }
+/* {chat:'id'} on someone who is answering another: [opener, answerer] when both are here, so either one plays the whole exchange */
+function chatPair(n){
+ const L=live(),o=n.chat?C.NPC[n.chat]:L.find(m=>m.chat&&C.NPC[m.chat]===n);
+ return o&&L.includes(o)&&!(o.badge&&o.badge.length)?(n.chat?[o,n]:[n,o]):null;
+}
 function interact(){
  if(!$('gloss').hidden){hideGloss();return}  // A closes the definition first, without advancing
  if(panelOpen())return;
@@ -809,6 +814,8 @@ function interact(){
    if(n.badge&&n.badge.every(has)){steps=[...says(n.after),reviewFor(n.badge)];isReview=true}
    else steps=n.talk();
   }
+  const pair=!isReview&&chatPair(n);  // two people talking to each other: whoever you face, the one who started speaks first
+  if(pair){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
   openDialog(n.name,steps,{npc:n,review:isReview});return;
  }
  if(F.pet){openDialog(C.FOLLOW.name,C.FOLLOW.talk());return}

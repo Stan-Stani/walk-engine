@@ -24,7 +24,8 @@ function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?`${m}분`:m<1440?`${
 /* Per-game settings come from src/game.js (`var GAME={…}`), so one engine serves 성실호, 형제 and 방과 후. */
 const G=typeof GAME!=='undefined'?GAME:{};
 const KEY=k=>(G.prefix||'walk')+'-'+k;
-const TERM=Object.assign({name:'복습 노트',empty:'아직 노트가 비어 있어요.',idle:'지금은 복습할 단어가 없어요.',next:'다음 복습',due:n=>`복습할 단어가 ${n}개 있어요.`,end:'복습 끝! 다음에 또 봐요.'},G.term||{});
+const TERM_BASE=Object.assign({name:'복습 노트',empty:'아직 노트가 비어 있어요.',idle:'지금은 복습할 단어가 없어요.',next:'다음 복습',due:n=>`복습할 단어가 ${n}개 있어요.`,end:'복습 끝! 다음에 또 봐요.'},G.term||{});
+const TERM=new Proxy(TERM_BASE,{get:(o,k)=>(typeof C!=='undefined'&&C&&C.term&&k in C.term)?C.term[k]:o[k]});  // a chapter's term:{name,…} overrides the game's (one 교시 reviews on paper, the next on a laptop)
 const LOGNAME=G.log||LOGNAME;
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 let soundOn=store.get(KEY('sound'))!=='0';
@@ -297,6 +298,11 @@ function setPortrait(s,text){
   open=!open;drawPortrait(cv,L,face,open)},130);
 }
 const palCache=new WeakMap();
+/* props an NPC can hold (NPC hold:'phone', or a function of the story). A chapter adds its own in C.PROPS. Drawn over the
+   hands of a standing character; facing away, the prop is hidden behind them. */
+const PROPS={
+ phone:(X,Y,dir)=>{if(dir==='up')return;const x=dir==='left'?X+3:dir==='right'?X+10:X+6;r(x,Y+9,3,5,'#23262D');r(x+1,Y+10,1,3,'#8FD3EA')},
+};
 function drawChar(L,X,Y,dir,step){
  if(L.art){drawCustom(L,X,Y,dir,step);return}
  let pal=palCache.get(L);if(!pal){pal=humanPal(L);palCache.set(L,pal)}
@@ -364,7 +370,7 @@ const ME_KEY=KEY('me');let me=null;try{me=JSON.parse(store.get(ME_KEY)||'null')}
 const myLook=(base=CREW_LOOK)=>me?{...base,...me}:base;   // a chapter's PLAYER object = the uniform; the player's choices = hair, skin, face
 const player={x:0,y:0,dir:'down',moving:false,t:0,fx:0,fy:0,step:0,look:myLook()};
 let held=null,warping=false,lockMsgAt=0;
-function npcPos(n){return n.pos?n.pos():[n.x,n.y]}
+function npcPos(n){return n.pos?n.pos():n.at||[n.x,n.y]}  // n.at: where a move: step left them
 const sitting=n=>typeof n.sit==='function'?n.sit():!!n.sit;  // NPC sit: true | fn → drawn seated (on n.chair, a look, if given), and doesn't turn to talk
 /* step sit:{npc} sits the player on that NPC's tile (a chair), facing its dir; sit:{x,y,dir,chair} anywhere. The first arrow key stands
    them up. The saved position stays where they stood, so a reload never puts them inside the chair. */
@@ -419,6 +425,7 @@ function update(dt,t){
  if(!dlg)live().forEach(n=>{if(n.still||n.pos||n.walk||sitting(n))return;if(t>n.turnAt){if(chatPair(n)){n.dir=n.home;n.turnAt=t+3000;return}  /* mid-conversation: no glancing around */
   const ds=['down','left','right',n.home,n.home];n.dir=ds[Math.random()*ds.length|0];n.turnAt=t+2500+Math.random()*3500}});
  $('btnA').classList.toggle('ready',!dlg&&!player.moving&&!!facing());
+ {const idle=!!dlg&&(choosing()||building())&&sel<0;if($('btnA').dataset.idle!==String(idle)){$('btnA').dataset.idle=idle;$('btnA').style.opacity=idle?'.45':''}}  // a question with nothing selected: A would do nothing, so it dims
 }
 const dark=document.createElement('canvas');dark.width=cv.width;dark.height=cv.height;const dg=dark.getContext('2d');
 /* a scene can point the camera at a tile (step cam:[x,y]); it glides there, and back to the player when the step says cam:null
@@ -463,6 +470,7 @@ function render(t){
  const ents=live().filter(n=>!(player.sit&&player.sit.npc===n)).map(n=>{const wk=walkAt(n,t);if(wk){const [wx,wy,wd,wf]=wk;return {y:wy,f:()=>drawChar(n.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)}}
   const [nx,ny]=npcPos(n);return {y:ny,f:()=>{const X=nx*TS-cx,Y=ny*TS-cy-2;
    if(n.look)n.kind==='andy'?drawAndy(n.look,X,Y,n.dir,0,t):sitting(n)?drawSeated(n.look,X,Y,n.dir,n.chair):drawChar(n.look,X,Y,n.dir,0);
+   {const h=typeof n.hold==='function'?n.hold():n.hold,p=h&&((C.PROPS||{})[h]||PROPS[h]);if(p)p(X,Y,n.dir,t)}  // hold: a prop in their hands
    if(n.sleep)for(let i=0;i<2;i++){const p=(t/900+i/2)%1,zx=X+11+Math.round(p*4),zy=Y-2-Math.round(p*10),c='#2E3550';g.globalAlpha=1-p*.7;r(zx,zy,4,1,c);r(zx+2,zy+1,1,1,c);r(zx+1,zy+2,1,1,c);r(zx,zy+3,4,1,c);g.globalAlpha=1}  // asleep: z's drifting up
    // no marker over the player standing just above, over the one you're talking to (or whoever a proxy stands for), or when nomark says so
    const talking=dlg&&(dlg.npc===n||(n.proxy&&dlg.npc===n.proxy())),off=typeof n.nomark==='function'?n.nomark():n.nomark;
@@ -504,6 +512,10 @@ function walkPath([fx,fy],[tx,ty],self){
  if(!(k(tx,ty) in prev)){let best=1e9;for(const kk in prev){const [a,b]=kk.split(',').map(Number),d=Math.abs(a-tx)+Math.abs(b-ty);if(d<best){best=d;end=[a,b]}}}
  const path=[];for(let c=end;c;c=prev[k(...c)])path.unshift(c);return path;
 }
+/* move:{npc,to:[x,y],dir}: mid-conversation, on that line, the NPC walks from where it stands to `to` and stays there (찬 crossing the
+   room to apologise). One or a list. The spot lasts until the chapter reloads; a chapter that needs it to survive a reload gives the NPC pos(). */
+function moveNpcs(s){[].concat(s.move).forEach(m=>{const n=C.NPC[m.npc];if(!n)return;const from=npcPos(n);n.at=m.to;
+ const path=walkPath(from,m.to,n);if(m.dir)n.home=m.dir;n.walk=path.length>1?{path,t0:performance.now(),end:m.dir||n.dir}:null;if(!n.walk&&m.dir)n.dir=m.dir})}
 function queueWalks(s){  // one or a list each
  // arrivals wait for the conversation to close (until then they stand where they start, no pop to the end spot first)
  [].concat(s.walk||[]).forEach(w=>{const n=C.NPC[w.npc];if(!n)return;walks.push(w);n.walk={path:[w.from],hold:1,end:n.dir}});
@@ -539,6 +551,7 @@ function show(s){
  lastLines.push(((s.who||dlg.name||'')+': '+plain(s.say||s.ask||'')).slice(0,300));if(lastLines.length>3)lastLines.shift();
  if(s.set){s.set();save()}
  if(s.walk||s.leave)queueWalks(s);
+ if(s.move)moveNpcs(s);
  if(s.sit)sitDown(s.sit);
  [].concat(s.turn||[]).forEach(o=>{const n=C.NPC[o.npc];if(n){n.dir=o.dir;n.turnAt=performance.now()+60000}});
  if('cam' in s)camT=s.cam||null;
@@ -692,12 +705,13 @@ function renderBuild(s){
  do order=shuffle(s.build.map((_,i)=>i));while(s.build.length>1&&solved(order));  /* never start already solved (in any right order) */
  $('tiles').innerHTML=order.map(i=>`<button class="tile" data-i="${i}">${s.build[i]}</button>`).join('');
  $('tiles').querySelectorAll('.tile').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();pickTile(s,b)}));
- sel=-1;choicesAt=performance.now();markSel();hintTile(s,4000);
+ sel=-1;choicesAt=performance.now();markSel();if(s.hintOK===undefined)s.hintOK=firstTime('tileHint');hintTile(s,4000);
 }
-/* stuck on a word-order question? after a pause (or a wrong tile) the next right tile bobs: a hint without instruction text */
+/* the very first word-order question a player meets: after a pause its first right tile bobs, a hint without instruction text.
+   Never again after that, and never past the first tile: from then on the player knows how tiles work. */
 function hintTile(s,ms){
  clearTimeout(hintTile.t);$('tiles').querySelectorAll('.hint').forEach(b=>b.classList.remove('hint'));
- if(s.got>=s.build.length)return;
+ if(!s.hintOK||s.got>0)return;
  hintTile.t=setTimeout(()=>{if(!(dlg&&dlg.cur===s&&building()))return;const seq=s.seq||[],o=[s.build,...(s.alts||[])].find(o=>seq.every((w,j)=>o[j]===w))||s.build;
   [...$('tiles').querySelectorAll('.tile:not(.used)')].find(b=>s.build[+b.dataset.i]===o[seq.length])?.classList.add('hint')},ms);
 }
@@ -785,7 +799,7 @@ function allQuestions(){
 function reviewFor(words){ // pick a question for the weakest of these words
  const ws=[...words].sort((a,b)=>(isDue(b)-isDue(a))||(lv(a).b-lv(b).b));
  const w=ws[0];
- const qs=allQuestions().filter(q=>q.w===w);
+ const all=allQuestions().filter(q=>q.w===w),own=all.filter(q=>!q.gram),qs=own.length?own:all;  // gram:1 tests a pattern, not the word: no star for the word from it
  const narr={review:true,who:'…',ok:'맞아요!'};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
  if(canSpeak()&&soundOn&&Math.random()<.35)return {listen:w,...narr};  // a muted phone can't answer a listening question
  return {...qs[Math.random()*qs.length|0],...narr};
@@ -1035,6 +1049,7 @@ addEventListener('keydown',e=>{
  if(e.target.closest&&e.target.closest('textarea,input'))return;  // typing a note, not playing
  if(KEYS[e.key]){e.preventDefault();if(dirPress(KEYS[e.key]))return;held=KEYS[e.key];return}
  if(choosing()&&/^[1-4]$/.test(e.key)){const b=choiceBtns()[+e.key-1];if(b){e.preventDefault();b.click()}return}
+ if(building()&&/^[1-9]$/.test(e.key)){const b=tileBtns()[+e.key-1];if(b){e.preventDefault();b.click()}return}
  if([' ','Enter','z','Z'].includes(e.key)){e.preventDefault();if(!e.repeat)interact();return}
  if(['x','X','Escape'].includes(e.key)){e.preventDefault();cancel();return}
  if(['m','M'].includes(e.key)&&!e.repeat){e.preventDefault();toggleStart()}

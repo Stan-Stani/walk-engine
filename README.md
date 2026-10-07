@@ -38,8 +38,11 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   counter-clockwise), `ART.flipH` / `ART.flipV` mirror it, `ART.put(rows, pal, X, Y)` draws it top-down (no bottom-alignment, for
   pieces of a tile). Draw a picture once, upright, and turn it to fit: e.g. 방과 후's 방송실 east windows show an upright street
   turned with `ART.rot(street, 1)` (sky to the outer edge, road to the room); a west wall would use `-1`.
-- Word help (tap a word) stays open until ×, A, B or the next line. Word-order tiles: after a 4 s pause or a wrong tile, the next right
-  tile gets the `hint` class (bobbing, via each game's shell CSS); no instruction text.
+- Word help (tap a word) stays open until ×, A, B or the next line. Word-order tiles have no instruction text: only in the very first
+  word-order question a player ever meets (per game, saved), after a 4 s pause the first right tile gets the `hint` class (bobbing,
+  via each game's shell CSS). Never again after that, and never past the first tile. Number keys 1–9 place the nth tile still on the
+  table, as 1–4 answer choices; arrows + A work too.
+- While a question waits with nothing selected (choices start unselected so A can't answer by accident), the A button dims.
 - 디버그 (START menu, saved per game): adds a 건너뛰기 button to every conversation. It runs the conversation to the end with right
   answers and all its effects, and stops at a real choice (`choose`). For testing.
 
@@ -47,6 +50,14 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   before the object's own tile, so object tiles draw only the object and look right in any room. A walkable tile is a floor itself
   unless its legend names one. Zones without `floor` are drawn exactly as before.
 - Review computer: the `terminal` tile, or any legend entry with `term:1` (so a laptop can look different and still open review).
+  Its name and lines come from the game's `term`; a chapter's own `term:{name,…}` overrides them (a paper 복습 노트 in one chapter,
+  the 방송실's 복습 노트북 in the next).
+- Grammar questions: a question step with `gram:1` tests a pattern (척, -대, -다 보니) asked under some word, not the word itself.
+  It is asked in conversations as usual; review asks a word's own questions and skips these, so they never give that word a ★.
+- Step `move:{npc:'id', to:[x,y], dir}` (or a list): mid-conversation, on that line, the NPC walks from where it stands to `to` and
+  stays (someone crosses the room to apologise). The spot lasts until the chapter reloads; give the NPC `pos()` if it must survive one.
+- NPC `hold:'phone'` (or a function of the story returning a prop name or null): a prop drawn in its hands, hidden when it faces
+  away. The engine has `phone`; a chapter adds its own as `PROPS:{name:(X,Y,dir,t)=>…}`.
 - Conversation pairs: `chat:'openerId'` on the NPC who answers; when both are present, talking to either plays the opener's lines,
   then the answerer's (each with its own portrait via a step's `look`), and the pair keeps facing each other.
 

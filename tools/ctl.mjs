@@ -15,7 +15,9 @@
 // After each action it prints the screenshot path and the text a player can see (dialogue, choices, popups, toasts).
 import {spawn,execSync} from 'node:child_process';import fs from 'node:fs';import path from 'node:path';
 const ROOT=process.cwd();if(!fs.existsSync(ROOT+'/index.html')){console.log('run from a game repo root (no index.html here)');process.exit(1)}
-const DIR='/tmp/'+path.basename(ROOT)+'-manual';const PORT=9555;
+// CTL_SESSION=name: a separate Chrome (profile, port, screenshots) per tester, so two can play at once (never more than two)
+const SES=(process.env.CTL_SESSION||'').replace(/[^\w-]/g,'');
+const DIR='/tmp/'+path.basename(ROOT)+'-manual'+(SES?'-'+SES:'');const PORT=9555+(SES?1+[...SES].reduce((h,c)=>(h*31+c.charCodeAt(0))%200,7):0);
 const [,,cmd,...args]=process.argv;const wait=ms=>new Promise(r=>setTimeout(r,ms));
 fs.mkdirSync(DIR+'/shots',{recursive:true});
 if(cmd==='stop'){try{execSync(`pkill -9 -f "user-data-dir=${DIR}/[p]rof"`)}catch(e){}console.log('stopped');process.exit(0)}

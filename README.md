@@ -43,14 +43,27 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - 디버그 (START menu, saved per game): adds a 건너뛰기 button to every conversation. It runs the conversation to the end with right
   answers and all its effects, and stops at a real choice (`choose`). For testing.
 
+- Floor layer (opt-in): a zone's `floor:'tileName'`, or a legend entry's `floor:`, is drawn under each object (non-walkable tile)
+  before the object's own tile, so object tiles draw only the object and look right in any room. A walkable tile is a floor itself
+  unless its legend names one. Zones without `floor` are drawn exactly as before.
+- Review computer: the `terminal` tile, or any legend entry with `term:1` (so a laptop can look different and still open review).
+- Conversation pairs: `chat:'openerId'` on the NPC who answers; when both are present, talking to either plays the opener's lines,
+  then the answerer's (each with its own portrait via a step's `look`), and the pair keeps facing each other.
+
 ## Tools
 - `tools/ctl.mjs`: hands-on controller for playing a game like a player would (one phone-sized Chrome; each command presses keys,
   walks, taps, or looks, then saves a screenshot and prints the visible text). From a game's repo root:
   `node ../walk-engine/tools/ctl.mjs start ch1`, then `walk`, `key`, `tap`, `tapword`, `shot`, `stop`. `look` (around the player),
   `look all`, or `look <col> <row> [w] [h]` save a close-up of the live game screen, pixel for pixel, unsmoothed: what a player
   sees by holding the phone closer. Blind playtesters get this, not zoom.mjs (whose save-state specs need the chapter's internals).
+  `CTL_SESSION=name` gives a tester its own Chrome (profile, port, screenshots), so two can play at once (never more than two).
 - `tools/zoom.mjs`: pixel inspector for sprite and tile art. From a game's repo root, after its build:
   `node ../walk-engine/tools/zoom.mjs spec.json out/`. The spec lists scenes (a chapter save to load, optional setup JS, a tile
   rectangle); each is read straight off the game canvas and blown up without smoothing (default 8×), plus a labelled `sheet.png`.
   Phone-sized screenshots hide overlaps and odd shapes; use this to check any art change. Example spec:
   `{"ch":"ch1","scale":8,"scenes":[{"name":"seat","save":{"zone":"class","x":14,"y":11,"dir":"left","f":{"paidFine":1}},"setup":"sitDown({npc:'seat'});1","tiles":[9,9,14,12]}]}`
+- `tools/zonedump.mjs` + `tools/zonediff.py`: pixel-checked refactors. `node ../walk-engine/tools/zonedump.mjs out/ [ch1,ch2]` draws every
+  zone of every chapter whole (no people), with the story flags off, all on and in two fixed random mixes, at two clock moments, with
+  Math.random seeded (deterministic: two dumps of the same build are identical). `python3 ../walk-engine/tools/zonediff.py before/ after/
+  [diff/]` lists every changed 16×16 tile by chapter, zone and flag mix, writes before|after images with the changes boxed, and exits 1
+  on any change. Take a dump before a refactor; after it, every changed tile should be one you meant to change.

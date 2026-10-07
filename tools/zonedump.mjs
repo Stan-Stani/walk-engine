@@ -1,7 +1,7 @@
 // Zone dump: draws every zone of every chapter whole (every tile plus the front layer, no people, no player) into PNGs, so an
 // art or layout refactor can be checked pixel by pixel instead of by eye. From a game's repo root, after python3 build.py:
 //   node ../walk-engine/tools/zonedump.mjs <out-dir> [ch1,ch2,…]
-// Each zone is drawn with the story flags all off and all on (so posters, lamps and festival art show), at two moments of the
+// Each zone is drawn with the story flags all off, all on and in two fixed random mixes (so posters, lamps and festival art show), at two moments of the
 // animation clock, with Math.random seeded. Writes <out-dir>/<ch>/<zone>.<off|on>.<t>.png. Compare two dumps with zonediff.py.
 // A tile that throws (e.g. under the all-on flags) is drawn magenta and listed; that happens the same way before and after.
 import {spawn,execSync} from 'node:child_process';import fs from 'node:fs';import path from 'node:path';
@@ -39,11 +39,13 @@ for(const ch of chs){
  const res=await ev(`(()=>{
   const seeded=s=>()=>{s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
   const ALL=new Proxy({},{get:(o,k)=>typeof k==='string'?1:undefined});
+  // two fixed random mixes too, so art that needs one flag on and another off (a poster before a meeting) gets compared
+  const mix=seed=>new Proxy({},{get:(o,k)=>{if(typeof k!=='string')return undefined;let h=seed;for(const c of k)h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>7)&1}});
   const keep={W:cv.width,H:cv.height,f:state.f,rnd:Math.random,Z,ZID,MAP,MW,MH,NPCS,px:player.x,py:player.y,sit:player.sit};
   const out=[],bad=[];Object.assign(player,{x:-99,y:-99,sit:null});NPCS=[];
   const safe=(fn,x,y,X,Y,t)=>{try{fn(X,Y,x,y,t)}catch(e){g.fillStyle='#FF00FF';g.fillRect(X,Y,16,16);bad.push(ZID+' '+x+','+y)}};
   for(const id of Object.keys(C.ZONES)){Z=C.ZONES[id];ZID=id;MAP=Z.map.map(r=>r.split(''));MW=MAP[0].length;MH=MAP.length;
-   for(const [fl,f] of [['off',{}],['on',ALL]])for(const t of [0,1750]){
+   for(const [fl,f] of [['off',{}],['on',ALL],['mixA',mix(2166136261)],['mixB',mix(97)]])for(const t of [0,1750]){
     state.f=f;Math.random=seeded(7);cv.width=MW*TS;cv.height=MH*TS;g.imageSmoothingEnabled=false;
     for(let y=0;y<MH;y++)for(let x=0;x<MW;x++)safe((X,Y,x,y,t)=>tile(x,y,X,Y,t),x,y,x*TS,y*TS,t);  // the engine's own tile(): floor layer included
     for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){const L=Z.legend[at(x,y)];if(L&&L.front&&TILES[L.front])safe(TILES[L.front],x,y,x*TS,y*TS,t)}

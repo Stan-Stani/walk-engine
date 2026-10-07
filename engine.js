@@ -126,7 +126,11 @@ const TILES={
  pond:(X,Y,x,y,t)=>{r(X,Y,16,16,'#4AA3C8');const o=Math.floor(t/400+x)%4;r(X+o*3,Y+4,5,1,'#9FD7E8');r(X+((o+2)%4)*3,Y+10,5,1,'#9FD7E8');if(at(x,y-1)!=='~')r(X,Y,16,2,'#3A86A8')},
  bench:(X,Y,x,y)=>{lawn(X,Y,x,y);r(X+1,Y+5,14,2,'#9A6A3C');r(X+1,Y+8,14,3,'#B68350');r(X+2,Y+11,2,4,'#6E4A28');r(X+12,Y+11,2,4,'#6E4A28')},
 };
-function tile(x,y,X,Y,t){const c=at(x,y);const L=c!=null&&Z.legend[c];const fn=L&&TILES[L.tile];if(fn)fn(X,Y,x,y,t);else r(X,Y,16,16,Z.outdoor?'#2F8466':'#1A1F24')}
+/* the floor layer (opt-in): an object stands on its legend's floor, else on its zone's floor, so object tiles draw only the object
+   and look right in any room; a walkable tile is a floor itself unless its legend names one */
+function tile(x,y,X,Y,t){const c=at(x,y);const L=c!=null&&Z.legend[c];const fn=L&&TILES[L.tile];
+ const fl=L&&(L.floor||(!L.walk&&Z.floor));if(fl&&fl!==L.tile&&TILES[fl])TILES[fl](X,Y,x,y,t);
+ if(fn)fn(X,Y,x,y,t);else r(X,Y,16,16,Z.outdoor?'#2F8466':'#1A1F24')}
 
 /* ---------- sprites: pixel-art grids ----------
    A sprite is an array of equal-length strings; each char is a palette key ('.' = transparent).

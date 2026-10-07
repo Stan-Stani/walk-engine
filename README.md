@@ -25,6 +25,12 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   after the end so a follow-up note doesn't make it dip. If keeping them above the box would scroll past the bottom of the map,
   the box moves to the top of the screen for that conversation instead (`.dlg.attop`; toasts and word help move down) and the
   camera stays in the room.
+- Phone screen (opt-in: shell has `#phonePanel` with `#pscr` inside `#screen`): a step's `phone:{app, post, by, when, count,
+  comments:[[name,text],…], time, battery, culture}` shows an app on someone's phone filling the game view on that line. The D-pad
+  scrolls it, A finishes the line and then closes it, B closes it; its words are tappable; it closes with the conversation.
+- 문화 노트 (opt-in: shell has `#notes` and `#noteCard` in the journal; data in `globalThis.CULTURE_NOTES`): real-world culture behind a
+  story moment, `{id:{t, lines:[[korean, english, [source numbers]]…], src:[[title, url]…]}}`. A step's `culture:'id'` (or a phone's,
+  when it closes) adds it with a toast; the journal lists them; each line shows its source numbers and the sources are links.
 - Answer choices (shell CSS): side by side when they fit, three short answers on one line, else two per row; toasts at the top edge.
 - The ! / ? marker of the character you're talking to is hidden while you talk.
 - Review questions (the ? marker) are asked by the narrator, not in the NPC's voice: the sentences are generic examples.

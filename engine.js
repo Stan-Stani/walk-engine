@@ -549,6 +549,50 @@ function loop(t){const dt=Math.min(50,t-last);last=t;if(Z){update(dt,t);render(t
 
 /* ---------- dialogue ---------- */
 let dlg=null,typing=null,pending=null,sel=0;
+/* ---------- phone screen and 문화 노트 (both optional: a game's shell opts in with #phonePanel/#pscr and #notes/#noteCard) ----------
+   Step phone:{app, post, by, when, count, comments:[[name,text],…], time, battery, culture}: an app on someone's phone fills the game
+   view on that line (the D-pad and A/B stay below): the D-pad scrolls it, A finishes the line and then closes it, B closes it, and its
+   words are tappable. A step's culture:'id' (or a phone's, when it closes) adds a 문화 노트 from globalThis.CULTURE_NOTES (a game's data:
+   {id:{t, lines:[[korean, english, [source numbers]]…], src:[[title, url]…]}}): the culture behind a story moment, every line tied
+   to its sources, read in the journal. */
+let phoneOpen=false,curPhone=null;
+function openPhone(p){
+ if(!$('phonePanel'))return;curPhone=p;
+ const bars='<i class="sig"><b></b><b></b><b></b><b class="off"></b></i>',bat=p.battery??60;
+ const c=p.comments.map(([n,t])=>`<div class="pc"><span class="pn">${n}</span><span class="pt txt">${glossHTML(t)}</span></div>`).join('');
+ const more=p.count-p.comments.length;
+ $('pscr').innerHTML=`<div class="pstat"><span>${p.time||'12:30'}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
+  +`<div class="pbar"><span>${p.app}</span><span>●●●</span></div><div class="ppost"><b class="txt">${glossHTML(p.post)}</b><span class="pmeta">${p.by} · ${p.when}</span></div>`
+  +`<div class="pcount txt">${glossHTML('댓글 '+p.count+'개')}</div><div class="plist">${c}${more>0?`<div class="pmore txt">${glossHTML('댓글 '+more+'개 더 보기')}</div>`:''}</div>`;
+ $('phonePanel').hidden=false;phoneOpen=true;
+}
+function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidden=true;hideGloss();if(curPhone&&curPhone.culture)unlockCulture(curPhone.culture);curPhone=null}
+if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w)}});
+const CULTURE=globalThis.CULTURE_NOTES||{};  // a game's notes (its own file sets globalThis.CULTURE_NOTES)
+let cultureSeen=[];try{cultureSeen=JSON.parse(store.get(KEY('culture'))||'[]')}catch(e){}
+function unlockCulture(k){
+ if(!CULTURE[k]||cultureSeen.includes(k))return;cultureSeen.push(k);store.set(KEY('culture'),JSON.stringify(cultureSeen));
+ setTimeout(()=>{toast('문화 노트에 추가: '+CULTURE[k].t);sfx('badge')},350);
+}
+function renderNotes(){
+ if(!$('notes'))return;const ks=cultureSeen.filter(k=>CULTURE[k]);
+ $('notes').innerHTML=ks.length?ks.map(k=>`<button class="nb" data-k="${k}">${CULTURE[k].t}</button>`).join(''):'<p class="none">아직 없어요.</p>';
+ $('noteCard').hidden=true;
+}
+function showNote(k){
+ const n=CULTURE[k],c=$('noteCard');let en=false;
+ const draw=()=>{c.innerHTML=`<div class="top"><span class="nt">${n.t}</span><button class="enb" aria-label="English">?</button></div>`
+  +`<ol>${n.lines.map(([ko,e,s])=>`<li><span class="txt">${glossHTML(ko)}</span><sup>${s.join(',')}</sup>${en?`<span class="en">${e}</span>`:''}</li>`).join('')}</ol>`
+  +`<div class="src"><b>출처</b>${n.src.map(([t,u],i)=>`<span>${i+1}. <a href="${u}" target="_blank" rel="noopener">${t}</a></span>`).join('')}</div>`;
+  c.querySelector('.enb').addEventListener('click',e=>{e.stopPropagation();en=!en;draw()})};
+ draw();c.hidden=false;c.scrollIntoView({block:'nearest'});
+}
+if($('notes')){
+ $('notes').addEventListener('click',e=>{const b=e.target.closest('.nb');if(b)showNote(b.dataset.k)});
+ $('noteCard').addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();document.body.classList.add('talkopen');showWord(w)}});  // word help above the journal
+ for(const id of ['closePanel','panel'])$(id).addEventListener('click',e=>{if(id==='closePanel'||e.target.id==='panel')document.body.classList.remove('talkopen')});
+}
+
 function openDialog(name,steps,opts={}){
  steps=steps.filter(s=>!s.when||s.when());
  dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review};
@@ -560,6 +604,8 @@ function show(s){
  if(s.set){s.set();save()}
  if(s.walk||s.leave)queueWalks(s);
  if(s.move)moveNpcs(s);
+ if(s.phone)openPhone(s.phone);
+ if(s.culture)unlockCulture(s.culture);
  if(s.sit)sitDown(s.sit);
  [].concat(s.turn||[]).forEach(o=>{const n=C.NPC[o.npc];if(n){n.dir=o.dir;n.turnAt=performance.now()+60000}});
  if('cam' in s)camT=s.cam||null;
@@ -784,11 +830,12 @@ function advance(){
 }
 let closedAt=0;
 function closeDialog(){
- closedAt=performance.now();dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
+ closedAt=performance.now();dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
 }
 function cancel(){
+ if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}closePhone();return}
  if(CREATOR&&!$('mePanel').hidden){if(me)closeMe(false);return}  // first time: you must pick (no B)
  if(!$('startPanel').hidden){$('startPanel').hidden=true;return}
  if($('repPanel')&&!$('repPanel').hidden){closeReport();return}
@@ -843,6 +890,7 @@ function chatPair(n){
  return o&&L.includes(o)&&!(o.badge&&o.badge.length)?(n.chat?[o,n]:[n,o]):null;
 }
 function interact(){
+ if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}if(typing&&!typing.finished){typing.fin();return}closePhone();return}  // A finishes the line, then puts the phone away
  if(!$('gloss').hidden){hideGloss();return}  // A closes the definition first, without advancing
  if(panelOpen())return;
  if(choosing()||building()){confirmSel();return}
@@ -894,6 +942,7 @@ function updateSound(){$('sndBtn').setAttribute('aria-pressed',soundOn?'true':'f
 let logSel=null,showEn=false;
 function pips(w){const L=lv(w);return `<span class="pips${isDue(w)?' due':''}">${[1,2,3,4,5].map(i=>`<i class="${L.b>=i?'on':''}"></i>`).join('')}</span>`}
 function openPanel(){
+ renderNotes();
  const got=C.WORDS.filter(has);
  $('logCount').textContent=`${got.length}/${C.WORDS.length} · 복습 ${dueWords().length}`;
  if(!logSel||!has(logSel))logSel=got[got.length-1]||null;
@@ -925,6 +974,7 @@ function loadState(){
 
 /* ---------- input ---------- */
 function dirPress(d){
+ if(phoneOpen){const l=$('pscr').querySelector('.plist');if(l&&(d==='up'||d==='down'))l.scrollBy({top:d==='down'?70:-70,behavior:'smooth'});return true}  // the D-pad scrolls the phone
  if(choosing()||building()){moveSel(d==='up'||d==='left'?-1:1);return true}
  return false;
 }

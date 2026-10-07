@@ -14,7 +14,7 @@ problems=[]
 for p in sorted(fa-fb):problems.append(f'gone: {p}')
 for p in sorted(fb-fa):problems.append(f'new:  {p}')
 for p in sorted(fa&fb):
-    a=Image.open(A/p).convert('RGBA');b=Image.open(B/p).convert('RGBA')
+    a=Image.open(A/p).convert('RGB');b=Image.open(B/p).convert('RGB')  # RGB: on RGBA, getbbox() looks at alpha only and misses every change
     ch=p.parts[0];zone,var=p.stem.split('.',1)
     if a.size!=b.size:problems.append(f'size: {p} {a.size} → {b.size}');continue
     box=ImageChops.difference(a,b).getbbox()
@@ -26,11 +26,11 @@ for p in sorted(fa&fb):
             if d.crop((tx*TS,ty*TS,tx*TS+TS,ty*TS+TS)).getbbox():tiles.append((tx,ty))
     for t in tiles:changed.setdefault((ch,zone),{}).setdefault(t,set()).add(var)
     if OUT:
-        k=3;W,H=a.size;im=Image.new('RGBA',(W*2*k+12,H*k),(29,33,40,255))
+        k=3;W,H=a.size;im=Image.new('RGB',(W*2*k+12,H*k),(29,33,40))
         im.paste(a.resize((W*k,H*k),Image.NEAREST),(0,0));im.paste(b.resize((W*k,H*k),Image.NEAREST),(W*k+12,0))
         dr=ImageDraw.Draw(im)
         for tx,ty in tiles:
-            for ox in (0,W*k+12):dr.rectangle((ox+tx*TS*k,ty*TS*k,ox+(tx+1)*TS*k-1,(ty+1)*TS*k-1),outline=(255,0,90,255),width=2)
+            for ox in (0,W*k+12):dr.rectangle((ox+tx*TS*k,ty*TS*k,ox+(tx+1)*TS*k-1,(ty+1)*TS*k-1),outline=(255,0,90),width=2)
         im.save(OUT/f'{ch}-{zone}.{var}.png')
 for s in problems:print(s)
 for (ch,zone),tiles in sorted(changed.items()):

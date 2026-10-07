@@ -2,6 +2,7 @@
 // thing like a player would and saves a screenshot. Usage, from a game's repo root (after its build):
 //   C=../walk-engine/tools/ctl.mjs
 //   node $C start [ch1]     open the game fresh (no saves) at 400×820
+//   (both open with ?listen=0: no listening-only review questions, since a tester can't hear them)
 //   node $C resume [ch1]    reopen the game where its save is (after stop, a crash, or a break), keeping saves and screenshots
 //   node $C key <Key> [n]   press a key n times: ArrowUp/Down/Left/Right, z (A), x (B), m (START), Enter, 1–4
 //   node $C walk <dir> <n>  take n steps (up/down/left/right)
@@ -42,7 +43,7 @@ await cdp('Emulation.setDeviceMetricsOverride',{width:400,height:820,deviceScale
 const KEYS={ArrowUp:38,ArrowDown:40,ArrowLeft:37,ArrowRight:39,z:90,x:88,m:77,Enter:13,' ':32,'1':49,'2':50,'3':51,'4':52};
 const press=async(k,hold=60)=>{const code=KEYS[k]||0;await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:k,windowsVirtualKeyCode:code});await wait(hold);await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:k,windowsVirtualKeyCode:code});await wait(120)};
 const tap=async(x,y)=>{for(const type of ['mousePressed','mouseReleased'])await cdp('Input.dispatchMouseEvent',{type,x,y,button:'left',clickCount:1});await wait(250)};
-if(cmd==='start'||cmd==='resume'){await cdp('Page.navigate',{url:`file://${DIR}/index.html?ch=${args[0]||'ch1'}`});await wait(2500)}
+if(cmd==='start'||cmd==='resume'){await cdp('Page.navigate',{url:`file://${DIR}/index.html?ch=${args[0]||'ch1'}&listen=0`});await wait(2500)}
 else if(cmd==='key'){for(let i=0;i<(+args[1]||1);i++)await press(args[0]);await wait(500)}
 else if(cmd==='walk'){const k={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[args[0]];for(let i=0;i<(+args[1]||1);i++){await press(k,170);await wait(80)}await wait(300)}
 else if(cmd==='tap'){await tap(+args[0],+args[1]);await wait(300)}

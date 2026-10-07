@@ -29,6 +29,9 @@ const TERM=new Proxy(TERM_BASE,{get:(o,k)=>(typeof C!=='undefined'&&C&&C.term&&k
 const LOGNAME=G.log||LOGNAME;
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 let soundOn=store.get(KEY('sound'))!=='0';
+/* 듣기 문제 (START menu): review may ask a word by sound alone. On by default; ?listen=0 in the URL turns it off and saves that
+   (the playtest tools do, since testers can't hear) */
+let listenOn=store.get(KEY('listen'))!=='0';{const q=new URLSearchParams(location.search).get('listen');if(q==='0'||q==='1'){listenOn=q==='1';store.set(KEY('listen'),q)}}
 let readOn=store.get(KEY('read'))==='1';
 
 /* ---------- sound ---------- */
@@ -801,7 +804,7 @@ function reviewFor(words){ // pick a question for the weakest of these words
  const w=ws[0];
  const all=allQuestions().filter(q=>q.w===w),own=all.filter(q=>!q.gram),qs=own.length?own:all;  // gram:1 tests a pattern, not the word: no star for the word from it
  const narr={review:true,who:'…',ok:'맞아요!'};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
- if(canSpeak()&&soundOn&&Math.random()<.35)return {listen:w,...narr};  // a muted phone can't answer a listening question
+ if(canSpeak()&&soundOn&&listenOn&&Math.random()<.35)return {listen:w,...narr};  // a muted phone (or 듣기 문제 off) can't answer a listening question
  return {...qs[Math.random()*qs.length|0],...narr};
 }
 function terminal(){
@@ -1028,6 +1031,8 @@ function skipTalk(){
  $('skipBtn').addEventListener('click',e=>{e.stopPropagation();skipTalk()});
 })();
 $('sndBtn').addEventListener('click',()=>{soundOn=!soundOn;store.set(KEY('sound'),soundOn?'1':'0');updateSound();sfx('ok')});
+if($('listenBtn')){const upd=()=>$('listenBtn').setAttribute('aria-pressed',String(listenOn));upd();  // a game's shell may offer the 듣기 문제 toggle
+ $('listenBtn').addEventListener('click',()=>{listenOn=!listenOn;store.set(KEY('listen'),listenOn?'1':'0');upd();sfx('ok');toast(listenOn?'복습에 듣기 문제가 나와요.':'듣기 문제를 껐어요.')})}
 $('readBtn').addEventListener('click',()=>{
  if(!canSpeak()){toast('이 기기에는 한국어 음성이 없어요.');return}
  readOn=!readOn;store.set(KEY('read'),readOn?'1':'0');updateRead();toast(readOn?'대사를 소리 내서 읽어요.':'읽기를 껐어요.');if(readOn&&dlg)speak(dlg.cur.say||dlg.cur.ask||'');

@@ -42,6 +42,8 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   word-order question a player ever meets (per game, saved), after a 4 s pause the first right tile gets the `hint` class (bobbing,
   via each game's shell CSS). Never again after that, and never past the first tile. Number keys 1–9 place the nth tile still on the
   table, as 1–4 answer choices; arrows + A work too.
+- 듣기 문제: review sometimes asks a word by sound alone (only with sound on). A shell button `#listenBtn` (START menu) turns that
+  off, saved per game; `?listen=0` in the URL does the same. `tools/ctl.mjs` opens games with it off (testers can't hear).
 - While a question waits with nothing selected (choices start unselected so A can't answer by accident), the A button dims.
 - 디버그 (START menu, saved per game): adds a 건너뛰기 button to every conversation. It runs the conversation to the end with right
   answers and all its effects, and stops at a real choice (`choose`). For testing.

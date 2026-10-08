@@ -13,7 +13,7 @@ const lv=w=>state.lv[w]||{b:0,due:0};
 const isDue=w=>has(w)&&lv(w).due<=now();
 function grade(w,ok){
  const L={...lv(w)};
- L.b=ok?Math.min(5,L.b+1):0;L.due=now()+GAP[L.b];
+ if(!ok){L.b=0;L.due=now()}else if(L.due<=now()){L.b=Math.min(5,L.b+1);L.due=now()+GAP[L.b]}  // a right answer before the word is due doesn't level it up (asking again and again can't max a word)
  state.lv[w]=L;save();return L.b;
 }
 const dueWords=()=>C.WORDS.filter(isDue);
@@ -917,7 +917,7 @@ function talkWith(n){
  if(!pair&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
  let steps=n.script?n.script():null,isReview=false;
  if(!steps){
-  if(n.badge&&n.badge.every(has)){steps=[...says(n.after),reviewFor(n.badge)];isReview=true}
+  if(n.badge&&n.badge.every(has)){const due=n.badge.some(isDue);steps=due?[...says(n.after),reviewFor(n.badge)]:says(n.after);isReview=due}  // a review question only when one of their words is due
   else steps=n.talk();
  }
  if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}

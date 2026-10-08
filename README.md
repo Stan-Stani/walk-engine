@@ -16,10 +16,11 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   in the wrong order. Also on loading a save in that room, so a reload in the middle of it starts it over.
 - Follower: a chapter's `FOLLOW:{name, look, when, talk}` walks one square behind you while `when()` is true (talk to it like
   anyone). When it starts in a talk with the person of that `name` (who hides on the same flag: "가자. 앞장서."), it starts from
-  where they stood, so they don't blink out.
+  where they stood, so they don't blink out. Pressing toward them turns you to face them; pressing again swaps places.
 - 문제 알리기 (START menu, added by the engine): game or Korean problem, plus a note. Context is attached automatically: chapter, room, position, objective, the last lines and the last looked-up word. 보내기 links to the word-reports inbox (`https://seldoncortex.com/word-reports/#…`); see the word-reports repo.
 - Front layer: a legend entry can name `front:'tileName'`. That tile function runs after the characters, without clipping, so a tree canopy can overhang the row above and cover the player walking behind it.
 - Choices that aren't quizzes: a step with `choose:[[label, fn|null], …]` shows buttons, closes the conversation and runs `fn`. An inspect line (spots/things) may be `{steps:[…]}`. `nextChapterAsk(line)` builds the end-of-chapter "go on to the next one?" prompt for a gate.
+- Singing: an NPC with `sing:true` (or a function) has three little ♪ rising from above their head while it's true.
 - Sitting: an NPC with `sit:true` (or a function) is drawn seated and doesn't turn to talk; `chair:` names a look (custom art) to sit on.
   A dialogue step `sit:{npc:'chairId'}` sits the player on that chair facing its direction (`sit:{x,y,dir,chair}` anywhere); the first
   arrow key stands them up, and the save keeps where they stood. From more than a step away it's a quick fade cut, not a jump. Chair art options: `back` (bottom rows redrawn over the sitter: the

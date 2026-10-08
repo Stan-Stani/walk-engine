@@ -394,7 +394,8 @@ const panelOpen=()=>(CREATOR&&!$('mePanel').hidden)||!$('startPanel').hidden||!$
 function tryMove(){
  if(player.moving||!held||dlg||panelOpen()||warping)return;
  player.sit=null;
- player.dir=held;const [dx,dy]=D[held];const nx=player.x+dx,ny=player.y+dy;
+ const was=player.dir;player.dir=held;const [dx,dy]=D[held];const nx=player.x+dx,ny=player.y+dy;
+ if(petOn()&&pet.x===nx&&pet.y===ny&&was!==held)return;  // the follower right there: a press turns you to face them (A talks); pressing again swaps places
  const w=warpAt(nx,ny);const lock=w&&w.lock&&w.lock();
  if(lock){if(performance.now()-lockMsgAt>1500){lockMsgAt=performance.now();sfx('lock');toast(lock)}return}
  if(blocked(nx,ny))return;
@@ -460,6 +461,12 @@ function placeBox(rows,camY){
 }
 function talkRows(){const rows=[player.y],n=dlg&&dlg.npc;if(n&&NPCS.includes(n)&&(!n.hide||!n.hide()))rows.push(npcPos(n)[1]);return rows}
 function talkLift(){return null}  // talk never moves the camera (the box chooses its side instead)
+/* sing: true | fn on an NPC → three little ♪ rise from above their head, drift and fade, while it's true (a song on air) */
+function singNotes(x,y,t,seed){
+ for(let i=0;i<3;i++){const p=(t/1600+i/3+seed*.13)%1,X=x+Math.round(Math.sin(p*5+i*2)*3)+(i-1)*4,Y=y-Math.round(p*16);
+  g.globalAlpha=p<.2?p/.2:1-(p-.2)/.8;
+  const note=(c,o)=>{r(X+o,Y+o+4,3,2,c);r(X+o+2,Y+o,1,5,c);r(X+o+3,Y+o+1,1,1,c);r(X+o+4,Y+o+2,1,1,c)};note('#2B2E36',1);note('#FFF3C4',0)}  // shadow, then the note
+ g.globalAlpha=1}
 function render(t){
  const px=player.moving?player.fx+(player.x-player.fx)*player.t:player.x;
  const py=player.moving?player.fy+(player.y-player.fy)*player.t:player.y;
@@ -497,6 +504,7 @@ function render(t){
  ents.sort((a,b)=>a.y-b.y).forEach(e=>e.f());
  // a legend entry's `front` tile (tree canopies) draws after the characters, unclipped: it overhangs and covers whoever walks behind it
  for(let y=y0-4;y<=y0+VH;y++)for(let x=x0-4;x<=x0+VW;x++){const c=at(x,y),L=c!=null&&Z.legend[c];if(L&&L.front&&TILES[L.front])TILES[L.front](x*TS-cx,y*TS-cy,x,y,t)}
+ for(const n of live())if(typeof n.sing==='function'?n.sing():n.sing){const [nx,ny]=npcPos(n);singNotes(Math.round(nx*TS-cx)+6,Math.round(ny*TS-cy)-10,t,nx*7+ny)}  // someone singing
  /* lights out in a broken room: everything goes dark except a small circle around the player */
  const dk=Z.dark&&Z.dark();
  if(dk){

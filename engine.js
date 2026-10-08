@@ -1134,7 +1134,7 @@ addEventListener('keydown',e=>{
  if(e.target.closest&&e.target.closest('textarea,input'))return;  // typing a note, not playing
  if(KEYS[e.key]){e.preventDefault();if(dirPress(KEYS[e.key]))return;held=KEYS[e.key];return}
  if(choosing()&&/^[1-4]$/.test(e.key)){const b=choiceBtns()[+e.key-1];if(b){e.preventDefault();b.click()}return}
- if(building()&&/^[1-9]$/.test(e.key)){const b=tileBtns()[+e.key-1];if(b){e.preventDefault();b.click()}return}
+ if(building()&&/^[1-9]$/.test(e.key)){const b=[...document.querySelectorAll('#tiles .tile')][+e.key-1];e.preventDefault();if(b&&!b.classList.contains('used'))b.click();return}  // N = the Nth tile where it sits (placed tiles leave a gap)
  if([' ','Enter','z','Z'].includes(e.key)){e.preventDefault();if(!e.repeat)interact();return}
  if(['x','X','Escape'].includes(e.key)){e.preventDefault();cancel();return}
  if(['m','M'].includes(e.key)&&!e.repeat){e.preventDefault();toggleStart()}

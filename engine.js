@@ -24,7 +24,7 @@ function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?`${m}분`:m<1440?`${
 /* Per-game settings come from src/game.js (`var GAME={…}`), so one engine serves 성실호, 형제 and 방과 후. */
 const G=typeof GAME!=='undefined'?GAME:{};
 const KEY=k=>(G.prefix||'walk')+'-'+k;
-const TERM_BASE=Object.assign({name:'복습 노트',empty:'아직 노트가 비어 있어요.',idle:'지금은 복습할 단어가 없어요.',next:'다음 복습',due:n=>`복습할 단어가 ${n}개 있어요.`,end:'복습 끝! 다음에 또 봐요.'},G.term||{});
+const TERM_BASE=Object.assign({name:'복습 노트',empty:'아직 노트가 비어 있어요.',idle:'지금은 복습할 단어가 없어요.',next:'다음 복습',due:(n,k)=>`복습할 단어가 ${n}개 있어요.`+(k<n?` 이번에는 ${k}개만 해요.`:''),end:'복습 끝! 다음에 또 봐요.'},G.term||{});
 const TERM=new Proxy(TERM_BASE,{get:(o,k)=>(typeof C!=='undefined'&&C&&C.term&&k in C.term)?C.term[k]:o[k]});  // a chapter's term:{name,…} overrides the game's (one 교시 reviews on paper, the next on a laptop)
 const LOGNAME=G.log||LOGNAME;
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
@@ -883,7 +883,7 @@ function terminal(){
  if(!state.badges.length)return [{who:TERM.name,say:TERM.empty}];
  if(!due.length){const n=nextDue();return [{who:TERM.name,say:TERM.idle+(n?` ${TERM.next}: ${fmtWait(n-now())} 후.`:'')}]}
  const pick=shuffle(due.slice()).slice(0,4);
- const steps=[{who:TERM.name,say:TERM.due(due.length)}];
+ const steps=[{who:TERM.name,say:TERM.due(due.length,pick.length)}];  // due(n,k): n words due, k asked this round (at most 4)
  pick.forEach(w=>steps.push(reviewFor([w])));
  steps.push({who:TERM.name,say:TERM.end});
  return steps;

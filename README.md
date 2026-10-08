@@ -72,7 +72,7 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   unless its legend names one. Zones without `floor` are drawn exactly as before.
 - Review computer: the `terminal` tile, or any legend entry with `term:1` (so a laptop can look different and still open review).
   Its name and lines come from the game's `term`; a chapter's own `term:{name,…}` overrides them (a paper 복습 노트 in one chapter,
-  the 방송실's 복습 노트북 in the next).
+  the 방송실's 복습 노트북 in the next). A round asks at most 4 words; `due(n,k)` gets the number due and the number asked.
 - Grammar questions: a question step with `gram:1` tests a pattern (척, -대, -다 보니) asked under some word, not the word itself.
   It is asked in conversations as usual; review asks a word's own questions and skips these, so they never give that word a ★.
 - Step `move:{npc:'id', to:[x,y], dir}` (or a list): mid-conversation, on that line, the NPC walks from where it stands to `to` and

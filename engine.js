@@ -407,7 +407,7 @@ function arrive(){
 }
 function goZone(id,x,y,dir){
  warping=true;sfx('door');$('fade').classList.add('on');
- setTimeout(()=>{loadZone(id,x,y,dir);save();$('fade').classList.remove('on');if(held&&held!==dir)held=null;setTimeout(()=>{warping=false;tryMove()},120)},230);  // turned around by the warp: let go of the held direction
+ setTimeout(()=>{loadZone(id,x,y,dir);save();$('fade').classList.remove('on');if(held&&held!==dir)held=null;setTimeout(()=>{warping=false;if(!greet())tryMove()},120)},230);  // turned around by the warp: let go of the held direction
 }
 function loadZone(id,x,y,dir){
  ZID=id;Z=C.ZONES[id];state.zone=id;
@@ -415,7 +415,7 @@ function loadZone(id,x,y,dir){
  NPCS=Z.npcs.map(k=>C.NPC[k]);NPCS.forEach(n=>{n.home=n.home||n.dir;n.turnAt=performance.now()+2000+Math.random()*3000});
  Object.assign(player,{x,y,dir,moving:false,t:0,sit:null});camT=null;camF=null;state.x=x;state.y=y;state.dir=dir;
  petReset();pet.on=false;ghosts=[];
- $('reg').textContent=`${Z.reg} · ${CH.n} ${CH.title}`;showRoom(true);
+ $('reg').textContent=`${Z.reg} · ${CH.n} ${CH.title}`;fitReg();showRoom(true);
 }
 let roomName='';
 function showRoom(force){
@@ -593,6 +593,14 @@ if($('notes')){
  for(const id of ['closePanel','panel'])$(id).addEventListener('click',e=>{if(id==='closePanel'||e.target.id==='panel')document.body.classList.remove('talkopen')});
 }
 
+/* a room's greeting: zone greet:'npcId' (or a function returning one, or null) — whoever is there talks to you the moment you walk
+   in, before you can move (찬 at the gym door), so a scene can't be met in the wrong order. Also on loading a save in that room, so
+   a reload in the middle of it starts it over (its flag is only set on its last line). */
+function greet(){
+ const g=typeof Z.greet==='function'?Z.greet():Z.greet,n=g&&C.NPC[g];if(!n||!NPCS.includes(n)||(n.hide&&n.hide())||dlg)return false;
+ const [nx,ny]=npcPos(n),dx=nx-player.x,dy=ny-player.y;held=null;
+ player.dir=Math.abs(dx)>=Math.abs(dy)&&dx?(dx>0?'right':'left'):(dy>0?'down':'up');state.dir=player.dir;  // look at them
+ talkWith(n);return true}
 function openDialog(name,steps,opts={}){
  steps=steps.filter(s=>!s.when||s.when());
  dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review};
@@ -890,6 +898,19 @@ function chatPair(n){
  const L=live(),o=n.chat?C.NPC[n.chat]:L.find(m=>m.chat&&C.NPC[m.chat]===n);
  return o&&L.includes(o)&&!(o.badge&&o.badge.length)?(n.chat?[o,n]:[n,o]):null;
 }
+/* a conversation with n, as when you press A facing them (also a room's greeting) */
+function talkWith(n){
+ if(n.proxy){const p=n.proxy();if(p)n=p}
+ const pair=chatPair(n);  // two people talking to each other: they keep facing each other, and the one who started speaks first
+ if(!pair&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
+ let steps=n.script?n.script():null,isReview=false;
+ if(!steps){
+  if(n.badge&&n.badge.every(has)){steps=[...says(n.after),reviewFor(n.badge)];isReview=true}
+  else steps=n.talk();
+ }
+ if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
+ openDialog(n.name,steps,{npc:n,review:isReview});
+}
 function interact(){
  if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}if(typing&&!typing.finished){typing.fin();return}closePhone();return}  // A finishes the line, then puts the phone away
  if(!$('gloss').hidden){hideGloss();return}  // A closes the definition first, without advancing
@@ -899,18 +920,7 @@ function interact(){
  if(performance.now()-closedAt<650)return;  // the tap that closed a talk, doubled, doesn't reopen it
  if(player.moving||warping)return;
  const F=facing();if(!F)return;
- if(F.n){
-  let n=F.n;if(n.proxy){const p=n.proxy();if(p)n=p}
-  const pair=chatPair(n);  // two people talking to each other: they keep facing each other, and the one who started speaks first
-  if(!pair&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
-  let steps=n.script?n.script():null,isReview=false;
-  if(!steps){
-   if(n.badge&&n.badge.every(has)){steps=[...says(n.after),reviewFor(n.badge)];isReview=true}
-   else steps=n.talk();
-  }
-  if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
-  openDialog(n.name,steps,{npc:n,review:isReview});return;
- }
+ if(F.n){talkWith(F.n);return}
  if(F.pet){openDialog(C.FOLLOW.name,C.FOLLOW.talk());return}
  if(F.term){openDialog(TERM.name,terminal(),{review:true});return}
  if(F.spot){openDialog('…',F.spot.steps||says(F.spot))}
@@ -936,7 +946,11 @@ function finish(pre){
 let toastT;function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2400)}
 
 /* ---------- HUD + log ---------- */
-function updateHud(){const n=state.badges.length,st=C.WORDS.filter(w=>has(w)&&lv(w).b>=3).length;$('logBtn').textContent=`일지 ${n}/${C.WORDS.length}`+(st?` ★${st}`:'')}
+function updateHud(){const n=state.badges.length,st=C.WORDS.filter(w=>has(w)&&lv(w).b>=3).length;$('logBtn').textContent=`일지 ${n}/${C.WORDS.length}`+(st?` ★${st}`:'');fitReg()}
+/* the header label (room · 교시 title): tighten its letter spacing, then its size, before it would be cut off (…) next to a wide 일지 badge */
+function fitReg(){const e=$('reg');if(!e)return;e.style.letterSpacing=e.style.fontSize='';const f0=parseFloat(getComputedStyle(e).fontSize);
+ for(const [ls,k] of [['.08em',1],['.03em',1],['.02em',.92],['0',.86]]){if(e.scrollWidth<=e.clientWidth)return;e.style.letterSpacing=ls;e.style.fontSize=k<1?f0*k+'px':''}}
+addEventListener('resize',()=>fitReg());
 function updateQuest(){$('questTxt').textContent=C.questText()}
 function updateRead(){$('readBtn').setAttribute('aria-pressed',readOn&&canSpeak()?'true':'false');$('spk').hidden=!canSpeak()}
 function updateSound(){$('sndBtn').setAttribute('aria-pressed',soundOn?'true':'false')}
@@ -1132,6 +1146,7 @@ function boot(id){
  $('chName').textContent=CH.n;
  updateHud();updateQuest();
  if(!state.seenIntro){state.seenIntro=true;save();const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
+ else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over
 }
 function chapterProgress(c){try{const s=JSON.parse(store.get(c.save)||'null');return s?{got:(s.badges||[]).length,done:!!(s.f&&s.f.done)}:{got:0,done:false}}catch(e){return {got:0,done:false}}}
 function openChapters(){

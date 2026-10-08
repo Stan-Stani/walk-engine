@@ -11,6 +11,9 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - `leave:{npc:'id', to:[x,y]}` on the step whose flag hides that NPC (the line that narrates the exit): it walks from its spot to
   `to` (a door, the map edge, up a tree) right away, during that line, and is gone. Put it on the line that says they leave, not
   a later one, or they linger after the text says they left. Both take one object or a list.
+- Greeting: a zone's `greet:'npcId'` (or a function returning an id or null) has that person talk to you the moment you walk in,
+  before you can move, if they're there (you turn to face them). A scene that must open a room (찬 at the gym door) can't be met
+  in the wrong order. Also on loading a save in that room, so a reload in the middle of it starts it over.
 - Follower: a chapter's `FOLLOW:{name, look, when, talk}` walks one square behind you while `when()` is true (talk to it like
   anyone). When it starts in a talk with the person of that `name` (who hides on the same flag: "가자. 앞장서."), it starts from
   where they stood, so they don't blink out.

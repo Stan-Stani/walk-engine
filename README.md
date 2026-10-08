@@ -91,6 +91,8 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   the engine's sprites (player, NPCs, followers); `GAME.marker(X, Y, t, status)` draws the ! ? ★ markers ('todo', 'review',
   'wait', 'star'); `GAME.hud` names the HUD counter (default 일지). A `term.allWords(n)` gives the note when the last word is in
   (default: "단어 n개를 다 모았어요!" + review hint; `[]` for none, when the chapter's own ending says it).
+- More chapter hooks (all optional): `C.onStep()` after every step taken (count steps, start a scene on a square), `C.afterTalk()`
+  when any conversation closes, `C.questLate()` → the 목표 line gets the `late` class, and `GAME.onBoot(CH, C)` when a chapter starts.
 
 ## Tools
 - `tools/ctl.mjs`: hands-on controller for playing a game like a player would (one phone-sized Chrome; each command presses keys,

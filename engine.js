@@ -406,6 +406,7 @@ function tryMove(){
 }
 function arrive(){
  state.x=player.x;state.y=player.y;state.dir=player.dir;save();
+ if(C.onStep){C.onStep();updateQuest();save()}  // a chapter that counts steps or starts a scene on a square (단어 마을's cartridges)
  const w=warpAt(player.x,player.y);
  if(w){goZone(w.to,w.x,w.y,w.dir);return true}
  showRoom();return false;
@@ -854,6 +855,7 @@ let closedAt=0;
 function closeDialog(){
  closedAt=performance.now();dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();
+ if(C.afterTalk)C.afterTalk();  // a chapter's own check after every conversation (단어 마을: the cartridge is complete, every word is ★)
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
 }
 function cancel(){
@@ -965,7 +967,7 @@ function updateHud(){const n=state.badges.length,st=C.WORDS.filter(w=>has(w)&&lv
 function fitReg(){const e=$('reg');if(!e)return;e.style.letterSpacing=e.style.fontSize='';const f0=parseFloat(getComputedStyle(e).fontSize);
  for(const [ls,k] of [['.08em',1],['.03em',1],['.02em',.92],['0',.86]]){if(e.scrollWidth<=e.clientWidth)return;e.style.letterSpacing=ls;e.style.fontSize=k<1?f0*k+'px':''}}
 addEventListener('resize',()=>fitReg());
-function updateQuest(){$('questTxt').textContent=C.questText()}
+function updateQuest(){$('questTxt').textContent=C.questText();$('quest').classList.toggle('late',!!(C.questLate&&C.questLate()))}  // questLate: the goal is overdue (shell CSS .quest.late)
 function updateRead(){$('readBtn').setAttribute('aria-pressed',readOn&&canSpeak()?'true':'false');$('spk').hidden=!canSpeak()}
 function updateSound(){$('sndBtn').setAttribute('aria-pressed',soundOn?'true':'false')}
 let logSel=null,showEn=false;
@@ -1159,6 +1161,7 @@ function boot(id){
  loadZone(state.zone,state.x,state.y,state.dir);
  $('chName').textContent=CH.n;
  updateHud();updateQuest();
+ if(G.onBoot)G.onBoot(CH,C);  // the game's own page parts for this chapter (단어 마을: tips, news sources)
  if(!state.seenIntro){state.seenIntro=true;save();const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
  else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over
 }

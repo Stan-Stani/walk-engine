@@ -379,7 +379,9 @@ const sitting=n=>typeof n.sit==='function'?n.sit():!!n.sit;  // NPC sit: true | 
    them up. The saved position stays where they stood, so a reload never puts them inside the chair. */
 function sitDown(o){
  const n=o.npc?C.NPC[o.npc]:null,[x,y]=n?npcPos(n):[o.x,o.y];
- Object.assign(player,{x,y,dir:o.dir||(n&&(n.home||n.dir))||player.dir,moving:false,t:0,sit:{npc:n,chair:o.chair||(n&&n.look)||null}});
+ const go=()=>Object.assign(player,{x,y,dir:o.dir||(n&&(n.home||n.dir))||player.dir,moving:false,t:0,sit:{npc:n,chair:o.chair||(n&&n.look)||null}});
+ if(Math.abs(player.x-x)+Math.abs(player.y-y)>1){$('fade').classList.add('on');setTimeout(()=>{go();$('fade').classList.remove('on')},230)}  // from further off: a cut, not a jump
+ else go();
 }
 const live=()=>NPCS.filter(n=>!n.hide||!n.hide());
 const npcAt=(x,y)=>live().find(n=>{const [a,b]=npcPos(n);return a===x&&b===y});

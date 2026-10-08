@@ -22,7 +22,7 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - Choices that aren't quizzes: a step with `choose:[[label, fn|null], …]` shows buttons, closes the conversation and runs `fn`. An inspect line (spots/things) may be `{steps:[…]}`. `nextChapterAsk(line)` builds the end-of-chapter "go on to the next one?" prompt for a gate.
 - Sitting: an NPC with `sit:true` (or a function) is drawn seated and doesn't turn to talk; `chair:` names a look (custom art) to sit on.
   A dialogue step `sit:{npc:'chairId'}` sits the player on that chair facing its direction (`sit:{x,y,dir,chair}` anywhere); the first
-  arrow key stands them up, and the save keeps where they stood. Chair art options: `back` (bottom rows redrawn over the sitter: the
+  arrow key stands them up, and the save keeps where they stood. From more than a step away it's a quick fade cut, not a jump. Chair art options: `back` (bottom rows redrawn over the sitter: the
   backrest of a chair facing away), `keep` (sitter rows kept, default 12 = head to belt), `drop` (px the sitter sinks, default 2),
   `lift` (px the whole seat rises, e.g. a stool pulled up to the table in the row above).
 - Dialogue box: as tall as its line, never taller than it needs. The typing lays the whole line out first (the untyped rest

@@ -207,7 +207,7 @@ function humanArt(L,dir,step){
 }
 function humanPal(L){
  const o='#1B1E2B';
- return {O:o,E:o,H:L.hair,h:shade(L.hair,.78),S:L.skin,s:shade(L.skin,.85),M:shade(L.skin,.72),W:shade(L.skin,1.12),C:L.shirt,c:shade(L.shirt,.8),
+ return {O:o,E:o,H:L.hair,h:L.hairHi||shade(L.hair,.78),S:L.skin,s:shade(L.skin,.85),M:shade(L.skin,.72),W:shade(L.skin,1.12),C:L.shirt,c:shade(L.shirt,.8),
   P:L.pants,p:shade(L.pants,.8),K:L.shoes||'#2A2A33',B:L.belt||L.shirt,D:L.beard||L.hair,L:L.lips||shade(L.skin,.72),A:L.arm||L.skin,Y:L.cap||L.hair,y:shade(L.cap||L.hair,.8),V:shade(L.cap||'#333333',.55)};
 }
 /* ---------- talk portraits: a chest-up 48×48 pixel portrait generated from a character's walk look (hair style/colour,
@@ -218,7 +218,7 @@ function portraitGrid(L,face,open){
  const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)px(i,j,c)};
  const oval=(cx,cy,rx,ry,c,y0=-99,y1=99)=>{for(let y=Math.ceil(cy-ry);y<=cy+ry;y++)for(let x=Math.ceil(cx-rx);x<=cx+rx;x++)
    if(y>=y0&&y<=y1&&((x-cx)/rx)**2+((y-cy)/ry)**2<=1)px(x,y,c)};
- const sk=L.skin,skS=shade(L.skin,.85),hr=L.hair,hrS=shade(L.hair,.78),sh=L.shirt,shS=shade(L.shirt,.82),style=L.style||(L.long?'long':'short');
+ const sk=L.skin,skS=shade(L.skin,.85),hr=L.hair,hrS=L.hairHi||shade(L.hair,.78),sh=L.shirt,shS=shade(L.shirt,.82),style=L.style||(L.long?'long':'short');
  // shoulders + uniform
  rect(9,40,30,8,sh);rect(12,37,24,4,sh);rect(9,44,4,4,shS);rect(35,44,4,4,shS);
  for(let i=0;i<5;i++){px(19+i,37+i,'#F4F2EA');px(28-i,37+i,'#F4F2EA')}         // collar V
@@ -572,6 +572,12 @@ let phoneOpen=false,curPhone=null;
 function openPhone(p){
  if(!$('phonePanel'))return;curPhone=p;
  const bars='<i class="sig"><b></b><b></b><b></b><b class="off"></b></i>',bat=p.battery??60;
+ if(p.photo){  // an album photo: a pixel picture (a look's portrait, made old) with its caption
+  $('pscr').innerHTML=`<div class="pstat"><span>${p.time||'12:30'}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
+   +`<div class="pbar"><span>${p.app||'사진'}</span><span>●●●</span></div><div class="pphoto${p.photo.old?' old':''}"><canvas width="48" height="48"></canvas><div class="pcap txt">${glossHTML(p.photo.caption||'')}</div></div>`;
+  const cv=$('pscr').querySelector('canvas');drawPortrait(cv,p.photo.look,p.photo.face||'happy',false);
+  if(p.photo.mic){const c=cv.getContext('2d');const R=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h)};R(33,27,7,7,'#1B1E2B');R(34,28,5,5,'#8A8E96');R(35,29,1,1,'#C9CDD4');R(35,34,3,14,'#1B1E2B');R(36,34,1,14,'#3A3E48')}  // a microphone in front
+  $('phonePanel').hidden=false;phoneOpen=true;return}
  const c=p.comments.map(([n,t])=>`<div class="pc"><span class="pn">${n}</span><span class="pt txt">${glossHTML(t)}</span></div>`).join('');
  const more=p.count-p.comments.length;
  $('pscr').innerHTML=`<div class="pstat"><span>${p.time||'12:30'}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
@@ -623,6 +629,7 @@ function show(s){
  dlg.cur=s;hideGloss();
  lastLines.push(((s.who||dlg.name||'')+': '+plain(s.say||s.ask||'')).slice(0,300));if(lastLines.length>3)lastLines.shift();
  if(s.set){s.set();save()}
+ if('black' in s){$('fade').classList.toggle('on',!!s.black);dlg.black=!!s.black}  // black:1 — the line plays over a black screen (a time cut); black:0 or the end of the talk brings the room back
  if(s.walk||s.leave)queueWalks(s);
  if(s.move)moveNpcs(s);
  if(s.phone)openPhone(s.phone);
@@ -853,6 +860,7 @@ function advance(){
 }
 let closedAt=0;
 function closeDialog(){
+ const wasBlack=dlg&&dlg.black;if(wasBlack)$('fade').classList.remove('on');
  closedAt=performance.now();dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();
  if(C.afterTalk)C.afterTalk();  // a chapter's own check after every conversation (단어 마을: the cartridge is complete, every word is ★)
@@ -987,7 +995,12 @@ function openPanel(){
   $('cardSpk')?.addEventListener('click',()=>speak(logSel+'. '+d.ex));
   $('enBtn')?.addEventListener('click',()=>{showEn=true;openPanel()});
  }else $('card').innerHTML='<span class="def">아직 단어가 없어요.</span><span class="ex">사람들한테 말을 걸면 일지에 단어가 생겨요.</span>';
- $('items').innerHTML=state.items.length?state.items.map(i=>`<li title="${String(C.ITEMS[i]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(i).replace(/</g,'&lt;')}</li>`).join(''):'<li class="none">비어 있어요.</li>';
+ $('items').innerHTML=state.items.length?state.items.map((i,k)=>`<li data-k="${k}" title="${String(C.ITEMS[i]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(i).replace(/</g,'&lt;')}</li>`).join(''):'<li class="none">비어 있어요.</li>';
+ /* tap an item to read it again (the 복숭아 쪽지 that starts it all): its description in the card; an item with a photo (C.PHOTOS) opens it */
+ $('items').querySelectorAll('li[data-k]').forEach(li=>li.addEventListener('click',()=>{const name=state.items[+li.dataset.k],ph=(C.PHOTOS||{})[name];
+  if(ph){$('panel').hidden=true;openPhone(ph);return}
+  $('items').querySelectorAll('li').forEach(x=>x.classList.toggle('sel',x===li));
+  $('card').innerHTML=`<div class="top"><span class="big">${String(name).replace(/</g,'&lt;')}</span></div><span class="def txt">${glossHTML(String(C.ITEMS[name]||''))}</span>`}));
  $('panel').hidden=false;
 }
 

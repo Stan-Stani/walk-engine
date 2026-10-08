@@ -93,6 +93,13 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   the engine's sprites (player, NPCs, followers); `GAME.marker(X, Y, t, status)` draws the ! ? ★ markers ('todo', 'review',
   'wait', 'star'); `GAME.hud` names the HUD counter (default 일지) and `GAME.gotToast` the new-word toast (default 일지에 추가). A `term.allWords(n)` gives the note when the last word is in
   (default: "단어 n개를 다 모았어요!" + review hint; `[]` for none, when the chapter's own ending says it).
+- Step `black:1`: the line (and the ones after it) plays over a black screen, a time cut ("겨울." in an epilogue); `black:0` or the end
+  of the conversation brings the room back.
+- Phone `photo:{look, face, caption, mic, old}` (instead of a post): an album photo, the look's portrait drawn as a pixel picture
+  (`old`: faded, via the shell's `.pphoto.old` CSS; `mic`: a microphone in front) with its caption. A chapter's `PHOTOS:{item: phone}`
+  makes that bag item open it again.
+- The journal's bag: tapping an item shows its description in the card (or opens its photo).
+- A look's `hairHi`: the colour of the hair's shading strands (grey streaks in dark hair); default a darker shade of `hair`.
 - More chapter hooks (all optional): `C.onStep()` after every step taken (count steps, start a scene on a square), `C.afterTalk()`
   when any conversation closes, `C.questLate()` → the 목표 line gets the `late` class, and `GAME.onBoot(CH, C)` when a chapter starts.
 

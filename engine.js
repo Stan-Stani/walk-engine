@@ -24,7 +24,7 @@ function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?`${m}분`:m<1440?`${
 /* Per-game settings come from src/game.js (`var GAME={…}`), so one engine serves 성실호, 형제 and 방과 후. */
 const G=typeof GAME!=='undefined'?GAME:{};
 const KEY=k=>(G.prefix||'walk')+'-'+k;
-const TERM_BASE=Object.assign({name:'복습 노트',empty:'아직 노트가 비어 있어요.',idle:'지금은 복습할 단어가 없어요.',next:'다음 복습',due:(n,k)=>`복습할 단어가 ${n}개 있어요.`+(k<n?` 이번에는 ${k}개만 해요.`:''),end:'복습 끝! 다음에 또 봐요.'},G.term||{});
+const TERM_BASE=Object.assign({allWords:n=>[`단어 ${n}개를 다 모았어요!`,`이제 ${TERM.name}에서 복습하면 ★가 생겨요.`],name:'복습 노트',empty:'아직 노트가 비어 있어요.',idle:'지금은 복습할 단어가 없어요.',next:'다음 복습',due:(n,k)=>`복습할 단어가 ${n}개 있어요.`+(k<n?` 이번에는 ${k}개만 해요.`:''),end:'복습 끝! 다음에 또 봐요.'},G.term||{});
 const TERM=new Proxy(TERM_BASE,{get:(o,k)=>(typeof C!=='undefined'&&C&&C.term&&k in C.term)?C.term[k]:o[k]});  // a chapter's term:{name,…} overrides the game's (one 교시 reviews on paper, the next on a laptop)
 const LOGNAME=G.log||LOGNAME;
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
@@ -307,6 +307,7 @@ const PROPS={
  phone:(X,Y,dir)=>{if(dir==='up')return;const x=dir==='left'?X+3:dir==='right'?X+10:X+6;r(x,Y+9,3,5,'#23262D');r(x+1,Y+10,1,3,'#8FD3EA')},
 };
 function drawChar(L,X,Y,dir,step){
+ if(L.draw){L.draw(L,X,Y,dir,step);return}  // look.draw(look,X,Y,dir,step): a game that keeps its own character drawing (단어 마을)
  if(L.art){drawCustom(L,X,Y,dir,step);return}
  let pal=palCache.get(L);if(!pal){pal=humanPal(L);palCache.set(L,pal)}
  shadow(X,Y);drawArt(humanArt(L,dir,step),pal,X,Y,dir==='right');
@@ -350,6 +351,7 @@ function petReset(){pet.x=pet.fx=player.x;pet.y=pet.fy=player.y;pet.dir=player.d
 function marker(X,Y,t,st){
  if(!st)return;
  if(Y<-12)return;if(Y<11){X+=11;Y=11}  // someone half off the top: the marker beside their head (on screen, not on their face)
+ if(G.marker){G.marker(X,Y,t,st);return}  // a game's own ! ? ★ (GAME.marker(X,Y,t,state))
  const bob=Math.round(Math.sin(t/220)*1.5);
  if(st==='todo'){r(X+6,Y-9+bob,4,8,'#1B1E2B');r(X+7,Y-8+bob,2,4,'#E8962A');r(X+7,Y-3+bob,2,1,'#E8962A')}
  else if(st==='review'){const y=Y-10+bob;r(X+5,y,6,9,'#1B1E2B');r(X+6,y+1,4,7,'#69CFD8');r(X+7,y+2,2,1,'#0F141A');r(X+8,y+3,1,1,'#0F141A');r(X+7,y+4,1,1,'#0F141A');r(X+7,y+6,1,1,'#0F141A')}
@@ -949,7 +951,7 @@ function award(words){
   ?{who:LOGNAME,say:`한 번도 안 틀렸어요! "${nw.join('", "')}" 기억 레벨 2/5.`}
   :{who:LOGNAME,say:`일지에 적었어요. 틀린 단어는 곧 다시 나와요. 머리 위의 ?를 찾아요.`};
  if(firstTime(perfect.length===nw.length?'awardPerfect':'awardMissed'))dlg.steps.splice(dlg.i+1,0,note);
- if(state.badges.length>=C.WORDS.length&&!state.f.allWords){state.f.allWords=1;save();pending=says([`단어 ${C.WORDS.length}개를 다 모았어요!`,`이제 ${TERM.name}에서 복습하면 ★가 생겨요.`])}
+ if(state.badges.length>=C.WORDS.length&&!state.f.allWords){state.f.allWords=1;save();const all=TERM.allWords(C.WORDS.length);if(all&&all.length)pending=says(all)}  // term.allWords(n): the note when the last word is in ([] = none)
 }
 function finish(pre){
  $('fade').classList.add('on');sfx('star');
@@ -958,7 +960,7 @@ function finish(pre){
 let toastT;function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2400)}
 
 /* ---------- HUD + log ---------- */
-function updateHud(){const n=state.badges.length,st=C.WORDS.filter(w=>has(w)&&lv(w).b>=3).length;$('logBtn').textContent=`일지 ${n}/${C.WORDS.length}`+(st?` ★${st}`:'');fitReg()}
+function updateHud(){const n=state.badges.length,st=C.WORDS.filter(w=>has(w)&&lv(w).b>=3).length;$('logBtn').textContent=`${G.hud||'일지'} ${n}/${C.WORDS.length}`+(st?` ★${st}`:'');fitReg()}
 /* the header label (room · 교시 title): tighten its letter spacing, then its size, before it would be cut off (…) next to a wide 일지 badge */
 function fitReg(){const e=$('reg');if(!e)return;e.style.letterSpacing=e.style.fontSize='';const f0=parseFloat(getComputedStyle(e).fontSize);
  for(const [ls,k] of [['.08em',1],['.03em',1],['.02em',.92],['0',.86]]){if(e.scrollWidth<=e.clientWidth)return;e.style.letterSpacing=ls;e.style.fontSize=k<1?f0*k+'px':''}}

@@ -87,6 +87,10 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   away. The engine has `phone`; a chapter adds its own as `PROPS:{name:(X,Y,dir,t)=>…}`.
 - Conversation pairs: `chat:'openerId'` on the NPC who answers; when both are present, talking to either plays the opener's lines,
   then the answerer's (each with its own portrait via a step's `look`), and the pair keeps facing each other.
+- A game's own art (단어 마을 keeps its older drawing style): a look's `draw(look, X, Y, dir, step)` draws that character instead of
+  the engine's sprites (player, NPCs, followers); `GAME.marker(X, Y, t, status)` draws the ! ? ★ markers ('todo', 'review',
+  'wait', 'star'); `GAME.hud` names the HUD counter (default 일지). A `term.allWords(n)` gives the note when the last word is in
+  (default: "단어 n개를 다 모았어요!" + review hint; `[]` for none, when the chapter's own ending says it).
 
 ## Tools
 - `tools/ctl.mjs`: hands-on controller for playing a game like a player would (one phone-sized Chrome; each command presses keys,

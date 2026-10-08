@@ -803,7 +803,7 @@ function pickTile(s,b){
   const line=seq.join(' ');sfx('ok');
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';$('build').hidden=true;
-  toast(okWord(s));show({who:s.who||dlg.name,say:line+(/[.!?…]$/.test(line)?'':'.')});  // the assembled line is the speaker's own words: praise is a toast
+  show({who:s.who||dlg.name,say:line+(/[.!?…]$/.test(line)?'':'.')});  // the assembled line, said whole: getting it right is the praise (no 맞아요 toast)
   if(readOn)speak(line);
  }else{sel=-1;markSel()}
 }
@@ -832,9 +832,9 @@ function choose(s,i){
   const line=s.done||(s.ask.includes('___')?answered(s.ask,o[0]):o[0]);
   const quiz=/["“][^"”]*___[^"”]*["”]/.test(s.ask)||s.listenOnly;
   if(s.who==='나'&&!s.listenOnly||s.own||s.who==='…'||!quiz){  /* own:1 — the line is the speaker's own words, not a reply to you */
-   // the toast is always praise; an ok: that isn't praise ("뭐?", "…") is the other person's reaction, so they say it next
+   // an ok: that isn't praise ("뭐?", "…") is the other person's reaction, so they say it next
    const react=s.ok&&!/^(맞아|정답|좋아|딩동댕)/.test(s.ok)?s.ok:null;
-   toast(react?(dlg.npc&&dlg.npc.banmal?'맞아!':'맞아요!'):okWord(s));show({who:s.who||dlg.name,say:line});
+   show({who:s.who||dlg.name,say:line});  // the line with its blank filled is the feedback: no 맞아요 toast (the sound and the talk going on say it was right)
    if(react)dlg.next={who:s.reactWho||dlg.name,say:react}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line)});
  }else{
   sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);

@@ -51,9 +51,10 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   Someone whose words you all have asks a review question only when one of them is due; otherwise they say their after line.
 - A question step with `scene:1` quotes its own scene ("끓는 약에 ___을 입었어요"): review never asks it, so a review card can't play a
   moment before the story reaches it.
-- Praise after an answer: a question step's NPC repeats the line with "맞아요!" (or `ok:`) in front, as a reply to you. When the
-  line is the speaker's own words (their question, their broadcast), mark the step `own:1`: the praise is a toast and the line
-  stays clean. Word-order tiles always work that way (the assembled sentence is someone speaking).
+- After a right answer the line is said again with its blank filled ("…침대에 누울 거예요."): that is the feedback, with the ok
+  sound; there is no 맞아요 toast. Only an explicit language quiz (the blank inside quotes: 맞춤법에 맞는 건 "___"?) and a
+  listening question get "맞아요!" (or `ok:`) in front, said by whoever asked. An `ok:` that isn't praise ("뭐?") is their reaction,
+  said next. `own:1` marks a line that is the speaker's own words (their broadcast). Word-order tiles: the assembled line, said whole.
 - Word-order tiles never start in the solved order.
 - NPC options: `proxy:()=>npc` — talking to this one talks to another (e.g. a table that hands the conversation to whoever's turn
   it is; it may stand on furniture); `look:null` — draw no body, only its marker; `nomark` (true or a function) — hide its

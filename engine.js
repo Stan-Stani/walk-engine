@@ -438,26 +438,22 @@ let camT=null,camF=null,camLast=0,talkCy=null,talkAt=0,talkExtra=0;
    are. It only ever moves further (never back and forth as the box grows and shrinks line to line) until the conversation ends.
    Near the bottom of a map it may scroll past the edge by as much as the box covers: that strip is behind the box. */
 /* canvas px where the plain dialogue box starts (choices and word tiles don't count), with air for one more line; null when no box */
-function boxTop(){const box=$('dlg');if(!dlg||box.hidden)return null;const k=cv.clientHeight/cv.height;if(!k)return null;
- let extra=0;for(const id of ['choices','build']){const e=$(id);if(e&&!e.hidden)extra+=e.offsetHeight+7}return (box.offsetTop+extra)/k-6-14}
-function talkLift(cy,py){
- const box=$('dlg');if(!dlg||box.hidden)return null;
- if(dlg.atTop)return null;  // the box went to the top for this conversation: the camera stays put
- const k=cv.clientHeight/cv.height;if(!k)return null;
- /* the plain box: answer choices and word tiles make it taller only for a moment, and following them would leave the camera
-    high (off the map) once they close */
- let extra=0;for(const id of ['choices','build']){const e=$(id);if(e&&!e.hidden)extra+=e.offsetHeight+7}
- const top=(box.offsetTop+extra)/k-6-14;  // canvas px where the plain box starts, with air for one more line (so it doesn't creep line by line)
- talkExtra=Math.max(talkExtra,Math.round(VH*TS-top));
- const rows=[py],n=dlg.npc;if(n&&NPCS.includes(n)&&(!n.hide||!n.hide()))rows.push(npcPos(n)[1]);
- const y0=Math.min(...rows)*TS-10,y1=Math.max(...rows)*TS+16;  // the marker above the heads … the feet
- if(y1-cy<=top)return null;
- const lift=y1-y0>top?y0:(y0+y1)/2-top/2;  // centred in the space above the box (or, if they don't fit, the top of them)
- /* lifting that far would scroll past the bottom of the map (a black band under the room): instead the box moves to the top of the
-    screen for this conversation and the camera stays in the room, as Undertale does. The shell styles .dlg.attop. */
- if(lift>MH*TS-VH*TS+.5){dlg.atTop=true;box.classList.add('attop');talkExtra=0;return null}
- return lift;
+/* ---------- the dialogue box: one fixed size (a name row and three lines: the shell's .txt min-height), its side chosen once per
+   conversation when it opens, as Undertale's dialogue code does (box at the top when you stand low on the screen): at the bottom
+   unless it would cover you or whoever you're talking to, then at the top. The camera doesn't move for talk. A scene's camera cut
+   (step cam:[x,y]) chooses again, for the tile it shows, and frames that tile in the space the box leaves free. ---------- */
+function boxSpan(){const box=$('dlg'),k=cv.clientHeight/cv.height;if(!dlg||box.hidden||!k)return null;
+ return [box.offsetTop/k,(box.offsetTop+box.offsetHeight)/k]}  // canvas px the box covers (choices and tiles included)
+function freeBand(){const b=boxSpan();if(!b)return [0,VH*TS];return dlg.atTop?[b[1]+4,VH*TS]:[0,b[0]-4]}  // the view's part the box leaves free
+function placeBox(rows,camY){
+ const box=$('dlg'),k=cv.clientHeight/cv.height;if(!dlg||!k)return;
+ box.classList.remove('attop');dlg.atTop=false;
+ const h=box.offsetHeight/k+6,cy=camY??CAM.y;
+ const feet=Math.max(...rows)*TS+16-cy;  // the lowest feet on screen
+ if(feet>VH*TS-h){box.classList.add('attop');dlg.atTop=true}
 }
+function talkRows(){const rows=[player.y],n=dlg&&dlg.npc;if(n&&NPCS.includes(n)&&(!n.hide||!n.hide()))rows.push(npcPos(n)[1]);return rows}
+function talkLift(){return null}  // talk never moves the camera (the box chooses its side instead)
 function render(t){
  const px=player.moving?player.fx+(player.x-player.fx)*player.t:player.x;
  const py=player.moving?player.fy+(player.y-player.fy)*player.t:player.y;
@@ -466,8 +462,8 @@ function render(t){
  if(dlg)talkAt=t;else if(talkCy!=null&&t-talkAt>700){talkCy=null;talkExtra=0;camF={...CAM}}  // glide back, never snap  /* held a moment after it ends: a follow-up note (단어 일지) doesn't make it dip and rise */
  const cyMap=Math.max(0,Math.min(cy,MH*TS-VH*TS));  // where the camera would be without a conversation (inside the map)
  if(!camT&&talkCy!=null||!camT&&dlg){const l=dlg?talkLift(cyMap,py):null;if(l!=null)talkCy=Math.max(talkCy??-1e9,l);if(talkCy!=null)cy=Math.max(cyMap,talkCy)}
- let camLift=false;if(camT&&dlg){const top=boxTop();if(top!=null){talkExtra=Math.max(talkExtra,Math.round(VH*TS-top));cy=fy*TS+8-top/2;camLift=true}}  // a scene's camera target sits in the space above the dialogue box, not behind it
- cx=Math.max(0,Math.min(cx,MW*TS-VW*TS));cy=Math.max(0,Math.min(cy,MH*TS-VH*TS+(talkCy!=null||camLift?talkExtra:0)));
+ let camLift=false;if(camT&&dlg){const [b0,b1]=freeBand();cy=fy*TS+8-(b0+b1)/2;camLift=true}  // a scene's camera target sits in the space above the dialogue box, not behind it
+ cx=Math.max(0,Math.min(cx,MW*TS-VW*TS));cy=Math.max(0,Math.min(cy,MH*TS-VH*TS));
  const dt=Math.min(50,t-camLast);camLast=t;
  if(camT||camF||talkCy!=null){if(!camF)camF={...CAM};const k=1-Math.exp(-dt/(camT?180:260));  /* talk shifts glide a little slower */camF.x+=(cx-camF.x)*k;camF.y+=(cy-camF.y)*k;
   if(!camT&&Math.abs(cx-camF.x)<.5&&Math.abs(cy-camF.y)<.5)camF=null;else{cx=camF.x;cy=camF.y}}
@@ -596,7 +592,7 @@ if($('notes')){
 function openDialog(name,steps,opts={}){
  steps=steps.filter(s=>!s.when||s.when());
  dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review};
- $('tag').hidden=!opts.review;$('dlg').hidden=false;show(dlg.steps[0]);
+ $('tag').hidden=!opts.review;$('dlg').hidden=false;show(dlg.steps[0]);placeBox(talkRows());
 }
 function show(s){
  dlg.cur=s;hideGloss();
@@ -608,8 +604,8 @@ function show(s){
  if(s.culture)unlockCulture(s.culture);
  if(s.sit)sitDown(s.sit);
  [].concat(s.turn||[]).forEach(o=>{const n=C.NPC[o.npc];if(n){n.dir=o.dir;n.turnAt=performance.now()+60000}});
- if('cam' in s)camT=s.cam||null;
- if(s.go){const [z,x,y,d]=s.go;loadZone(z,x,y,d||'down');talkCy=null;talkExtra=0;save()}  // a scene that moves you ("다음 날 아침, 학교")
+ if('cam' in s){camT=s.cam||null;if(camT){const cyc=Math.max(0,Math.min(camT[1]*TS+8-VH*TS/2,MH*TS-VH*TS));placeBox([camT[1]],cyc)}else placeBox(talkRows())}
+ if(s.go){const [z,x,y,d]=s.go;loadZone(z,x,y,d||'down');talkCy=null;talkExtra=0;save();placeBox(talkRows())}  // a scene that moves you ("다음 날 아침, 학교")
  if(s.sfx||/딩동댕동/.test(s.say||''))sfx(s.sfx||'bell');  /* a step can play a sound; the school bell rings on its own */
  if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
@@ -655,14 +651,15 @@ function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; Engli
  el.hidden=false;el.querySelector('.q').addEventListener('click',e=>{e.stopPropagation();el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden)});
 }
 function typeText(text,done){
- clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.textContent='';let i=0;
+ clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.innerHTML='<span style="visibility:hidden">'+p.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</span>';let i=0;
  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
  typing={id:null,finished:false};
  const fin=()=>{clearInterval(typing.id);el.innerHTML=glossHTML(text);typing.finished=true;done()};
  typing.fin=fin;
  if(reduce)return fin();
  const seg=(()=>{try{return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(p)].map(x=>x.segment)}catch(e){return Array.from(p)}})();  // whole characters: never half an emoji (it shows as ? for a tick)
- typing.id=setInterval(()=>{i++;el.textContent=seg.slice(0,i).join('');if(i>=seg.length)fin()},26);
+ const esc=x=>x.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));  // the whole line is laid out from the start: words never jump down a line
+ typing.id=setInterval(()=>{i++;el.innerHTML=esc(seg.slice(0,i).join(''))+'<span style="visibility:hidden">'+esc(seg.slice(i).join(''))+'</span>';if(i>=seg.length)fin()},26);
 }
 function showGloss(k){const d=C.DICT[k];if(d){noteTap([[k,d]]);popGloss([[k,d]])}}
 function showWord(w){const rows=lexLookup(w);noteTap(rows);popGloss(rows);lastWord=(w+(rows.length?' → '+rows.map(([h,d])=>h+': '+d.k).join(' / '):' (사전에 없음)')).slice(0,400)}

@@ -19,12 +19,15 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   arrow key stands them up, and the save keeps where they stood. Chair art options: `back` (bottom rows redrawn over the sitter: the
   backrest of a chair facing away), `keep` (sitter rows kept, default 12 = head to belt), `drop` (px the sitter sinks, default 2),
   `lift` (px the whole seat rises, e.g. a stool pulled up to the table in the row above).
-- Camera: a step with `cam:[x,y]` glides the camera to that tile; `cam:null` (or the end of the conversation) brings it back.
-  During any conversation the camera also glides (never jumps) so the player and the speaker stay above the dialogue box. It
-  only moves when they would be covered, only ever further (no bobbing as the box grows line to line), and holds for a moment
-  after the end so a follow-up note doesn't make it dip. If keeping them above the box would scroll past the bottom of the map,
-  the box moves to the top of the screen for that conversation instead (`.dlg.attop`; toasts and word help move down) and the
-  camera stays in the room.
+- Dialogue box: one fixed size (a name row and three lines; the shell's `.txt{min-height:4.5em}`), so it never grows while text
+  types, and the typing lays the whole line out first (the untyped rest invisible), so words never jump down a line. Its side is
+  chosen once per conversation, when it opens, as Undertale's own dialogue code does: at the bottom unless it would cover you or
+  whoever you're talking to, then at the top (`.dlg.attop`; toasts and word help move down). The camera doesn't move for talk.
+  `tools/linecheck.mjs` lays out every Korean string at phone width and lists any over three lines. Choices and word tiles are
+  the one time the box grows, away from the edge it sits on.
+- Camera: a step with `cam:[x,y]` glides the camera to that tile; `cam:null` (or the end of the conversation) brings it back. A
+  camera cut chooses the box's side again, for the tile it shows, and frames that tile in the space the box leaves free. The
+  camera never scrolls past the map.
 - Phone screen (opt-in: shell has `#phonePanel` with `#pscr` inside `#screen`): a step's `phone:{app, post, by, when, count,
   comments:[[name,text],…], time, battery, culture}` shows an app on someone's phone filling the game view on that line. The D-pad
   scrolls it, A finishes the line and then closes it, B closes it; its words are tappable; it closes with the conversation.

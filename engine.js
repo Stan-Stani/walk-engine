@@ -947,7 +947,7 @@ function award(words){
  toast('일지에 추가: '+nw.join(', '));
  const note=perfect.length===nw.length
   ?{who:LOGNAME,say:`한 번도 안 틀렸어요! "${nw.join('", "')}" 기억 레벨 2/5.`}
-  :{who:LOGNAME,say:`일지에 적었어요. 틀린 단어는 곧 다시 나와요. 머리 위 ? 를 찾아요.`};
+  :{who:LOGNAME,say:`일지에 적었어요. 틀린 단어는 곧 다시 나와요. 머리 위의 ?를 찾아요.`};
  if(firstTime(perfect.length===nw.length?'awardPerfect':'awardMissed'))dlg.steps.splice(dlg.i+1,0,note);
  if(state.badges.length>=C.WORDS.length&&!state.f.allWords){state.f.allWords=1;save();pending=says([`단어 ${C.WORDS.length}개를 다 모았어요!`,`이제 ${TERM.name}에서 복습하면 ★가 생겨요.`])}
 }

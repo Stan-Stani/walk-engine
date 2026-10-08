@@ -11,6 +11,9 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - `leave:{npc:'id', to:[x,y]}` on the step whose flag hides that NPC (the line that narrates the exit): it walks from its spot to
   `to` (a door, the map edge, up a tree) right away, during that line, and is gone. Put it on the line that says they leave, not
   a later one, or they linger after the text says they left. Both take one object or a list.
+- Follower: a chapter's `FOLLOW:{name, look, when, talk}` walks one square behind you while `when()` is true (talk to it like
+  anyone). When it starts in a talk with the person of that `name` (who hides on the same flag: "가자. 앞장서."), it starts from
+  where they stood, so they don't blink out.
 - 문제 알리기 (START menu, added by the engine): game or Korean problem, plus a note. Context is attached automatically: chapter, room, position, objective, the last lines and the last looked-up word. 보내기 links to the word-reports inbox (`https://seldoncortex.com/word-reports/#…`); see the word-reports repo.
 - Front layer: a legend entry can name `front:'tileName'`. That tile function runs after the characters, without clipping, so a tree canopy can overhang the row above and cover the player walking behind it.
 - Choices that aren't quizzes: a step with `choose:[[label, fn|null], …]` shows buttons, closes the conversation and runs `fn`. An inspect line (spots/things) may be `{steps:[…]}`. `nextChapterAsk(line)` builds the end-of-chapter "go on to the next one?" prompt for a gate.
@@ -19,10 +22,10 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   arrow key stands them up, and the save keeps where they stood. Chair art options: `back` (bottom rows redrawn over the sitter: the
   backrest of a chair facing away), `keep` (sitter rows kept, default 12 = head to belt), `drop` (px the sitter sinks, default 2),
   `lift` (px the whole seat rises, e.g. a stool pulled up to the table in the row above).
-- Dialogue box: one fixed size (a name row and three lines; the shell's `.txt{min-height:4.5em}`), so it never grows while text
-  types, and the typing lays the whole line out first (the untyped rest invisible), so words never jump down a line. Its side is
-  chosen once per conversation, when it opens, as Undertale's own dialogue code does: at the bottom unless it would cover you or
-  whoever you're talking to, then at the top (`.dlg.attop`; toasts and word help move down). The camera doesn't move for talk.
+- Dialogue box: as tall as its line, never taller than it needs. The typing lays the whole line out first (the untyped rest
+  invisible), so the box never grows mid-line and words never jump down a line. Its side is chosen once per conversation, when it
+  opens, as Undertale's own dialogue code does: at the bottom unless the tallest box (three lines) would cover you or whoever
+  you're talking to, then at the top (`.dlg.attop`; toasts and word help move down). The camera doesn't move for talk.
   `tools/linecheck.mjs` lays out every Korean string at phone width and lists any over three lines. Choices and word tiles are
   the one time the box grows, away from the edge it sits on.
 - Camera: a step with `cam:[x,y]` glides the camera to that tile; `cam:null` (or the end of the conversation) brings it back. A

@@ -438,17 +438,21 @@ let camT=null,camF=null,camLast=0,talkCy=null,talkAt=0,talkExtra=0;
    are. It only ever moves further (never back and forth as the box grows and shrinks line to line) until the conversation ends.
    Near the bottom of a map it may scroll past the edge by as much as the box covers: that strip is behind the box. */
 /* canvas px where the plain dialogue box starts (choices and word tiles don't count), with air for one more line; null when no box */
-/* ---------- the dialogue box: one fixed size (a name row and three lines: the shell's .txt min-height), its side chosen once per
-   conversation when it opens, as Undertale's dialogue code does (box at the top when you stand low on the screen): at the bottom
-   unless it would cover you or whoever you're talking to, then at the top. The camera doesn't move for talk. A scene's camera cut
-   (step cam:[x,y]) chooses again, for the tile it shows, and frames that tile in the space the box leaves free. ---------- */
+/* ---------- the dialogue box: as tall as its line (typing lays the whole line out first, so it never grows mid-line), its side
+   chosen once per conversation when it opens, as Undertale's dialogue code does (box at the top when you stand low on the screen):
+   at the bottom unless the tallest box (three lines, the most linecheck allows) would cover you or whoever you're talking to, then
+   at the top. The camera doesn't move for talk. A scene's camera cut (step cam:[x,y]) chooses again, for the tile it shows, and
+   frames that tile in the space the tallest box would leave free, so shorter and longer lines don't nudge the view. ---------- */
 function boxSpan(){const box=$('dlg'),k=cv.clientHeight/cv.height;if(!dlg||box.hidden||!k)return null;
  return [box.offsetTop/k,(box.offsetTop+box.offsetHeight)/k]}  // canvas px the box covers (choices and tiles included)
-function freeBand(){const b=boxSpan();if(!b)return [0,VH*TS];return dlg.atTop?[b[1]+4,VH*TS]:[0,b[0]-4]}  // the view's part the box leaves free
+function boxReserve(){const box=$('dlg'),t=$('txt'),k=cv.clientHeight/cv.height,m=t.style.minHeight;  // canvas px of the box with three full lines
+ t.style.minHeight=3*(parseFloat(getComputedStyle(t).lineHeight)||parseFloat(getComputedStyle(t).fontSize)*1.5)+'px';const h=box.offsetHeight/k;t.style.minHeight=m;return h}
+function freeBand(){const b=boxSpan();if(!b)return [0,VH*TS];const h=Math.max(b[1]-b[0],dlg.boxH||0);  // the view's part the tallest box leaves free
+ return dlg.atTop?[b[0]+h+4,VH*TS]:[0,b[1]-h-4]}
 function placeBox(rows,camY){
  const box=$('dlg'),k=cv.clientHeight/cv.height;if(!dlg||!k)return;
  box.classList.remove('attop');dlg.atTop=false;
- const h=box.offsetHeight/k+6,cy=camY??CAM.y;
+ dlg.boxH=Math.max(box.offsetHeight/k,boxReserve());const h=dlg.boxH+6,cy=camY??CAM.y;
  const feet=Math.max(...rows)*TS+16-cy;  // the lowest feet on screen
  if(feet>VH*TS-h){box.classList.add('attop');dlg.atTop=true}
 }
@@ -482,7 +486,7 @@ function render(t){
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
-  if(!pet.on){petReset();pet.on=true}
+  if(!pet.on){petReset();const n=dlg&&dlg.npc;if(n&&n.name===C.FOLLOW.name){const [x,y]=npcPos(n);pet.x=pet.fx=x;pet.y=pet.fy=y;pet.dir=n.dir}pet.on=true}  // joining you in a talk ("앞장서"): from where they stood, not from your square
   const qx=player.moving?pet.fx+(pet.x-pet.fx)*player.t:pet.x,qy=player.moving?pet.fy+(pet.y-pet.fy)*player.t:pet.y;
   if(player.moving||pet.x!==player.x||pet.y!==player.y)ents.push({y:qy-.01,f:()=>drawChar(C.FOLLOW.look,Math.round(qx*TS-cx),Math.round(qy*TS-cy-2),pet.dir,walk?3-walk:0)});  // not while it shares your square
  }else pet.on=false;

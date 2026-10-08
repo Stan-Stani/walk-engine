@@ -43,7 +43,11 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   when it closes) adds it with a toast; the journal lists them; each line shows its source numbers and the sources are links.
 - Answer choices (shell CSS): side by side when they fit, three short answers on one line, else two per row; toasts at the top edge.
 - The ! / ? marker of the character you're talking to is hidden while you talk.
+- 목표 line: refreshed after every step, except that a `take:` step (with no `set:`) holds it until a later step's `set:` or the end of
+  the conversation, so handing an item over doesn't flash the goal that asks you to go and fetch it.
 - Review questions (the ? marker) are asked by the narrator, not in the NPC's voice: the sentences are generic examples.
+- A question step with `scene:1` quotes its own scene ("끓는 약에 ___을 입었어요"): review never asks it, so a review card can't play a
+  moment before the story reaches it.
 - Praise after an answer: a question step's NPC repeats the line with "맞아요!" (or `ok:`) in front, as a reply to you. When the
   line is the speaker's own words (their question, their broadcast), mark the step `own:1`: the praise is a toast and the line
   stays clean. Word-order tiles always work that way (the assembled sentence is someone speaking).

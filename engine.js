@@ -423,7 +423,7 @@ function loadZone(id,x,y,dir){
 let roomName='';
 function showRoom(force){
  let nm=Z.name;(Z.rooms||[]).forEach(([a,b,c,d,n])=>{if(player.x>=a&&player.x<=c&&player.y>=b&&player.y<=d)nm=n});
- if(nm!==roomName||force){roomName=nm;const z=$('zone');z.textContent=nm;z.classList.remove('dim');clearTimeout(showRoom.t);showRoom.t=setTimeout(()=>z.classList.add('dim'),1500)}  // fades so it never hides a ! marker
+ if(nm!==roomName||force){roomName=nm;const z=$('zone');z.textContent=nm;if(!dlg)z.classList.remove('dim');clearTimeout(showRoom.t);showRoom.t=setTimeout(()=>z.classList.add('dim'),1500)}  // fades so it never hides a ! marker
 }
 function update(dt,t){
  if(player.moving){player.t+=dt/(170*(Z.slow||1)); /* Z.slow > 1 = heavy gravity */if(player.t>=1){player.t=0;player.moving=false;if(!arrive())tryMove()}}
@@ -614,7 +614,7 @@ function greet(){
 function openDialog(name,steps,opts={}){
  steps=steps.filter(s=>!s.when||s.when());
  dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review};
- $('tag').hidden=!opts.review;$('dlg').hidden=false;show(dlg.steps[0]);placeBox(talkRows());
+ $('tag').hidden=!opts.review;$('dlg').hidden=false;$('zone').classList.add('dim');show(dlg.steps[0]);placeBox(talkRows());  // the room label never shows through a box at the top
 }
 function show(s){
  dlg.cur=s;hideGloss();
@@ -641,7 +641,8 @@ function show(s){
  setPortrait(s,text);
  if(readOn&&!s.listenOnly)speak(s.listen?'':text);
  if(s.listen)setTimeout(()=>speak(s.listen),readOn?1200:150);
- updateQuest();
+ if(s.take&&!s.set)dlg.questHold=1;else if(s.set)dlg.questHold=0;  // handing an item over: keep the old 목표 until the scene moves the story on (or ends)
+ if(!dlg.questHold)updateQuest();
 }
 function prepListen(s){
  const w=s.listen;const pool=(C.CONFUSE[w]||[]).slice(0,2);
@@ -873,7 +874,8 @@ function allQuestions(){
 function reviewFor(words){ // pick a question for the weakest of these words
  const ws=[...words].sort((a,b)=>(isDue(b)-isDue(a))||(lv(a).b-lv(b).b));
  const w=ws[0];
- const all=allQuestions().filter(q=>q.w===w),own=all.filter(q=>!q.gram),qs=own.length?own:all;  // gram:1 tests a pattern, not the word: no star for the word from it
+ const pool=allQuestions().filter(q=>q.w===w),gen=pool.filter(q=>!q.scene),all=gen.length?gen:pool;  // scene:1 quotes its own scene: never asked in review (it would play the scene before it happens)
+ const own=all.filter(q=>!q.gram),qs=own.length?own:all;  // gram:1 tests a pattern, not the word: no star for the word from it
  const narr={review:true,who:'…',ok:'맞아요!'};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
  if(canSpeak()&&soundOn&&listenOn&&Math.random()<.35)return {listen:w,...narr};  // a muted phone (or 듣기 문제 off) can't answer a listening question
  return {...qs[Math.random()*qs.length|0],...narr};

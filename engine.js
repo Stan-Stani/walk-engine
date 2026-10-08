@@ -948,7 +948,7 @@ function award(words){
  const perfect=nw.filter(w=>!dlg.missed.has(w));
  nw.forEach(w=>{state.lv[w]=perfect.includes(w)?{b:2,due:now()+GAP[2]}:{b:0,due:now()}});
  save();updateHud();sfx('badge');
- toast('일지에 추가: '+nw.join(', '));
+ toast((G.gotToast||'일지에 추가')+': '+nw.join(', '));  // GAME.gotToast: the game's word for it (단어 마을: 배지 획득)
  const note=perfect.length===nw.length
   ?{who:LOGNAME,say:`한 번도 안 틀렸어요! "${nw.join('", "')}" 기억 레벨 2/5.`}
   :{who:LOGNAME,say:`일지에 적었어요. 틀린 단어는 곧 다시 나와요. 머리 위의 ?를 찾아요.`};

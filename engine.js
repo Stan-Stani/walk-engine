@@ -561,7 +561,7 @@ function render(t){
    if(n.sleep)for(let i=0;i<2;i++){const p=(t/900+i/2)%1,zx=X+11+Math.round(p*4),zy=Y-2-Math.round(p*10),c='#2E3550';g.globalAlpha=1-p*.7;r(zx,zy,4,1,c);r(zx+2,zy+1,1,1,c);r(zx+1,zy+2,1,1,c);r(zx,zy+3,4,1,c);g.globalAlpha=1}  // asleep: z's drifting up
    // no marker over the player standing just above, over the one you're talking to (or whoever a proxy stands for), or when nomark says so
    const talking=dlg&&(dlg.npc===n||(n.proxy&&dlg.npc===n.proxy())),off=typeof n.nomark==='function'?n.nomark():n.nomark;
-   if(!(player.x===nx&&player.y<ny&&player.y>=ny-1-Math.ceil(artLift(n.look)/TS))&&!talking&&!off)marker(X+(n.markDx||0),Y-artLift(n.look)+(n.markDy||0),t,status(n))}}});
+   if(!(player.x===nx&&player.y<ny&&player.y>=ny-1-Math.ceil(artLift(n.look)/TS))&&!talking&&!off)marker(X+(n.markDx||0),Y-artLift(n.look)+(n.markDy??(n.look?0:7)),t,status(n))}}});  // no look (a stand-in for an object: a chair, a shelf, embers): the mark sits on its own tile, not over whatever is above it
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){

@@ -430,8 +430,11 @@ function status(n){
  if(!n.badge)return null;
  if(!n.badge.every(has))return 'todo';
  if(!C.REVIEW&&n.badge.some(isDue))return n.script&&n.script()?null:'review';  // a ? only when talking reviews (their script lines come first and skip it)
- return n.badge.every(w=>lv(w).b>=3)?'star':null;
+ return n.badge.every(w=>lv(w).b>=3)&&!(state.starDone||{})[npcId(n)]?'star':null;  // ★: all their words mastered — shown a while, then it fades for good (starFade)
 }
+/* the ★ over someone whose words you've all mastered: on screen for STAR_MS, or until you talk to them, then it fades out and stays gone */
+const STAR_MS=18000,STAR_FADE=2000,starAcc={};let starT=0,starDt=0;
+function starFade(n){const id=npcId(n),a=starAcc[id]=(starAcc[id]||0)+starDt,al=a<STAR_MS?1:1-(a-STAR_MS)/STAR_FADE;if(al<=0){(state.starDone=state.starDone||{})[id]=1;save();return 0}return al}
 
 /* ---------- player, movement, zones ---------- */
 const D={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
@@ -538,6 +541,7 @@ function singNotes(x,y,t,seed){
   const note=(c,o)=>{r(X+o,Y+o+4,3,2,c);r(X+o+2,Y+o,1,5,c);r(X+o+3,Y+o+1,1,1,c);r(X+o+4,Y+o+2,1,1,c)};note('#2B2E36',1);note('#FFF3C4',0)}  // shadow, then the note
  g.globalAlpha=1}
 function render(t){
+ starDt=starT?Math.min(100,t-starT):0;starT=t;
  const px=player.moving?player.fx+(player.x-player.fx)*player.t:player.x;
  const py=player.moving?player.fy+(player.y-player.fy)*player.t:player.y;
  const [fx,fy]=camT||[px,py];
@@ -561,7 +565,7 @@ function render(t){
    if(n.sleep)for(let i=0;i<2;i++){const p=(t/900+i/2)%1,zx=X+11+Math.round(p*4),zy=Y-2-Math.round(p*10),c='#2E3550';g.globalAlpha=1-p*.7;r(zx,zy,4,1,c);r(zx+2,zy+1,1,1,c);r(zx+1,zy+2,1,1,c);r(zx,zy+3,4,1,c);g.globalAlpha=1}  // asleep: z's drifting up
    // no marker over the player standing just above, over the one you're talking to (or whoever a proxy stands for), or when nomark says so
    const talking=dlg&&(dlg.npc===n||(n.proxy&&dlg.npc===n.proxy())),off=typeof n.nomark==='function'?n.nomark():n.nomark;
-   if(!(player.x===nx&&player.y<ny&&player.y>=ny-1-Math.ceil(artLift(n.look)/TS))&&!talking&&!off)marker(X+(n.markDx||0),Y-artLift(n.look)+(n.markDy??(n.look?0:7)),t,status(n))}}});  // no look (a stand-in for an object: a chair, a shelf, embers): the mark sits on its own tile, not over whatever is above it
+   if(!(player.x===nx&&player.y<ny&&player.y>=ny-1-Math.ceil(artLift(n.look)/TS))&&!talking&&!off){const st=status(n),al=st==='star'?starFade(n):1;if(al>0){g.globalAlpha=al;marker(X+(n.markDx||0),Y-artLift(n.look)+(n.markDy??(n.look?0:7)),t,st);g.globalAlpha=1}}}}});  // no look (a stand-in for an object: a chair, a shelf, embers): the mark sits on its own tile, not over whatever is above it
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
@@ -1062,7 +1066,7 @@ function talkWith(n){
   if(n.badge&&n.badge.every(has)){const due=n.badge.some(isDue);steps=due?[...says(n.after),reviewFor(n.badge)]:says(n.after);isReview=due}  // a review question only when one of their words is due
   else steps=n.talk();
  }
- {const id=npcId(n);if(id&&!metIds().includes(id)){metIds().push(id);save()}}  // met: from now on they can review and chat
+ {const id=npcId(n);if(id&&!metIds().includes(id)){metIds().push(id);save()}if(id&&status(n)==='star')starAcc[id]=Math.max(starAcc[id]||0,STAR_MS)}  // met: from now on they can review and chat; a ★ over them starts to fade once you've talked
  if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
  openDialog(n.name,steps,{npc:n,review:isReview});
 }
@@ -1085,11 +1089,12 @@ function award(words){
  const nw=words.filter(w=>!has(w));if(!nw.length)return;
  state.badges.push(...nw);
  const perfect=nw.filter(w=>!dlg.missed.has(w));
- nw.forEach(w=>{state.lv[w]=perfect.includes(w)?spaced(2):{b:0,due:now()}});
+ const L0=SRS().start??2;  // srs.start: the level of a word answered right every time it was taught (★ is level 3)
+ nw.forEach(w=>{state.lv[w]=perfect.includes(w)?spaced(L0):{b:0,due:now()}});
  save();updateHud();sfx('badge');
  toast((G.gotToast||'일지에 추가')+': '+nw.join(', '));  // GAME.gotToast: the game's word for it (단어 마을: 배지 획득)
  const note=perfect.length===nw.length
-  ?{who:LOGNAME,say:`한 번도 안 틀렸어요! "${nw.join('", "')}" 기억 레벨 2/5.`}
+  ?{who:LOGNAME,say:`한 번도 안 틀렸어요! "${nw.join('", "')}" 기억 레벨 ${L0}/5.`}
   :{who:LOGNAME,say:`일지에 적었어요. 틀린 단어는 곧 다시 나와요. 머리 위의 ?를 찾아요.`};
  if(firstTime(perfect.length===nw.length?'awardPerfect':'awardMissed'))dlg.steps.splice(dlg.i+1,0,note);
  if(state.badges.length>=C.WORDS.length&&!state.f.allWords){state.f.allWords=1;save();const all=TERM.allWords(C.WORDS.length);if(all&&all.length)pending=says(all)}  // term.allWords(n): the note when the last word is in ([] = none)

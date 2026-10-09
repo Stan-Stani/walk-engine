@@ -563,7 +563,9 @@ function render(t){
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
-  if(!pet.on){petReset();const n=dlg&&dlg.npc;if(n&&n.name===C.FOLLOW.name){const [x,y]=npcPos(n);pet.x=pet.fx=x;pet.y=pet.fy=y;pet.dir=n.dir}pet.on=true}  // joining you in a talk ("앞장서"): from where they stood, not from your square
+  if(!pet.on){petReset();const n=dlg&&dlg.npc;if(n&&n.name===C.FOLLOW.name){const [x,y]=npcPos(n);pet.x=pet.fx=x;pet.y=pet.fy=y;pet.dir=n.dir}  // joining you in a talk ("앞장서"): from where they stood, not from your square
+   else{const [dx,dy]=D[player.dir],b=[[-dx,-dy],[dy,dx],[-dy,-dx]].map(([ax,ay])=>[player.x+ax,player.y+ay]).find(([x,y])=>walkable(x,y)&&!npcAt(x,y));if(b){pet.x=pet.fx=b[0];pet.y=pet.fy=b[1]}}  // after a door: one step behind you (or beside), not hidden on your square until you move
+   pet.on=true}
   const qx=player.moving?pet.fx+(pet.x-pet.fx)*player.t:pet.x,qy=player.moving?pet.fy+(pet.y-pet.fy)*player.t:pet.y;
   if(player.moving||pet.x!==player.x||pet.y!==player.y)ents.push({y:qy-.01,f:()=>drawChar(C.FOLLOW.look,Math.round(qx*TS-cx),Math.round(qy*TS-cy-2),pet.dir,walk?3-walk:0)});  // not while it shares your square
  }else pet.on=false;

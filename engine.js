@@ -743,10 +743,11 @@ if(!Array.isArray(grammarSeen))grammarSeen=[];if(!Array.isArray(grammarRead))gra
 const NOTE_KINDS={culture:{name:'문화 노트',data:CULTURE,seen:cultureSeen,read:cultureRead,key:'culture',list:'notes',card:'noteCard'},
  grammar:{name:'문법 노트',data:GRAMMAR,seen:grammarSeen,read:grammarRead,key:'grammar',list:'gnotes',card:'gnoteCard'}};
 if(!Object.keys(GRAMMAR).length)for(const id of ['gnotesH','gnotes','gnoteCard'])$(id)?.remove();  // a game without 문법 노트 shows no heading for them
+if($('panel'))new MutationObserver(()=>noteChip()).observe($('panel'),{attributes:true,attributeFilter:['hidden']});  // the chip hides while the 일지 is open (it sat on top of the notes) and comes back when it closes
 let noteLast='culture';  // the kind unlocked last: the chip shows its newest unread note first, then the rest, newest first
 const unreadNotes=K=>{const N=NOTE_KINDS[K];return N.seen.filter(k=>N.data[k]&&!N.read.includes(k))};
 function noteChip(){const el=$('noteChip');if(!el)return;const K=[noteLast,...Object.keys(NOTE_KINDS)].find(K=>unreadNotes(K).length);
- el.hidden=!K;if(K){const N=NOTE_KINDS[K],un=unreadNotes(K),k=un[un.length-1];el.dataset.kind=K;el.dataset.k=k;el.innerHTML=`<span>📖 ${N.name} · ${N.data[k].t}</span><b>›</b>`}}
+ el.hidden=!K||!$('panel').hidden;if(K){const N=NOTE_KINDS[K],un=unreadNotes(K),k=un[un.length-1];el.dataset.kind=K;el.dataset.k=k;el.innerHTML=`<span>📖 ${N.name} · ${N.data[k].t}</span><b>›</b>`}}
 function readNote(K,k){const N=NOTE_KINDS[K];if(!N.read.includes(k)){N.read.push(k);store.set(KEY(N.key+'Read'),JSON.stringify(N.read))}noteChip()}
 function unlockNote(K,k){const N=NOTE_KINDS[K];
  if(!N.data[k]||N.seen.includes(k))return;N.seen.push(k);store.set(KEY(N.key),JSON.stringify(N.seen));noteLast=K;

@@ -24,7 +24,8 @@ const lv=w=>state.lv[w]||{b:0,due:0};
 const dueL=L=>L.due<=now()||(L.beat!=null&&beats()>=L.beat);
 let carrySet=new Set(),carryQs=null;  // words learned in other chapters (shared), and their BANK questions (made once, on demand)
 const known=w=>has(w)||(!!SRS().shared&&carrySet.has(w)&&!C.WORDS.includes(w));
-const isDue=w=>known(w)&&dueL(lv(w));
+let talkN=0;const askedIn={};  // conversations opened so far, and the one each word was last asked in
+const isDue=w=>known(w)&&dueL(lv(w))&&!(askedIn[w]>=talkN-1);  // never in the conversation right after it was asked (타이밍, then 타이밍 again)
 function spaced(b){const bg=SRS().beats;return {b,due:now()+gapAt(b),beat:bg&&bg[b]!=null?beats()+bg[b]:null}}
 function grade(w,ok){
  let L={...lv(w)};
@@ -691,7 +692,7 @@ function greet(){
  talkWith(n);return true}
 function openDialog(name,steps,opts={}){
  steps=steps.filter(s=>!s.when||s.when());
- dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review};
+ talkN++;dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review};
  $('tag').hidden=!opts.review;$('dlg').hidden=false;$('zone').classList.add('dim');show(dlg.steps[0]);placeBox(talkRows());  // the room label never shows through a box at the top
 }
 function show(s){
@@ -904,7 +905,7 @@ const okWord=s=>s.ok||(dlg.npc&&dlg.npc.banmal?'맞아!':'맞아요!');
 function answered(ask,a){const f=ask.replace('___',a),i=ask.indexOf('___')+a.length;
  const m=f.slice(i).match(/^([^"”]*["”][.!?]?)\s+([^"”]*\?)$/);return m?f.slice(0,i)+m[1]:f}  // only a quoted example's question
 function choose(s,i){
- const o=s.opts[i];
+ const o=s.opts[i];if(s.w)askedIn[s.w]=talkN;
  if(o[1]){
   sfx('ok');
   if(s.review||dlg.review)gradeStep(s);

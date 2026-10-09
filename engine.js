@@ -75,7 +75,8 @@ function wrapUp(){
  const said=w=>(C.REVIEW||[]).filter(r=>r.w===w&&r.who!=='나'),pick=a=>a[Math.random()*a.length|0];
  const nameOf=r=>{const b=[].concat(r.by)[0];return (C.NPC[b]&&C.NPC[b].name)||b};
  const metBy=r=>[].concat(r.by).some(b=>metIds().includes(b));
- const line=w=>{const R=said(w);if(R.length){const f=R.filter(r=>unheard(r)&&metBy(r)),h=R.filter(r=>!unheard(r)),r=pick(f.length?f:h.length?h:R),q={...r,who:nameOf(r),review:true};delete q.by;delete q.pre;delete q.when;return q}  // a line with it from someone in this chapter, under their name: one you haven't heard yet from someone you've met first (a word-for-word repeat felt stale), else one you heard
+ const now_=r=>(!r.when||r.when())&&[].concat(r.by).every(b=>{const n=C.NPC[b];return !n||!n.hide||!n.hide()});  // a new line needs its moment and its speaker still here (no one speaks after they've died or gone)
+ const line=w=>{const R=said(w);if(R.length){const f=R.filter(r=>unheard(r)&&metBy(r)&&now_(r)),h=R.filter(r=>!unheard(r)),r=pick(f.length?f:h.length?h:R),q={...r,who:nameOf(r),review:true};delete q.by;delete q.pre;delete q.when;return q}  // a line with it from someone in this chapter, under their name: one you haven't heard yet from someone you've met first (a word-for-word repeat felt stale), else one you heard
   const b=bank(w);return b.length?{...pick(b),who:'…',review:true}:null};
  const qs=C.WORDS.filter(w=>has(w)&&lv(w).b<3&&(said(w).length||bank(w).length)).sort((a,b)=>lv(a).b-lv(b).b).slice(0,4).map(line);
  carryDue().slice(0,Math.max(0,4-qs.length)).forEach(w=>{const q=carryQ(w);if(q)qs.push({...q,who:'…',review:true})});

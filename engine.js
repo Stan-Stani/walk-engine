@@ -72,8 +72,11 @@ function classTime(CLASS,parts){
 }
 function wrapUp(){
  const bank=w=>(C.BANK||[]).filter(q=>q.w===w&&!q.scene&&!q.gram);
- const qs=C.WORDS.filter(w=>has(w)&&lv(w).b<3&&bank(w).length).sort((a,b)=>lv(a).b-lv(b).b).slice(0,4)
-  .map(w=>{const b=bank(w);return {...b[Math.random()*b.length|0],who:'…',review:true}});
+ const said=w=>(C.REVIEW||[]).filter(r=>r.w===w&&r.who!=='나'),pick=a=>a[Math.random()*a.length|0];
+ const nameOf=r=>{const b=[].concat(r.by)[0];return (C.NPC[b]&&C.NPC[b].name)||b};
+ const line=w=>{const R=said(w);if(R.length){const h=R.filter(r=>!unheard(r)),r=pick(h.length?h:R),q={...r,who:nameOf(r),review:true};delete q.by;delete q.pre;delete q.when;return q}  // what someone in this chapter said with it (heard first), under their name
+  const b=bank(w);return b.length?{...pick(b),who:'…',review:true}:null};
+ const qs=C.WORDS.filter(w=>has(w)&&lv(w).b<3&&(said(w).length||bank(w).length)).sort((a,b)=>lv(a).b-lv(b).b).slice(0,4).map(line);
  carryDue().slice(0,Math.max(0,4-qs.length)).forEach(w=>{const q=carryQ(w);if(q)qs.push({...q,who:'…',review:true})});
  return qs.length?[{who:'…',say:TERM.wrap},...qs]:[];
 }

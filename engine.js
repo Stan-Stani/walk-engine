@@ -74,7 +74,8 @@ function wrapUp(){
  const bank=w=>(C.BANK||[]).filter(q=>q.w===w&&!q.scene&&!q.gram);
  const said=w=>(C.REVIEW||[]).filter(r=>r.w===w&&r.who!=='나'),pick=a=>a[Math.random()*a.length|0];
  const nameOf=r=>{const b=[].concat(r.by)[0];return (C.NPC[b]&&C.NPC[b].name)||b};
- const line=w=>{const R=said(w);if(R.length){const h=R.filter(r=>!unheard(r)),r=pick(h.length?h:R),q={...r,who:nameOf(r),review:true};delete q.by;delete q.pre;delete q.when;return q}  // what someone in this chapter said with it (heard first), under their name
+ const metBy=r=>[].concat(r.by).some(b=>metIds().includes(b));
+ const line=w=>{const R=said(w);if(R.length){const f=R.filter(r=>unheard(r)&&metBy(r)),h=R.filter(r=>!unheard(r)),r=pick(f.length?f:h.length?h:R),q={...r,who:nameOf(r),review:true};delete q.by;delete q.pre;delete q.when;return q}  // a line with it from someone in this chapter, under their name: one you haven't heard yet from someone you've met first (a word-for-word repeat felt stale), else one you heard
   const b=bank(w);return b.length?{...pick(b),who:'…',review:true}:null};
  const qs=C.WORDS.filter(w=>has(w)&&lv(w).b<3&&(said(w).length||bank(w).length)).sort((a,b)=>lv(a).b-lv(b).b).slice(0,4).map(line);
  carryDue().slice(0,Math.max(0,4-qs.length)).forEach(w=>{const q=carryQ(w);if(q)qs.push({...q,who:'…',review:true})});
@@ -861,7 +862,7 @@ function moveSel(d){if(performance.now()-choicesAt<450)return;  // keys still he
  const n=(choosing()?choiceBtns():tileBtns()).length;if(!n)return;sel=sel<0?(d>0?0:n-1):(sel+d+n)%n;markSel();sfx('move')}
 let choicesAt=0,lastA=0;
 function confirmSel(){const t=performance.now();if(t-choicesAt<450)return;
- if(choosing()){const quick=t-lastA<500;lastA=t;if(quick)return}  // mashing A through talk never answers: in a question, presses under 0.5 s apart do nothing (pause, then A picks)
+ if(choosing()||(building()&&!dlg.cur.got)){const quick=lastA>choicesAt&&t-lastA<500;lastA=t;if(quick)return}  // mashing A through talk never answers: in a question (or word tiles before the first is placed), presses under 0.5 s apart do nothing (pause, then A picks)
  if(sel<0){sel=0;markSel();return}  // nothing selected: A selects the first one (never does nothing); A again picks it
  const b=(choosing()?choiceBtns():tileBtns())[sel];if(b)b.click()}
 

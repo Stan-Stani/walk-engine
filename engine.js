@@ -268,12 +268,76 @@ function humanArt(L,dir,step){
   if(view==='up'){set(body,1,3,'A');set(body,2,3,'A');set(body,3,3,'A')}
   if(dir==='left'){body=body.map(rw=>rw.replace(/S/g,'A'));set(body,1,7,'A')}
  }
- return head.concat(body);
+ const out=head.concat(body);
+ return crewOn(L)?crewRows(L,out,view):out;
 }
 function humanPal(L){
  const o='#1B1E2B';
- return {O:o,E:o,H:L.hair,h:L.hairHi||shade(L.hair,.78),S:L.skin,s:shade(L.skin,.85),M:shade(L.skin,.72),W:shade(L.skin,1.12),C:L.shirt,c:shade(L.shirt,.8),
+ const p={O:o,E:o,H:L.hair,h:L.hairHi||shade(L.hair,.78),S:L.skin,s:shade(L.skin,.85),M:shade(L.skin,.72),W:shade(L.skin,1.12),C:L.shirt,c:shade(L.shirt,.8),
   P:L.pants,p:shade(L.pants,.8),K:L.shoes||'#2A2A33',B:L.belt||L.shirt,D:L.beard||L.hair,L:L.lips||shade(L.skin,.72),A:L.arm||L.skin,Y:L.cap||L.hair,y:shade(L.cap||L.hair,.8),V:shade(L.cap||'#333333',.55)};
+ return crewOn(L)?crewPal(L,p):p;
+}
+/* ---------- crew style (GAME.lookStyle:'crew' — 성실호): the same base sprite and portrait, set apart from 방과 후's students by
+   everyday kit instead of a school uniform. Every human gets gloves and boots on the walk sprite; portraits lose the school collar and tie
+   and get eyes with an iris (look.eye, else dark brown). Per look (GAME.looks by name, merged at boot):
+   kit:{piece:colour,…} two pieces from coat, sweater (over a T-shirt: their own colour at the neck), vest, strap (shoulder to hip),
+   pouches (a belt with pouches; a chest pocket in the portrait) · uniform:1 (collar band, seams, insignia) · onePiece:1 (trousers match
+   the top) · jaw: square|round|pointed|long · fullBeard:1 (a short fringe under the chin) · visor:1 (a band across the eyes).
+   Walk-sprite eyes stay the base 1-px eyes: at 16 px any colour there reads as goggles. look.school:1 opts one look out. ---------- */
+const crewOn=L=>G.lookStyle==='crew'&&!L.school&&!L.art&&!L.draw;
+const JAWS={square:{26:10.5,27:10.5,28:10.5,29:10.5,30:10.5,31:10,32:9},round:{26:10.5,27:10.5,28:10.5,29:10,30:9.5,31:8.5,32:7,33:4.5},
+ pointed:{26:9,27:8,28:7,29:6,30:5,31:4,32:3,33:1.5},long:{26:9.5,27:9.5,28:9,29:8.5,30:8,31:7,32:6,33:5,34:3.5,35:1.5}};
+function jawCut(L,g){const J=JAWS[L.jaw];if(!J)return;const neck=shade(L.skin,.85);  // re-cut the face below the cheeks; a cut below the chin shows the neck, never a hole
+ for(let y=26;y<=35;y++)for(let x=0;x<48;x++){const c=g[y][x],hw=J[y];if(c!==L.skin&&c!==null&&!(y>=33&&c===neck))continue;
+  if(hw!=null&&Math.abs(x-23.5)<=hw){if(c!==L.skin)g[y][x]=L.skin}else if(c===L.skin)g[y][x]=(y>=31&&x>=20&&x<=27)?neck:null}}
+function crewPal(L,p){const k=L.kit||{},c0='#8A6A4A',sw=k.sweater||c0;
+ Object.assign(p,{F:k.coat||k.vest||c0,X:sw,x:shade(sw,.75),Q:k.strap||c0,T:'#4A3A2E',t:'#7A5F45',N:shade(L.shirt,1.5),n:shade(L.shirt,.6),I:'#E3B74A',U:'#D8CFAE',G:'#3A3F4A',Z:'#3A6F8A'});
+ if(L.onePiece){p.P=shade(L.shirt,.88);p.p=shade(L.shirt,.7);p.B='#2E3440'}
+ return p;
+}
+function crewRows(L,rows,view){
+ const R=rows.map(r=>[...r]),set=(y,x,ch,only)=>{if(R[y]&&R[y][x]!==undefined&&(!only||only.includes(R[y][x])))R[y][x]=ch};
+ if(L.visor){if(view==='down')for(const x of [5,6,7,8,9,10])set(5,x,'Z');if(view==='left')for(const x of [3,4,5])set(5,x,'Z')}
+ if(L.uniform){
+  if(view==='left'){set(8,7,'N','C');set(8,8,'N','C');set(10,5,'I','C')}
+  else{for(const x of [6,7,8,9])set(8,x,'N','C');set(9,3,'n','C');set(9,12,'n','C');if(view==='down')set(10,10,'I','Cc');set(11,7,'U','B');set(11,8,'U','B')}
+ }
+ for(const piece of Object.keys(L.kit||{})){
+  if(piece==='vest'){if(view==='left'){for(let y=8;y<=10;y++)for(const x of [5,6,7])set(y,x,'F','Cc')}else for(let y=8;y<=10;y++)for(const x of [5,6,9,10])set(y,x,'F','Cc')}
+  if(piece==='strap'){const pts=view==='down'?[[8,5],[9,6],[9,7],[10,8],[10,9],[11,10]]:view==='up'?[[8,10],[9,9],[9,8],[10,7],[10,6],[11,5]]:[[8,8],[9,7],[10,6],[11,5]];for(const [y,x] of pts)set(y,x,'Q','CcFXxB')}
+  if(piece==='coat'){const side=view==='left'?[5,10]:[3,4,11,12];for(let y=8;y<=10;y++)for(const x of side)set(y,x,'F','Cc');for(const y of [12,13])for(const x of (view==='left'?[5,10]:[4,11]))set(y,x,'F','Pp')}
+  if(piece==='sweater'){for(let y=8;y<=10;y++)for(let x=0;x<16;x++)if(!(y===8&&x>=6&&x<=9&&view!=='up'))set(y,x,'X','Cc');for(let x=0;x<16;x++)set(11,x,'x','B')}
+  if(piece==='pouches'){for(const x of (view==='left'?[5,6,7,8,9]:[5,6,7,8,9,10]))set(11,x,'T','BCcXx');if(view!=='left')set(11,7,'U','T');for(const x of (view==='left'?[6]:[5,10])){set(11,x,'t','T');set(12,x,'t','Pp')}}
+ }
+ for(let y=8;y<16;y++)for(let x=0;x<16;x++)set(y,x,'G','S');   // gloves
+ for(let x=0;x<16;x++)set(14,x,'K','P');                          // boots
+ return R.map(r=>r.join(''));
+}
+function crewPortrait(L,face,p){
+ const D='#1B1E2B',sh=L.shirt,shS=shade(sh,.82),px=(x,y,c)=>{if(p[y]&&x>=0&&x<48)p[y][x]=c},rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let k=x;k<x+w;k++)px(k,j,c)};
+ if(!['happy','surprised','sad','angry','think','sleep'].includes(face)){const iris=L.eye||'#5A4632',dk=shade(iris,.6);  // eyes: lid, white, iris with a catchlight
+  for(const x of [19,29]){rect(x-1,20,4,4,L.skin);rect(x-1,20,4,1,D);px(x-1,21,'#F4F6F8');px(x,21,'#FFFFFF');px(x+1,21,iris);px(x+2,21,'#F4F6F8');px(x-1,22,'#F4F6F8');px(x,22,iris);px(x+1,22,dk);px(x+2,22,'#F4F6F8');rect(x,23,2,1,dk)}}
+ for(let y=34;y<48;y++)for(let x=0;x<48;x++)if(p[y][x]==='#F4F2EA')p[y][x]=sh;      // no school collar
+ if(L.belt)for(let y=39;y<48;y++)for(const x of [23,24])if(p[y][x]!==D)p[y][x]=sh;   // no school tie
+ for(const [piece,c] of Object.entries(L.kit||{})){const cd=shade(c,.75);
+  if(piece==='vest'){rect(14,40,9,8,c);rect(26,40,9,8,c);rect(22,40,1,8,cd);rect(26,40,1,8,cd)}
+  if(piece==='strap'){for(let k=0;k<=25;k++){const x=11+k,y=38+Math.round(k*9/25);px(x,y,c);px(x,y+1,cd)}rect(23,41,3,3,'#C9B98A');px(24,42,cd)}
+  if(piece==='coat'){rect(10,38,11,10,c);rect(27,38,11,10,c);rect(9,40,1,8,c);rect(38,40,1,8,c);rect(20,38,1,10,cd);rect(27,38,1,10,cd);px(19,39,cd);px(28,39,cd)}
+  if(piece==='sweater'){for(let y=38;y<48;y++)for(let x=0;x<48;x++){if(p[y][x]===sh)p[y][x]=c;else if(p[y][x]===shS)p[y][x]=cd}rect(18,38,12,1,cd)}
+  if(piece==='pouches'){rect(13,42,6,5,'#7A5F45');rect(13,42,6,2,'#4A3A2E');px(15,43,'#D8CFAE')}
+ }
+ if(L.uniform){const N=shade(sh,1.5),n=shade(sh,.6);rect(18,36,12,2,N);rect(18,38,12,1,n);rect(9,40,6,2,n);rect(33,40,6,2,n);rect(30,42,3,2,'#E3B74A');px(31,41,'#E3B74A')}
+ if(L.beard&&L.fullBeard){const B=L.beard;for(let x=20;x<28;x++)px(x,33,B);for(const x of [21,23,26])px(x,34,B);px(22,33,shade(B,1.25));px(26,32,shade(B,1.25))}
+ if(L.visor){rect(15,20,18,3,'#3A6F8A');rect(15,20,18,1,'#7FB3C8')}
+ const q=p.map(r=>r.slice());for(let y=0;y<48;y++)for(let x=0;x<48;x++)if(!q[y][x]&&[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{const c=q[y+dy]&&q[y+dy][x+dx];return c&&c!==D}))p[y][x]=D;  // edge anything painted out past the outline
+ return p;
+}
+/* GAME.looks: per-name additions to a chapter's looks (kit, uniform, jaw, eye, fullBeard, visor, colour fixes), merged at boot into
+   every NPC (and the follower) with that name whose look is a plain object; dynamic looks (getters) and custom sprites keep their own */
+function mergeLooks(){
+ if(!G.looks)return;
+ const fix=n=>{const x=G.looks[n&&n.name];if(!x)return;const d=Object.getOwnPropertyDescriptor(n,'look');if(!d||d.get||!n.look||n.look.art||n.look.draw||!n.look.skin)return;n.look={...n.look,...x}};
+ Object.values(C.NPC||{}).forEach(fix);if(C.FOLLOW)fix(C.FOLLOW);
 }
 /* ---------- talk portraits: a chest-up 48×48 pixel portrait generated from a character's walk look (hair style/colour,
    skin, uniform, tie, lashes/lips, cap, beard) with an expression and an open/closed mouth — Openbound-style, all our own art ---------- */
@@ -295,6 +359,7 @@ function portraitGrid(L,face,open){
  rect(20,31,8,7,skS);oval(24,20,11,13,sk);oval(12.5,22,1.6,2.6,sk);oval(35.5,22,1.6,2.6,sk);
  rect(14,28,20,1,null);oval(24,20,11,13,sk,8,33);
  for(let y=26;y<=32;y++)px(13+Math.max(0,y-26),y,null),px(35-Math.max(0,y-26),y,null);  // jaw taper
+ if(L.jaw)jawCut(L,g);  // a crew look's own jaw
  oval(24,20,11,13,sk,8,25);
  // hair
  const top=()=>{oval(24,15,12,9,hr,0,14)};
@@ -328,7 +393,7 @@ function portraitGrid(L,face,open){
  // outline everything
  const out=g.map(r=>r.slice());
  for(let y=0;y<W;y++)for(let x=0;x<W;x++)if(!g[y][x]&&[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>g[y+dy]&&g[y+dy][x+dx]))out[y][x]=O;
- return out;
+ return crewOn(L)?crewPortrait(L,face,out):out;
 }
 function drawPortrait(cv,L,face,open){
  const c=cv.getContext('2d');c.clearRect(0,0,48,48);
@@ -1302,7 +1367,7 @@ addEventListener('keyup',e=>{if(KEYS[e.key]===held)held=null});
 const BASE_TILES={...TILES};
 function boot(id){
  CH=CHAPTERS.find(c=>c.id===id)||CHAPTERS[0];
- C=CH.make();
+ C=CH.make();mergeLooks();
  Object.keys(TILES).forEach(k=>{if(!(k in BASE_TILES))delete TILES[k]});Object.assign(TILES,C.TILES||{});
  player.look=typeof C.PLAYER==='function'?myLook():myLook(C.PLAYER||CREW_LOOK);  // PLAYER as a function = a disguise, drawn at render time // a chapter may put the player in someone else's shoes (5장: Terence)
  if(dlg){dlg=null;clearInterval(typing?.id);$('dlg').hidden=true}

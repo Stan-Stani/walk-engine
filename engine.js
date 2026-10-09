@@ -701,12 +701,16 @@ function loop(t){const dt=Math.min(50,t-last);last=t;if(Z){update(dt,t);render(t
 
 /* ---------- dialogue ---------- */
 let dlg=null,typing=null,pending=null,sel=0;
-/* ---------- phone screen and 문화 노트 (both optional: a game's shell opts in with #phonePanel/#pscr and #notes/#noteCard) ----------
-   Step phone:{app, post, by, when, count, comments:[[name,text],…], time, battery, culture}: an app on someone's phone fills the game
-   view on that line (the D-pad and A/B stay below): the D-pad scrolls it, A finishes the line and then closes it, B closes it, and its
-   words are tappable. A step's culture:'id' (or a phone's, when it closes) adds a 문화 노트 from globalThis.CULTURE_NOTES (a game's data:
-   {id:{t, lines:[[korean, english, [source numbers]]…], src:[[title, url]…]}}): the culture behind a story moment, every line tied
-   to its sources, read in the journal. */
+/* ---------- phone screen, 문화 노트 and 문법 노트 (all optional: a game's shell opts in with #phonePanel/#pscr, #notes/#noteCard and
+   #gnotes/#gnoteCard) ----------
+   Step phone:{app, post, by, when, count, comments:[[name,text],…], time, battery, culture, grammar}: an app on someone's phone fills
+   the game view on that line (the D-pad and A/B stay below): the D-pad scrolls it, A finishes the line and then closes it, B closes
+   it, and its words are tappable. A step's culture:'id' (or a phone's, when it closes) adds a 문화 노트 from globalThis.CULTURE_NOTES
+   (a game's data: {id:{t, lines:[[korean, english, [source numbers]]…], src:[[title, url]…]}}): the culture behind a story moment,
+   every line tied to its sources, read in the journal. A step's grammar:'id' (or a phone's) adds a 문법 노트 from
+   globalThis.GRAMMAR_NOTES ({id:{t, lines:[[korean, english]…], ex:[[korean, english]…]}}): the grammar of the line it's on, a few
+   lines and then its examples, read in the journal under its own heading (#gnotesH), after the 문화 노트. Each kind keeps its own
+   seen/read lists; without GRAMMAR_NOTES the 문법 노트 heading and list are taken out of the journal. */
 let phoneOpen=false,curPhone=null;
 function openPhone(p){
  if(!$('phonePanel'))return;curPhone=p;
@@ -724,38 +728,54 @@ function openPhone(p){
   +`<div class="pcount txt">${glossHTML('댓글 '+p.count+'개')}</div><div class="plist">${c}${more>0?`<div class="pmore txt">${glossHTML('댓글 '+more+'개 더 보기')}</div>`:''}</div>`;
  $('phonePanel').hidden=false;phoneOpen=true;
 }
-function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidden=true;hideGloss();if(curPhone&&curPhone.culture)unlockCulture(curPhone.culture);curPhone=null}
-if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w)}});
+function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidden=true;hideGloss();if(curPhone&&curPhone.culture)unlockCulture(curPhone.culture);if(curPhone&&curPhone.grammar)unlockGrammar(curPhone.grammar);curPhone=null}
+if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
 const CULTURE=globalThis.CULTURE_NOTES||{};  // a game's notes (its own file sets globalThis.CULTURE_NOTES)
 let cultureSeen=[];try{cultureSeen=JSON.parse(store.get(KEY('culture'))||'[]')}catch(e){}
-/* A new note waits on the screen as a tappable chip (#noteChip, made here when the shell has the notes section) until you
+/* A new note waits on the screen as a tappable chip (#noteChip, made here when the shell has a notes section) until you
    read it: tapping it opens the 일지 on that note. Notes seen before this existed count as read. */
 let cultureRead;try{cultureRead=JSON.parse(store.get(KEY('cultureRead'))||'null')}catch(e){}if(!Array.isArray(cultureRead))cultureRead=cultureSeen.slice();
-function noteChip(){const el=$('noteChip');if(!el)return;const un=cultureSeen.filter(k=>CULTURE[k]&&!cultureRead.includes(k));
- el.hidden=!un.length;if(un.length){const k=un[un.length-1];el.dataset.k=k;el.innerHTML=`<span>📖 문화 노트 · ${CULTURE[k].t}</span><b>›</b>`}}
-function readNote(k){if(!cultureRead.includes(k)){cultureRead.push(k);store.set(KEY('cultureRead'),JSON.stringify(cultureRead))}noteChip()}
-function unlockCulture(k){
- if(!CULTURE[k]||cultureSeen.includes(k))return;cultureSeen.push(k);store.set(KEY('culture'),JSON.stringify(cultureSeen));
+const GRAMMAR=globalThis.GRAMMAR_NOTES||{};  // a game's 문법 노트 (its own file sets globalThis.GRAMMAR_NOTES)
+let grammarSeen=[],grammarRead=[];try{grammarSeen=JSON.parse(store.get(KEY('grammar'))||'[]')}catch(e){}try{grammarRead=JSON.parse(store.get(KEY('grammarRead'))||'[]')}catch(e){}
+if(!Array.isArray(grammarSeen))grammarSeen=[];if(!Array.isArray(grammarRead))grammarRead=[];
+/* the two kinds of note: the chip's name for it, its data, seen/read lists (saved under KEY(key) and KEY(key+'Read')), journal list and card */
+const NOTE_KINDS={culture:{name:'문화 노트',data:CULTURE,seen:cultureSeen,read:cultureRead,key:'culture',list:'notes',card:'noteCard'},
+ grammar:{name:'문법 노트',data:GRAMMAR,seen:grammarSeen,read:grammarRead,key:'grammar',list:'gnotes',card:'gnoteCard'}};
+if(!Object.keys(GRAMMAR).length)for(const id of ['gnotesH','gnotes','gnoteCard'])$(id)?.remove();  // a game without 문법 노트 shows no heading for them
+let noteLast='culture';  // the kind unlocked last: the chip shows its newest unread note first, then the rest, newest first
+const unreadNotes=K=>{const N=NOTE_KINDS[K];return N.seen.filter(k=>N.data[k]&&!N.read.includes(k))};
+function noteChip(){const el=$('noteChip');if(!el)return;const K=[noteLast,...Object.keys(NOTE_KINDS)].find(K=>unreadNotes(K).length);
+ el.hidden=!K;if(K){const N=NOTE_KINDS[K],un=unreadNotes(K),k=un[un.length-1];el.dataset.kind=K;el.dataset.k=k;el.innerHTML=`<span>📖 ${N.name} · ${N.data[k].t}</span><b>›</b>`}}
+function readNote(K,k){const N=NOTE_KINDS[K];if(!N.read.includes(k)){N.read.push(k);store.set(KEY(N.key+'Read'),JSON.stringify(N.read))}noteChip()}
+function unlockNote(K,k){const N=NOTE_KINDS[K];
+ if(!N.data[k]||N.seen.includes(k))return;N.seen.push(k);store.set(KEY(N.key),JSON.stringify(N.seen));noteLast=K;
  setTimeout(()=>{sfx('badge');noteChip()},350);
 }
+const unlockCulture=k=>unlockNote('culture',k),unlockGrammar=k=>unlockNote('grammar',k);
 function renderNotes(){
- if(!$('notes'))return;const ks=cultureSeen.filter(k=>CULTURE[k]);
- $('notes').innerHTML=ks.length?ks.map(k=>`<button class="nb" data-k="${k}">${CULTURE[k].t}</button>`).join(''):'<p class="none">아직 없어요.</p>';
- $('noteCard').hidden=true;
+ for(const N of Object.values(NOTE_KINDS)){if(!$(N.list))continue;const ks=N.seen.filter(k=>N.data[k]);
+  $(N.list).innerHTML=ks.length?ks.map(k=>`<button class="nb" data-k="${k}">${N.data[k].t}</button>`).join(''):'<p class="none">아직 없어요.</p>';
+  $(N.card).hidden=true}
 }
-function showNote(k){
- const n=CULTURE[k],c=$('noteCard');let en=false;
+/* a note in its card: the title and ? (English for every line), its lines, then a 문법 노트's examples (예문) or a 문화 노트's sources (출처);
+   one card is open at a time */
+function showNote(K,k){
+ const N=NOTE_KINDS[K],n=N&&N.data[k],c=n&&$(N.card);if(!c)return;let en=false;
+ for(const M of Object.values(NOTE_KINDS))if(M!==N&&$(M.card))$(M.card).hidden=true;
+ const ko=t=>`<span class="txt">${glossHTML(t)}</span>`,eng=e=>en?`<span class="en">${e}</span>`:'';
  const draw=()=>{c.innerHTML=`<div class="top"><span class="nt">${n.t}</span><button class="enb" aria-label="English">?</button></div>`
-  +`<ol>${n.lines.map(([ko,e,s])=>`<li><span class="txt">${glossHTML(ko)}</span><sup>${s.join(',')}</sup>${en?`<span class="en">${e}</span>`:''}</li>`).join('')}</ol>`
-  +`<div class="src"><b>출처</b>${n.src.map(([t,u],i)=>`<span>${i+1}. <a href="${u}" target="_blank" rel="noopener">${t}</a></span>`).join('')}</div>`;
+  +`<ol>${n.lines.map(([t,e,s])=>`<li>${ko(t)}${s?`<sup>${s.join(',')}</sup>`:''}${eng(e)}</li>`).join('')}</ol>`
+  +(n.ex&&n.ex.length?`<div class="nex"><b>예문</b><ul>${n.ex.map(([t,e])=>`<li>${ko(t)}${eng(e)}</li>`).join('')}</ul></div>`:'')
+  +(n.src?`<div class="src"><b>출처</b>${n.src.map(([t,u],i)=>`<span>${i+1}. <a href="${u}" target="_blank" rel="noopener">${t}</a></span>`).join('')}</div>`:'');
   c.querySelector('.enb').addEventListener('click',e=>{e.stopPropagation();en=!en;draw()})};
- draw();c.hidden=false;c.scrollIntoView({block:'nearest'});readNote(k);
+ draw();c.hidden=false;c.scrollIntoView({block:'nearest'});readNote(K,k);
 }
-if($('notes')){
- $('notes').addEventListener('click',e=>{const b=e.target.closest('.nb');if(b)showNote(b.dataset.k)});
+if(Object.values(NOTE_KINDS).some(N=>$(N.list))){
+ for(const [K,N] of Object.entries(NOTE_KINDS))if($(N.list)){
+  $(N.list).addEventListener('click',e=>{const b=e.target.closest('.nb');if(b)showNote(K,b.dataset.k)});
+  $(N.card).addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();document.body.classList.add('talkopen');showWord(w.textContent)}})}  // word help above the journal
  {const b=document.createElement('button');b.id='noteChip';b.className='notechip';b.type='button';b.hidden=true;$('toast').after(b);
-  b.addEventListener('click',e=>{e.stopPropagation();const k=b.dataset.k;openPanel();showNote(k)});noteChip()}
- $('noteCard').addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();document.body.classList.add('talkopen');showWord(w)}});  // word help above the journal
+  b.addEventListener('click',e=>{e.stopPropagation();openPanel();showNote(b.dataset.kind,b.dataset.k)});noteChip()}
  for(const id of ['closePanel','panel'])$(id).addEventListener('click',e=>{if(id==='closePanel'||e.target.id==='panel')document.body.classList.remove('talkopen')});
 }
 
@@ -783,6 +803,7 @@ function show(s){
  if(s.move)moveNpcs(s);
  if(s.phone)openPhone(s.phone);
  if(s.culture)unlockCulture(s.culture);
+ if(s.grammar)unlockGrammar(s.grammar);
  if(s.sit)sitDown(s.sit);
  [].concat(s.turn||[]).forEach(o=>{const n=C.NPC[o.npc];if(n){n.dir=o.dir;n.turnAt=performance.now()+60000}});
  if('cam' in s){camT=s.cam||null;if(camT){const cyc=Math.max(0,Math.min(camT[1]*TS+8-VH*TS/2,MH*TS-VH*TS));placeBox([camT[1]],cyc)}else placeBox(talkRows())}
@@ -1030,7 +1051,8 @@ function cancel(){
  if($('repPanel')&&!$('repPanel').hidden){closeReport();return}
  if(!$('tapPanel').hidden){closeTaps();return}
  if(!$('talkPanel').hidden){if(!$('gloss').hidden)hideGloss();else closeTalk();return}
- if(panelOpen()){$('panel').hidden=true;$('chPanel').hidden=true;return}
+ if(panelOpen()){if(document.body.classList.contains('talkopen')&&!$('gloss').hidden){hideGloss();return}  // word help over a note: B closes it first, as in the talk log
+  $('panel').hidden=true;$('chPanel').hidden=true;document.body.classList.remove('talkopen');return}
  if(!$('gloss').hidden){hideGloss();return}
  if(choosing()||building()){speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.ask||'');return} // B never throws away a question; it replays it
  if(dlg)closeDialog();
@@ -1066,7 +1088,7 @@ function sayLine(n){
  return [...says(r.pre||[]),{...(r.who?{who:r.who}:{}),say:answered(r.ask,ok?ok[0]:r.w)}];
 }
 const usual=n=>n.badge?(n.badge.every(has)?says(n.after):null):(n.again&&metIds().includes(npcId(n))?says(typeof n.again==='function'?n.again():n.again):n.talk());  // again: what they say once you've met (no second introduction)  // what they'd say anyway (null: still teaching)
-const moves=s=>['set','give','take','award','go','walk','leave','move','phone','culture','sit','choose','finale'].some(k=>k in s);
+const moves=s=>['set','give','take','award','go','walk','leave','move','phone','culture','grammar','sit','choose','finale'].some(k=>k in s);
 function reviewPick(n){
  const L=reviewLines(n);if(!L.length)return null;
  const rank=r=>lv(r.w).b*2+((n.badge||[]).includes(r.w)?0:1);  // the weakest word first; their own word before someone else's

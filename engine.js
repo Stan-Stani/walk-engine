@@ -591,9 +591,15 @@ function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidde
 if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w)}});
 const CULTURE=globalThis.CULTURE_NOTES||{};  // a game's notes (its own file sets globalThis.CULTURE_NOTES)
 let cultureSeen=[];try{cultureSeen=JSON.parse(store.get(KEY('culture'))||'[]')}catch(e){}
+/* A new note waits on the screen as a tappable chip (#noteChip, made here when the shell has the notes section) until you
+   read it: tapping it opens the 일지 on that note. Notes seen before this existed count as read. */
+let cultureRead;try{cultureRead=JSON.parse(store.get(KEY('cultureRead'))||'null')}catch(e){}if(!Array.isArray(cultureRead))cultureRead=cultureSeen.slice();
+function noteChip(){const el=$('noteChip');if(!el)return;const un=cultureSeen.filter(k=>CULTURE[k]&&!cultureRead.includes(k));
+ el.hidden=!un.length;if(un.length){const k=un[un.length-1];el.dataset.k=k;el.innerHTML=`<span>📖 문화 노트 · ${CULTURE[k].t}</span><b>›</b>`}}
+function readNote(k){if(!cultureRead.includes(k)){cultureRead.push(k);store.set(KEY('cultureRead'),JSON.stringify(cultureRead))}noteChip()}
 function unlockCulture(k){
  if(!CULTURE[k]||cultureSeen.includes(k))return;cultureSeen.push(k);store.set(KEY('culture'),JSON.stringify(cultureSeen));
- setTimeout(()=>{toast('문화 노트에 추가: '+CULTURE[k].t);sfx('badge')},350);
+ setTimeout(()=>{sfx('badge');noteChip()},350);
 }
 function renderNotes(){
  if(!$('notes'))return;const ks=cultureSeen.filter(k=>CULTURE[k]);
@@ -606,10 +612,12 @@ function showNote(k){
   +`<ol>${n.lines.map(([ko,e,s])=>`<li><span class="txt">${glossHTML(ko)}</span><sup>${s.join(',')}</sup>${en?`<span class="en">${e}</span>`:''}</li>`).join('')}</ol>`
   +`<div class="src"><b>출처</b>${n.src.map(([t,u],i)=>`<span>${i+1}. <a href="${u}" target="_blank" rel="noopener">${t}</a></span>`).join('')}</div>`;
   c.querySelector('.enb').addEventListener('click',e=>{e.stopPropagation();en=!en;draw()})};
- draw();c.hidden=false;c.scrollIntoView({block:'nearest'});
+ draw();c.hidden=false;c.scrollIntoView({block:'nearest'});readNote(k);
 }
 if($('notes')){
  $('notes').addEventListener('click',e=>{const b=e.target.closest('.nb');if(b)showNote(b.dataset.k)});
+ {const b=document.createElement('button');b.id='noteChip';b.className='notechip';b.type='button';b.hidden=true;$('toast').after(b);
+  b.addEventListener('click',e=>{e.stopPropagation();const k=b.dataset.k;openPanel();showNote(k)});noteChip()}
  $('noteCard').addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();document.body.classList.add('talkopen');showWord(w)}});  // word help above the journal
  for(const id of ['closePanel','panel'])$(id).addEventListener('click',e=>{if(id==='closePanel'||e.target.id==='panel')document.body.classList.remove('talkopen')});
 }

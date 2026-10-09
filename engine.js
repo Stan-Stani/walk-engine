@@ -78,7 +78,7 @@ function wrapUp(){
  const now_=r=>(!r.when||r.when())&&[].concat(r.by).every(b=>{const n=C.NPC[b];return !n||!n.hide||!n.hide()});  // a new line needs its moment and its speaker still here (no one speaks after they've died or gone)
  const line=w=>{const R=said(w),f=R.filter(r=>unheard(r)&&metBy(r)&&now_(r)),h=R.filter(r=>!unheard(r)),P=f.length?f:h.length?h:R.filter(now_);if(P.length){const r=pick(P),q={...r,who:nameOf(r),review:true};delete q.by;delete q.pre;delete q.when;return q}  // a line with it from someone in this chapter, under their name: one you haven't heard yet from someone you've met first (a word-for-word repeat felt stale), else one you heard (a memory), else the generic sentence
   const b=bank(w);return b.length?{...pick(b),who:'…',review:true}:null};
- const qs=C.WORDS.filter(w=>has(w)&&lv(w).b<3&&(said(w).length||bank(w).length)).sort((a,b)=>lv(a).b-lv(b).b).slice(0,4).map(line);
+ const qs=C.WORDS.filter(w=>has(w)&&lv(w).b<3&&(said(w).length||bank(w).length)).sort((a,b)=>lv(a).b-lv(b).b).slice(0,4).map(line).filter(Boolean);
  carryDue().slice(0,Math.max(0,4-qs.length)).forEach(w=>{const q=carryQ(w);if(q)qs.push({...q,who:'…',review:true})});
  return qs.length?[{who:'…',say:TERM.wrap},...qs]:[];
 }

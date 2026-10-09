@@ -287,6 +287,7 @@ function lookFor(who){ // speaker name → look: an NPC of this chapter with tha
 }
 function faceFor(s,text){ // expression for a line: explicit face, else a guess from the punctuation
  if(s.face)return s.face;
+ {const n=dlg&&dlg.npc;if(n&&n.sleep&&(!s.who||s.who===n.name))return 'sleep'}  // someone asleep (NPC sleep:1) talks in their sleep with their eyes shut, review lines and replies too
  if(s.ask||/^…|…$/.test(text))return 'think';
  if(/[?!]{2}|!\?/.test(text))return 'surprised';
  if(/!$/.test(text.trim()))return 'happy';

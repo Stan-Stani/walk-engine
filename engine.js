@@ -961,8 +961,10 @@ function allQuestions(){
    asks it in their own voice (a friend, a teacher, a passer-by), and the answer grades the word as any review does.
    A chapter without C.REVIEW keeps the narrator's review of the person's own badge words. */
 const npcId=n=>Object.keys(C.NPC).find(k=>C.NPC[k]===n);
+const metIds=()=>state.met||(state.met=[]),met=n=>!!n.badge||metIds().includes(npcId(n));  // someone you've talked to (a teacher always counts)
 function linesFor(n){  // their lines for words you have, true right now (when), due or not
  if(!C.REVIEW||(n.badge&&!n.badge.every(has)))return [];  // someone still teaching teaches first
+ if(!met(n))return [];  // the first talk with anyone is their own (an introduction, a cameo), never a review
  const id=npcId(n);
  return C.REVIEW.filter(r=>[].concat(r.by).some(b=>b===id||b===n.name)&&known(r.w)&&(!r.when||r.when()));  // known: this chapter's word you have, or one from another chapter (srs.shared)
 }
@@ -1035,13 +1037,14 @@ function talkWith(n){
  if(!pair&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
  let steps=n.script?n.script():null,isReview=false;
  if(!steps&&C.REVIEW){const own=usual(n),rv=own&&!own.some(moves)?reviewPick(n):null;  // a talk that moves the story goes first; the review waits for the next talk
-  if(rv){const q=rv[rv.length-1],stem=q.w.replace(/다$/,''),gives=t=>(t.say||'').includes(stem);  // their usual line goes first, unless it says the very word they're about to ask
+  if(rv){const q=rv[rv.length-1],stems=[q.w.replace(/다$/,''),q.w.replace(/하다$/,'')].filter(x=>x),gives=t=>stems.some(x=>(t.say||'').includes(x));  // their usual line goes first, unless it says the very word they're about to ask (흥정해 → 흥정하다)
    steps=[...(n.badge?own.filter(t=>!gives(t)):[]),...rv];isReview=true}
   else{const sl=own&&!own.some(moves)?sayLine(n):null;steps=sl?[...(n.badge?own:[]),...sl]:own||n.talk()}}
  if(!steps){
   if(n.badge&&n.badge.every(has)){const due=n.badge.some(isDue);steps=due?[...says(n.after),reviewFor(n.badge)]:says(n.after);isReview=due}  // a review question only when one of their words is due
   else steps=n.talk();
  }
+ {const id=npcId(n);if(id&&!metIds().includes(id)){metIds().push(id);save()}}  // met: from now on they can review and chat
  if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
  openDialog(n.name,steps,{npc:n,review:isReview});
 }

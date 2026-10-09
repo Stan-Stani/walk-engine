@@ -1103,7 +1103,7 @@ function updateSound(){$('sndBtn').setAttribute('aria-pressed',soundOn?'true':'f
 let logSel=null,showEn=false;
 function pips(w){const L=lv(w);return `<span class="pips${isDue(w)?' due':''}">${[1,2,3,4,5].map(i=>`<i class="${L.b>=i?'on':''}"></i>`).join('')}</span>`}
 function openPanel(){
- renderNotes();
+ renderNotes();if($('itemCard'))$('itemCard').hidden=true;
  const got=C.WORDS.filter(has);
  $('logCount').textContent=`${got.length}/${C.WORDS.length} · 복습 ${dueWords().length}`;
  if(!logSel||!has(logSel))logSel=got[got.length-1]||null;

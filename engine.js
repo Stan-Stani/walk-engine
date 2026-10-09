@@ -350,7 +350,7 @@ function petReset(){pet.x=pet.fx=player.x;pet.y=pet.fy=player.y;pet.dir=player.d
 
 function marker(X,Y,t,st){
  if(!st)return;
- if(Y<-12)return;if(Y<11){X+=11;Y=11}  // someone half off the top: the marker beside their head (on screen, not on their face)
+ if(Y+CAM.y<11){X+=11;Y=11-CAM.y}  // no room above them on the map (the top row: no camera can show a marker there): it sits beside their head and moves with them, so it never jumps while the camera scrolls
  if(G.marker){G.marker(X,Y,t,st);return}  // a game's own ! ? ★ (GAME.marker(X,Y,t,state))
  const bob=Math.round(Math.sin(t/220)*1.5);
  if(st==='todo'){r(X+6,Y-9+bob,4,8,'#1B1E2B');r(X+7,Y-8+bob,2,4,'#E8962A');r(X+7,Y-3+bob,2,1,'#E8962A')}
@@ -360,9 +360,10 @@ function marker(X,Y,t,st){
 }
 function status(n){
  if(n.status){const v=n.status();if(v!==undefined)return v}
+ if(C.REVIEW&&reviewLines(n).length){const own=usual(n);return (n.script&&n.script())||!own||own.some(moves)?null:'review'}  // anyone with a line for a due word, badge or not, when the talk would be the review
  if(!n.badge)return null;
  if(!n.badge.every(has))return 'todo';
- if(n.badge.some(isDue))return n.script&&n.script()?null:'review';  // a ? only when talking reviews (their script lines come first and skip it)
+ if(!C.REVIEW&&n.badge.some(isDue))return n.script&&n.script()?null:'review';  // a ? only when talking reviews (their script lines come first and skip it)
  return n.badge.every(w=>lv(w).b>=3)?'star':null;
 }
 
@@ -650,14 +651,16 @@ function show(s){
  typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)renderChoices(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);
  if(readOn&&!s.listenOnly)speak(s.listen?'':text);
- if(s.listen)setTimeout(()=>speak(s.listen),readOn?1200:150);
+ if(s.listen)setTimeout(()=>speak(s.listenLine||s.listen),readOn?1200:150);
  if(s.take&&!s.set)dlg.questHold=1;else if(s.set)dlg.questHold=0;  // handing an item over: keep the old 목표 until the scene moves the story on (or ends)
  if(!dlg.questHold)updateQuest();
 }
 function prepListen(s){
  const w=s.listen;const pool=(C.CONFUSE[w]||[]).slice(0,2);
  while(pool.length<2){const o=C.WORDS[Math.random()*C.WORDS.length|0];if(o!==w&&!pool.includes(o))pool.push(o)}
- const out={...s,ask:'잘 들어 보세요. 무슨 단어예요?',w,opts:[[w,1],...pool.map(p=>[p,0,`"${w}"였어요. 다시 들어 보세요.`])],listenOnly:1};
+ const again=dlg.npc&&dlg.npc.banmal?`다시 들어 봐. "${w}".`:`다시 들어 보세요. "${w}".`;
+ const out=s.listenLine?{...s,ask:s.ask.replace('___','🔊'),done:s.listenLine,own:1,w,opts:[[w,1],...pool.map(p=>[p,0,again])],listenOnly:1}  // someone's review line said aloud: the word is a sound in the text, and the whole line is the answer
+  :{...s,ask:'잘 들어 보세요. 무슨 단어예요?',w,opts:[[w,1],...pool.map(p=>[p,0,`"${w}"였어요. 다시 들어 보세요.`])],listenOnly:1};
  dlg.cur=out;return out;
 }
 /* Every Korean word in a line is tappable: marked glosses ({shown|key}) open the chapter DICT entry,
@@ -875,7 +878,7 @@ function cancel(){
  if(!$('talkPanel').hidden){if(!$('gloss').hidden)hideGloss();else closeTalk();return}
  if(panelOpen()){$('panel').hidden=true;$('chPanel').hidden=true;return}
  if(!$('gloss').hidden){hideGloss();return}
- if(choosing()||building()){speak(dlg.cur.listen||dlg.cur.ask||'');return} // B never throws away a question; it replays it
+ if(choosing()||building()){speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.ask||'');return} // B never throws away a question; it replays it
  if(dlg)closeDialog();
 }
 const says=a=>(Array.isArray(a)?a:[a]).map(t=>typeof t==='string'?{say:t}:t);  // a line, or a full step (set:, sfx:, …)
@@ -883,10 +886,32 @@ const says=a=>(Array.isArray(a)?a:[a]).map(t=>typeof t==='string'?{say:t}:t);  /
 function allQuestions(){
  const out=[...(C.BANK||[])];Object.keys(C.Q).forEach(k=>{if(k!=='cafe')out.push(...C.Q[k])});return out;
 }
+/* In-character review (opt-in): a chapter's C.REVIEW lists lines people say that use a word you've learned —
+   {w, by:'npcId'|'이름'|[…], ask, opts, pre?:[lines before it], when?:()=>bool, who?:'나'}. Whoever has a line for a word that is due
+   asks it in their own voice (a friend, a teacher, a passer-by), and the answer grades the word as any review does.
+   A chapter without C.REVIEW keeps the narrator's review of the person's own badge words. */
+const npcId=n=>Object.keys(C.NPC).find(k=>C.NPC[k]===n);
+function reviewLines(n){
+ if(!C.REVIEW||(n.badge&&!n.badge.every(has)))return [];  // someone still teaching teaches first
+ const id=npcId(n);
+ return C.REVIEW.filter(r=>[].concat(r.by).some(b=>b===id||b===n.name)&&isDue(r.w)&&(!r.when||r.when()));
+}
+const usual=n=>n.badge?(n.badge.every(has)?says(n.after):null):n.talk();  // what they'd say anyway (null: still teaching)
+const moves=s=>['set','give','take','award','go','walk','leave','move','phone','culture','sit','choose','finale'].some(k=>k in s);
+function reviewPick(n){
+ const L=reviewLines(n);if(!L.length)return null;
+ const rank=r=>lv(r.w).b*2+((n.badge||[]).includes(r.w)?0:1);  // the weakest word first; their own word before someone else's
+ const lo=Math.min(...L.map(rank)),best=L.filter(r=>rank(r)===lo),r=best[Math.random()*best.length|0];
+ const q={...r,review:true};delete q.by;delete q.pre;delete q.when;
+ if(q.who!=='나'&&canSpeak()&&soundOn&&listenOn&&Math.random()<.35){const ok=(q.opts||[]).find(o=>o[1]);q.listen=q.w;q.listenLine=answered(q.ask,ok?ok[0]:q.w)}  // they say it aloud (the answer as it fits the line: 주워, not 줍다); you pick the word you heard
+ return [...says(r.pre||[]),q];
+}
 function reviewFor(words){ // pick a question for the weakest of these words
  const ws=[...words].sort((a,b)=>(isDue(b)-isDue(a))||(lv(a).b-lv(b).b));
  const w=ws[0];
- const pool=allQuestions().filter(q=>q.w===w),gen=pool.filter(q=>!q.scene),all=gen.length?gen:pool;  // scene:1 quotes its own scene: never asked in review (it would play the scene before it happens)
+ let pool=allQuestions().filter(q=>q.w===w);
+ if(C.REVIEW){const g=(C.BANK||[]).filter(q=>q.w===w&&!q.scene);if(g.length)pool=g}  // with in-character review, the notebook asks the generic example sentences, not lines from someone's scene
+ const gen=pool.filter(q=>!q.scene),all=gen.length?gen:pool;  // scene:1 quotes its own scene: never asked in review (it would play the scene before it happens)
  const own=all.filter(q=>!q.gram),qs=own.length?own:all;  // gram:1 tests a pattern, not the word: no star for the word from it
  const narr={review:true,who:'…',ok:'맞아요!'};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
  if(canSpeak()&&soundOn&&listenOn&&Math.random()<.35)return {listen:w,...narr};  // a muted phone (or 듣기 문제 off) can't answer a listening question
@@ -928,6 +953,9 @@ function talkWith(n){
  const pair=chatPair(n);  // two people talking to each other: they keep facing each other, and the one who started speaks first
  if(!pair&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
  let steps=n.script?n.script():null,isReview=false;
+ if(!steps&&C.REVIEW){const own=usual(n),rv=own&&!own.some(moves)?reviewPick(n):null;  // a talk that moves the story goes first; the review waits for the next talk
+  if(rv){const q=rv[rv.length-1],stem=q.w.replace(/다$/,''),gives=t=>(t.say||'').includes(stem);  // their usual line goes first, unless it says the very word they're about to ask
+   steps=[...(n.badge?own.filter(t=>!gives(t)):[]),...rv];isReview=true}else steps=own||n.talk()}
  if(!steps){
   if(n.badge&&n.badge.every(has)){const due=n.badge.some(isDue);steps=due?[...says(n.after),reviewFor(n.badge)]:says(n.after);isReview=due}  // a review question only when one of their words is due
   else steps=n.talk();
@@ -1031,7 +1059,7 @@ document.querySelectorAll('.dpad button').forEach(b=>{
 $('btnA').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
 $('btnB').addEventListener('pointerdown',e=>{e.preventDefault();cancel()});
 $('dlg').addEventListener('click',e=>{const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.textContent);return}if(e.target.closest('#spk'))return;advance()});
-$('spk').addEventListener('click',e=>{e.stopPropagation();if(dlg)speak(dlg.cur.listen||dlg.cur.say||dlg.cur.ask||'')});
+$('spk').addEventListener('click',e=>{e.stopPropagation();if(dlg)speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.say||dlg.cur.ask||'')});
 $('gloss').addEventListener('click',e=>{if(e.target.closest('.gx'))hideGloss()});  // × closes; A and B close too
 $('choices').addEventListener('pointerdown',e=>{const b=e.target.closest('.choice');if(b){sel=choiceBtns().indexOf(b);markSel()}});
 $('logBtn').addEventListener('click',()=>{showEn=false;openPanel()});

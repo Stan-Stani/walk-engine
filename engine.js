@@ -1122,7 +1122,8 @@ function openPanel(){
  $('items').querySelectorAll('li[data-k]').forEach(li=>li.addEventListener('click',()=>{const name=state.items[+li.dataset.k],ph=(C.PHOTOS||{})[name];
   if(ph){$('panel').hidden=true;openPhone(ph);return}
   $('items').querySelectorAll('li').forEach(x=>x.classList.toggle('sel',x===li));
-  $('card').innerHTML=`<div class="top"><span class="big">${String(name).replace(/</g,'&lt;')}</span></div><span class="def txt">${glossHTML(String(C.ITEMS[name]||''))}</span>`}));
+  let ic=$('itemCard');if(!ic){ic=document.createElement('div');ic.id='itemCard';ic.className='card';$('items').after(ic)}  // right under the bag, not in the word card at the top (out of view)
+  ic.innerHTML=`<div class="top"><span class="big">${String(name).replace(/</g,'&lt;')}</span></div><span class="def txt">${glossHTML(String(C.ITEMS[name]||''))}</span>`;ic.hidden=false;ic.scrollIntoView({block:'nearest'})}));
  $('panel').hidden=false;
 }
 

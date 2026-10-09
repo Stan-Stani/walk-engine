@@ -718,7 +718,7 @@ function show(s){
  $('who').textContent=s.who||dlg.name;
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;
  const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
- if(!s.build)logTalk(s.who||dlg.name,text);
+ if(!s.build&&!s.ask)logTalk(s.who||dlg.name,text);  // a question is logged once, as the line it becomes when answered
  typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)renderChoices(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);
  if(readOn&&!s.listenOnly)speak(s.listen?'':text);
@@ -758,6 +758,7 @@ function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; Engli
  el.hidden=false;el.querySelector('.q').addEventListener('click',e=>{e.stopPropagation();el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden)});
 }
 function typeText(text,done){
+ text=text.replace(/ ___/g,'\u00A0___').replace(/___(?=\S)/g,'___\u2060');  // a blank never starts or ends a line on its own ("국어 수행 ___ / 예요")
  clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.innerHTML='<span style="visibility:hidden">'+p.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</span>';let i=0;
  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
  typing={id:null,finished:false};

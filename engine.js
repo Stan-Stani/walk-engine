@@ -855,7 +855,8 @@ function markSel(){const bs=choosing()?choiceBtns():tileBtns();bs.forEach((b,i)=
 function moveSel(d){if(performance.now()-choicesAt<450)return;  // keys still held from walking don't move a fresh question's selection
  const n=(choosing()?choiceBtns():tileBtns()).length;if(!n)return;sel=sel<0?(d>0?0:n-1):(sel+d+n)%n;markSel();sfx('move')}
 let choicesAt=0;
-function confirmSel(){if(sel<0||performance.now()-choicesAt<450)return;const b=(choosing()?choiceBtns():tileBtns())[sel];if(b)b.click()}
+function confirmSel(){if(performance.now()-choicesAt<450)return;if(sel<0){sel=0;markSel();return}  // nothing selected: A selects the first one (never does nothing); A again picks it
+ const b=(choosing()?choiceBtns():tileBtns())[sel];if(b)b.click()}
 
 function renderBuild(s){
  s.got=0;$('build').hidden=false;
@@ -887,7 +888,7 @@ function pickTile(s,b){
   dlg.next='advance';$('build').hidden=true;
   show({who:s.who||dlg.name,say:line+(/[.!?…]$/.test(line)?'':'.')});  // the assembled line, said whole: getting it right is the praise (no 맞아요 toast)
   if(readOn)speak(line);
- }else{sel=-1;markSel()}
+ }else{sel=Math.min(Math.max(sel,0),tileBtns().length-1);markSel()}  // the selection moves on to the next tile: A, A, A builds the line
 }
 /* Each rule is explained once per player, then only the toasts speak. */
 let explained={};try{explained=JSON.parse(localStorage.getItem(KEY('explained'))||'{}')}catch(e){}
@@ -970,22 +971,25 @@ function linesFor(n){  // their lines for words you have, true right now (when),
  const id=npcId(n);
  return C.REVIEW.filter(r=>[].concat(r.by).some(b=>b===id||b===n.name)&&known(r.w)&&(!r.when||r.when()));  // known: this chapter's word you have, or one from another chapter (srs.shared)
 }
-const reviewLines=n=>linesFor(n).filter(r=>isDue(r.w));
+const revAt={};  // when each person last asked a review: at most one per story beat (re-talking isn't a quiz machine)
+const cooling=n=>{const r=revAt[npcId(n)];return !!r&&(SRS().beats?r.b===beats():talkN-r.t<3)};
+const cooledLine=r=>{const h=(state.heardB||{})[rKey(r)];return h==null||beats()-h>=3};  // a line just heard as plain talk isn't asked for a few beats
+const reviewLines=n=>cooling(n)?[]:linesFor(n).filter(r=>isDue(r.w)&&cooledLine(r));
 /* Spaced review decides when a line is a question, not whether you hear it: with nothing of theirs due, a person says one of
    their lines you haven't heard yet, the word filled in, as ordinary talk (state.heard keeps which), then their usual chatter. */
 const rKey=r=>r.w+'|'+r.ask,heard=()=>state.heard||(state.heard=[]),unheard=r=>!heard().includes(rKey(r));
 function hear(r){if(unheard(r)){heard().push(rKey(r));save()}}
 function sayLine(n){
  const L=linesFor(n).filter(unheard);if(!L.length)return null;
- const r=L[Math.random()*L.length|0],ok=(r.opts||[]).find(o=>o[1]);hear(r);
+ const r=L[Math.random()*L.length|0],ok=(r.opts||[]).find(o=>o[1]);hear(r);(state.heardB||(state.heardB={}))[rKey(r)]=beats();
  return [...says(r.pre||[]),{...(r.who?{who:r.who}:{}),say:answered(r.ask,ok?ok[0]:r.w)}];
 }
-const usual=n=>n.badge?(n.badge.every(has)?says(n.after):null):n.talk();  // what they'd say anyway (null: still teaching)
+const usual=n=>n.badge?(n.badge.every(has)?says(n.after):null):(n.again&&metIds().includes(npcId(n))?says(typeof n.again==='function'?n.again():n.again):n.talk());  // again: what they say once you've met (no second introduction)  // what they'd say anyway (null: still teaching)
 const moves=s=>['set','give','take','award','go','walk','leave','move','phone','culture','sit','choose','finale'].some(k=>k in s);
 function reviewPick(n){
  const L=reviewLines(n);if(!L.length)return null;
  const rank=r=>lv(r.w).b*2+((n.badge||[]).includes(r.w)?0:1);  // the weakest word first; their own word before someone else's
- const lo=Math.min(...L.map(rank)),best0=L.filter(r=>rank(r)===lo),fresh=best0.filter(unheard),best=fresh.length?fresh:best0,r=best[Math.random()*best.length|0];hear(r);  // a line you haven't heard first
+ const lo=Math.min(...L.map(rank)),best0=L.filter(r=>rank(r)===lo),fresh=best0.filter(unheard),best=fresh.length?fresh:best0,r=best[Math.random()*best.length|0];hear(r);revAt[npcId(n)]={b:beats(),t:talkN+1};  // a line you haven't heard first
  const q={...r,review:true};delete q.by;delete q.pre;delete q.when;
  if(q.who!=='나'&&canSpeak()&&soundOn&&listenOn&&Math.random()<.35){const ok=(q.opts||[]).find(o=>o[1]);q.listen=q.w;q.listenLine=answered(q.ask,ok?ok[0]:q.w)}  // they say it aloud (the answer as it fits the line: 주워, not 줍다); you pick the word you heard
  return [...says(r.pre||[]),q];

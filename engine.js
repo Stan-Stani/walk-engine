@@ -898,7 +898,7 @@ function gradeStep(s){
  const before=lv(s.w).b,b=grade(s.w,!s.missed);
  updateHud();
  if(s.missed)setTimeout(()=>toast(`"${s.w}" 다시 연습해요`),250);
- if(!s.missed&&b>=3&&before<3){setTimeout(()=>{toast('★ '+s.w+' 완벽!');sfx('star')},250)}
+ if(!s.missed&&b>=3&&before<3){setTimeout(()=>{toast('★ '+s.w+' 기억했어요!');sfx('star')},250)}
  if(s.missed?firstTime('reviewMiss'):firstTime('reviewLevel'))dlg.steps.splice(dlg.i+1,0,{who:LOGNAME,say:s.missed?`"${s.w}" 다시 연습해요. 곧 또 나와요.`:`"${s.w}" 기억 레벨 ${b}/5.`+(b>=3?' ★':'')});
 }
 /* praise after a right answer: a step's own `ok`, else 맞아! from a friend who speaks 반말 (NPC banmal:1), else 맞아요! */

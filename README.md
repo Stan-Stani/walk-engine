@@ -43,9 +43,10 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   story moment, `{id:{t, lines:[[korean, english, [source numbers]]…], src:[[title, url]…]}}`. A step's `culture:'id'` (or a phone's,
   when it closes) adds it with a toast; the journal lists them; each line shows its source numbers and the sources are links.
 - 문법 노트 (opt-in: shell has `#gnotes` and `#gnoteCard` under an `#gnotesH` heading in the journal; data in
-  `globalThis.GRAMMAR_NOTES`): the grammar of a story line, `{id:{t, lines:[[korean, english]…], ex:[[korean, english]…]}}`. A step's
-  `grammar:'id'` (or a phone's, when it closes) adds it; it gets its own seen/read lists (`KEY('grammar')`, `KEY('grammarRead')`),
-  its own list in the journal, the same card (lines, then the examples under 예문, English behind ?) and the same chip as a 문화 노트
+  `globalThis.GRAMMAR_NOTES`): the grammar of a story line, `{id:{t, lines:[[korean, english, [source numbers]]…],
+  ex:[[korean, english]…], src:[[title, url]…]}}`. A step's `grammar:'id'` (or a phone's, when it closes) adds it; it gets its own
+  seen/read lists (`KEY('grammar')`, `KEY('grammarRead')`), its own list in the journal, the same card (lines with their source
+  numbers, then the examples under 예문, then the sources as links under 출처, English behind ?) and the same chip as a 문화 노트
   ("문법 노트 · title"). With several unread notes the chip shows the newest first. Every Korean word in a note card is tappable.
   A game without `GRAMMAR_NOTES` gets nothing: the heading and list are removed.
 - Answer choices (shell CSS): side by side when they fit, three short answers on one line, else two per row; toasts at the top edge.

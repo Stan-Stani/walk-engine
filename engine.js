@@ -708,9 +708,10 @@ let dlg=null,typing=null,pending=null,sel=0;
    it, and its words are tappable. A step's culture:'id' (or a phone's, when it closes) adds a 문화 노트 from globalThis.CULTURE_NOTES
    (a game's data: {id:{t, lines:[[korean, english, [source numbers]]…], src:[[title, url]…]}}): the culture behind a story moment,
    every line tied to its sources, read in the journal. A step's grammar:'id' (or a phone's) adds a 문법 노트 from
-   globalThis.GRAMMAR_NOTES ({id:{t, lines:[[korean, english]…], ex:[[korean, english]…]}}): the grammar of the line it's on, a few
-   lines and then its examples, read in the journal under its own heading (#gnotesH), after the 문화 노트. Each kind keeps its own
-   seen/read lists; without GRAMMAR_NOTES the 문법 노트 heading and list are taken out of the journal. */
+   globalThis.GRAMMAR_NOTES ({id:{t, lines:[[korean, english, [source numbers]]…], ex:[[korean, english]…], src:[[title, url]…]}}):
+   the grammar of the line it's on, a few lines and then its examples, every line tied to its sources like a 문화 노트's, read in the
+   journal under its own heading (#gnotesH), after the 문화 노트. Each kind keeps its own seen/read lists; without GRAMMAR_NOTES the
+   문법 노트 heading and list are taken out of the journal. */
 let phoneOpen=false,curPhone=null;
 function openPhone(p){
  if(!$('phonePanel'))return;curPhone=p;
@@ -757,8 +758,8 @@ function renderNotes(){
   $(N.list).innerHTML=ks.length?ks.map(k=>`<button class="nb" data-k="${k}">${N.data[k].t}</button>`).join(''):'<p class="none">아직 없어요.</p>';
   $(N.card).hidden=true}
 }
-/* a note in its card: the title and ? (English for every line), its lines, then a 문법 노트's examples (예문) or a 문화 노트's sources (출처);
-   one card is open at a time */
+/* a note in its card: the title and ? (English for every line), its lines (each with its source numbers), then a 문법 노트's examples
+   (예문), then the note's sources (출처) as numbered links, the same markup for both kinds; one card is open at a time */
 function showNote(K,k){
  const N=NOTE_KINDS[K],n=N&&N.data[k],c=n&&$(N.card);if(!c)return;let en=false;
  for(const M of Object.values(NOTE_KINDS))if(M!==N&&$(M.card))$(M.card).hidden=true;

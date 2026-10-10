@@ -510,7 +510,7 @@ const CREW_LOOK=G.player||{hair:'#2A2F4A',skin:'#F1C9A5',shirt:'#F4F2EA',pants:'
 const ME_KEY=KEY('me');let me=null;try{me=JSON.parse(store.get(ME_KEY)||'null')}catch(e){}
 const myLook=(base=CREW_LOOK)=>me?{...base,...me}:base;   // a chapter's PLAYER object = the uniform; the player's choices = hair, skin, face
 const player={x:0,y:0,dir:'down',moving:false,t:0,fx:0,fy:0,step:0,look:myLook()};
-let held=null,warping=false,lockMsgAt=0;
+let held=null,warping=false,lockMsgAt=0,pressN=0,petTurn=-1;  // pressN counts new presses (not key repeats): facing the follower takes one press, swapping with them a new one
 function npcPos(n){return n.pos?n.pos():n.at||[n.x,n.y]}  // n.at: where a move: step left them
 const sitting=n=>typeof n.sit==='function'?n.sit():!!n.sit;  // NPC sit: true | fn → drawn seated (on n.chair, a look, if given), and doesn't turn to talk
 /* step sit:{npc} sits the player on that NPC's tile (a chair), facing its dir; sit:{x,y,dir,chair} anywhere. The first arrow key stands
@@ -533,7 +533,7 @@ function tryMove(){
  if(player.moving||!held||dlg||panelOpen()||warping)return;
  player.sit=null;
  const was=player.dir;player.dir=held;const [dx,dy]=D[held];const nx=player.x+dx,ny=player.y+dy;
- if(petOn()&&pet.x===nx&&pet.y===ny&&was!==held)return;  // the follower right there: a press turns you to face them (A talks); pressing again swaps places
+ if(petOn()&&pet.x===nx&&pet.y===ny){if(was!==held){petTurn=pressN;return}if(petTurn===pressN)return}  // the follower right there: a press turns you to face them (A talks); a NEW press swaps places — holding that first press never swaps by itself (a normal tap lasts a few frames)
  const w=warpAt(nx,ny);const lock=w&&w.lock&&w.lock();
  if(lock){if(performance.now()-lockMsgAt>1500){lockMsgAt=performance.now();sfx('lock');toast(lock)}return}
  if(blocked(nx,ny))return;
@@ -1259,7 +1259,7 @@ function dirPress(d){
  return false;
 }
 document.querySelectorAll('.dpad button').forEach(b=>{
- const on=e=>{e.preventDefault();b.classList.add('on');const d=b.dataset.d;if(dirPress(d))return;held=d;if(dlg)return;tryMove()};
+ const on=e=>{e.preventDefault();b.classList.add('on');const d=b.dataset.d;if(dirPress(d))return;held=d;pressN++;if(dlg)return;tryMove()};
  const off=()=>{b.classList.remove('on');if(held===b.dataset.d)held=null};
  b.addEventListener('pointerdown',e=>{b.setPointerCapture?.(e.pointerId);on(e)});
  b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);
@@ -1387,7 +1387,7 @@ document.querySelector('.pad').addEventListener('touchstart',e=>{if(e.cancelable
 const KEYS={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right'};
 addEventListener('keydown',e=>{
  if(e.target.closest&&e.target.closest('textarea,input'))return;  // typing a note, not playing
- if(KEYS[e.key]){e.preventDefault();if(dirPress(KEYS[e.key]))return;held=KEYS[e.key];return}
+ if(KEYS[e.key]){e.preventDefault();if(dirPress(KEYS[e.key]))return;held=KEYS[e.key];if(!e.repeat)pressN++;return}
  if(choosing()&&/^[1-4]$/.test(e.key)){const b=choiceBtns()[+e.key-1];if(b){e.preventDefault();b.click()}return}
  if(building()&&/^[1-9]$/.test(e.key)){const b=[...document.querySelectorAll('#tiles .tile')][+e.key-1];e.preventDefault();if(b&&!b.classList.contains('used'))b.click();return}  // N = the Nth tile where it sits (placed tiles leave a gap)
  if([' ','Enter','z','Z'].includes(e.key)){e.preventDefault();if(!e.repeat)interact();return}

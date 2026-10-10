@@ -81,7 +81,7 @@ function wrapUp(){
   const b=bank(w);return b.length?{...pick(b),who:'…',review:true}:null};
  const qs=C.WORDS.filter(w=>has(w)&&lv(w).b<3&&(said(w).length||bank(w).length)).sort((a,b)=>lv(a).b-lv(b).b).slice(0,4).map(line).filter(Boolean);
  carryDue().slice(0,Math.max(0,4-qs.length)).forEach(w=>{const q=carryQ(w);if(q)qs.push({...q,who:'…',review:true})});
- return qs.length?[{who:'…',say:TERM.wrap},...qs]:[];
+ return qs.length?[{who:'…',say:TERM.wrap,black:1,wrapStart:1},...qs]:[];  // over a black screen: these are memories of people who aren't here
 }
 function nextDue(){const t=C.WORDS.filter(has).map(w=>lv(w).due).filter(d=>d>now());return t.length?Math.min(...t):null}
 function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?`${m}분`:m<1440?`${Math.round(m/60)}시간`:`${Math.round(m/1440)}일`}
@@ -807,6 +807,8 @@ function show(s){
  dlg.cur=s;hideGloss();
  lastLines.push(((s.who||dlg.name||'')+': '+plain(s.say||s.ask||'')).slice(0,300));if(lastLines.length>3)lastLines.shift();
  if(s.set){s.set();save()}
+ if(dlg.wrapBlack&&!s.wrapStart&&!s.review&&s.who!==LOGNAME&&!('black' in s)){$('fade').classList.remove('on');dlg.black=false;dlg.wrapBlack=false}  // the end round's black lifts at the first ordinary line after it
+ if(s.wrapStart)dlg.wrapBlack=true;
  if('black' in s){$('fade').classList.toggle('on',!!s.black);dlg.black=!!s.black}  // black:1 — the line plays over a black screen (a time cut); black:0 or the end of the talk brings the room back
  if(s.walk||s.leave)queueWalks(s);
  if(s.move)moveNpcs(s);

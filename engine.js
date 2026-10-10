@@ -51,7 +51,8 @@ function refreshCarry(){  // other chapters' saves: their words, and their level
 const carryWords=()=>[...carrySet].filter(w=>!C.WORDS.includes(w)&&(carryBank()[w]||[]).length);
 const dueWords=()=>[...C.WORDS,...(SRS().shared?carryWords():[])].filter(isDue);
 const carryDue=()=>SRS().shared?carryWords().filter(isDue).sort((a,b)=>lv(a).b-lv(b).b):[];  // other chapters' words that are due, weakest first
-const carryQ=w=>{const qs=carryBank()[w]||[];return qs[Math.random()*qs.length|0]};
+const freshQ=(w,qs)=>{const last=(state.lastAsk||{})[w],o=qs.length>1?qs.filter(q=>q.ask!==last):qs,q=o[Math.random()*o.length|0];if(q)(state.lastAsk=state.lastAsk||{})[w]=q.ask;return q};  // a word's example sentence: not the one it was asked with last time, when it has another
+const carryQ=w=>freshQ(w,carryBank()[w]||[]);
 /* ---------- practice while time passes (opt-in content) ----------
    classTime(CLASS,parts): a stretch of time passing (classes between the bells, a shift, a journey). Each part narrates a beat, then
    someone says one of its lines with a word you've learned, graded like a review: a due word of this chapter (weakest first), else a
@@ -1109,7 +1110,7 @@ function reviewFor(words){ // pick a question for the weakest of these words
  const own=all.filter(q=>!q.gram),qs=own.length?own:all;  // gram:1 tests a pattern, not the word: no star for the word from it
  const narr={review:true,who:'…',ok:'맞아요!'};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
  if(canSpeak()&&soundOn&&listenOn&&Math.random()<.35)return {listen:w,...narr};  // a muted phone (or 듣기 문제 off) can't answer a listening question
- return {...qs[Math.random()*qs.length|0],...narr};
+ return {...freshQ(w,qs),...narr};
 }
 function terminal(){
  const due=dueWords();

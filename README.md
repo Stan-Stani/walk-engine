@@ -1,6 +1,6 @@
 # walk-engine
 
-The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (expert-brother), 방과 후 (sora-vocab) and 단어 마을
+The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (expert-brother), 점심 방송 (sora-vocab) and 단어 마을
 (daneo-maul, drawn in its own style through the look.draw and GAME.marker hooks).
 - `engine.js` is the one engine. Each game has `src/game.js` (`var GAME={prefix, title, log, term, player}`), and its page decides
   the optional parts: talk portraits need `#face` in the dialogue box, and 나 꾸미기 needs `#mePanel`.
@@ -70,7 +70,7 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - Step `turn:{npc:'id', dir:'left'}` (or a list): turns an NPC to face that way and keeps it there (someone looks at the speaker).
 - Art transforms: `ART.rot(rows, q)` turns a pixel grid (array of strings of palette keys) clockwise by quarter turns (`-1` =
   counter-clockwise), `ART.flipH` / `ART.flipV` mirror it, `ART.put(rows, pal, X, Y)` draws it top-down (no bottom-alignment, for
-  pieces of a tile). Draw a picture once, upright, and turn it to fit: e.g. 방과 후's 방송실 east windows show an upright street
+  pieces of a tile). Draw a picture once, upright, and turn it to fit: e.g. 점심 방송's 방송실 east windows show an upright street
   turned with `ART.rot(street, 1)` (sky to the outer edge, road to the room); a west wall would use `-1`.
 - Word help (tap a word) stays open until ×, A, B or the next line. Word-order tiles have no instruction text: only in the very first
   word-order question a player ever meets (per game, saved), after a 4 s pause the first right tile gets the `hint` class (bobbing,

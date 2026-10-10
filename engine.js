@@ -8,7 +8,7 @@ const has=w=>!!state&&state.badges.includes(w);
 const now=()=>Date.now();
 
 /* ---------- spaced review: each word has a level 0..5 and a due time ---------- */
-/* GAME.srs (optional, 방과 후):
+/* GAME.srs (optional, 점심 방송):
    gap:[…ms]  the wait after reaching each level (default below).
    beats:[…]  a word is also due again after that many story beats (talks that move the story: a flag, a word, an item, a scene
               change), whichever comes first, so a fast player and a slow one both get their reviews within one chapter.
@@ -87,7 +87,7 @@ function nextDue(){const t=C.WORDS.filter(has).map(w=>lv(w).due).filter(d=>d>now
 function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?`${m}분`:m<1440?`${Math.round(m/60)}시간`:`${Math.round(m/1440)}일`}
 
 /* ---------- settings ---------- */
-/* Per-game settings come from src/game.js (`var GAME={…}`), so one engine serves 성실호, 형제 and 방과 후. */
+/* Per-game settings come from src/game.js (`var GAME={…}`), so one engine serves 성실호, 형제 and 점심 방송. */
 const G=typeof GAME!=='undefined'?GAME:{};
 const KEY=k=>(G.prefix||'walk')+'-'+k;
 const TERM_BASE=Object.assign({allWords:n=>[`단어 ${n}개를 다 모았어요!`,`이제 ${TERM.name}에서 복습하면 ★가 생겨요.`],name:'복습 노트',empty:'아직 노트가 비어 있어요.',idle:'지금은 복습할 단어가 없어요.',next:'다음 복습',due:(n,k)=>`복습할 단어가 ${n}개 있어요.`+(k<n?` 이번에는 ${k}개만 해요.`:''),end:'복습 끝! 다음에 또 봐요.',carry:'지난번에 배운 말도 다시 나와요.',wrap:'오늘 배운 말, 한 번 더 떠올려요.'},G.term||{});
@@ -278,7 +278,7 @@ function humanPal(L){
   P:L.pants,p:shade(L.pants,.8),K:L.shoes||'#2A2A33',B:L.belt||L.shirt,D:L.beard||L.hair,L:L.lips||shade(L.skin,.72),A:L.arm||L.skin,Y:L.cap||L.hair,y:shade(L.cap||L.hair,.8),V:shade(L.cap||'#333333',.55)};
  return crewOn(L)?crewPal(L,p):p;
 }
-/* ---------- crew style (GAME.lookStyle:'crew' — 성실호): the same base sprite and portrait, set apart from 방과 후's students by
+/* ---------- crew style (GAME.lookStyle:'crew' — 성실호): the same base sprite and portrait, set apart from 점심 방송's students by
    everyday kit instead of a school uniform. Every human gets gloves and boots on the walk sprite; portraits lose the school collar and tie
    and get eyes with an iris (look.eye, else dark brown). Per look (GAME.looks by name, merged at boot):
    kit:{piece:colour,…} two pieces from coat, sweater (over a T-shirt: their own colour at the neck), vest, strap (shoulder to hip),

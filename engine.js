@@ -890,7 +890,7 @@ function openTaps(){
  $('tapSortT').classList.toggle('on',tapSort==='t');$('tapSortN').classList.toggle('on',tapSort==='n');
  $('tapPanel').hidden=false;document.body.classList.add('talkopen');$('tapList').scrollTop=0;
 }
-function closeTaps(){$('tapPanel').hidden=true;document.body.classList.remove('talkopen')}
+function closeTaps(){$('tapPanel').hidden=true;document.body.classList.remove('talkopen');backToMenu()}
 /* 복사: every looked-up word as plain text (word | times | last day | meaning | English), to paste into a chat and practise */
 function tapsText(){
  const d=t=>{const x=new Date(t);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
@@ -922,7 +922,9 @@ function openTalk(){
  $('talkPanel').hidden=false;document.body.classList.add('talkopen');
  const L=$('talkList');L.scrollTop=L.scrollHeight;
 }
-function closeTalk(){$('talkPanel').hidden=true;document.body.classList.remove('talkopen');hideGloss()}
+let fromMenu=false;  // the talk log / dictionary was opened from the START menu: closing it goes back there, not to the game
+const backToMenu=()=>{if(fromMenu){fromMenu=false;$('startPanel').hidden=false}};
+function closeTalk(){$('talkPanel').hidden=true;document.body.classList.remove('talkopen');hideGloss();backToMenu()}
 
 const choiceBtns=()=>[...document.querySelectorAll('#choices .choice')];
 const tileBtns=()=>[...document.querySelectorAll('#tiles .tile:not(.used)')];
@@ -1330,7 +1332,7 @@ function toggleStart(){const P=$('startPanel');if(P.hidden&&panelOpen())return;P
  const b=document.createElement('button');b.className=odd?'mi':'mi wide';b.id='repBtn';b.textContent='문제 알리기';b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});$('startPanel').querySelector('.mgrid').append(b)}
 $('startBtn').addEventListener('click',toggleStart);$('startClose').addEventListener('click',()=>$('startPanel').hidden=true);
 $('startPanel').addEventListener('click',e=>{if(e.target.id==='startPanel'){$('startPanel').hidden=true;return}
- const mi=e.target.closest('.mi');if(mi&&!mi.classList.contains('toggle'))$('startPanel').hidden=true},true);  // capture: close the menu before the item opens its panel
+ const mi=e.target.closest('.mi');if(mi&&!mi.classList.contains('toggle')){fromMenu=!$('startPanel').hidden&&['talkBtn','tapBtn'].includes(mi.id);$('startPanel').hidden=true}},true);  // capture: close the menu before the item opens its panel (the talk log and dictionary go back to it on 닫기)
 $('tapBtn').addEventListener('click',openTaps);$('tapClose').addEventListener('click',closeTaps);
 $('tapSortT').addEventListener('click',()=>{tapSort='t';openTaps()});$('tapSortN').addEventListener('click',()=>{tapSort='n';openTaps()});
 $('tapPanel').addEventListener('click',e=>{if(e.target.id==='tapPanel'){closeTaps();return}const p=e.target.closest('.tp');if(p){const en=p.querySelector('.tpe');en.hidden=!en.hidden}});$('talkClose').addEventListener('click',closeTalk);

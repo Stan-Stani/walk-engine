@@ -480,6 +480,7 @@ const pet={x:0,y:0,fx:0,fy:0,dir:'down',on:false};
 const petOn=()=>!!(C.FOLLOW&&C.FOLLOW.when());
 function petReset(){pet.x=pet.fx=player.x;pet.y=pet.fy=player.y;pet.dir=player.dir}
 
+function someoneAt(x,y){const n=npcAt(x,y);return !!(n&&n.look)||petOn()&&pet.on&&pet.x===x&&pet.y===y}  // a person (not an object stand-in) or the follower on that tile
 function marker(X,Y,t,st){
  if(!st)return;
  if(Y+CAM.y<11){X+=11;Y=11-CAM.y}  // no room above them on the map (the top row: no camera can show a marker there): it sits beside their head and moves with them, so it never jumps while the camera scrolls
@@ -570,7 +571,6 @@ function update(dt,t){
  if(!dlg)live().forEach(n=>{if(n.still||n.pos||n.walk||sitting(n))return;if(t>n.turnAt){if(chatPair(n)){n.dir=n.home;n.turnAt=t+3000;return}  /* mid-conversation: no glancing around */
   const ds=['down','left','right',n.home,n.home];n.dir=ds[Math.random()*ds.length|0];n.turnAt=t+2500+Math.random()*3500}});
  $('btnA').classList.toggle('ready',!dlg&&!player.moving&&!!facing());
- {const idle=!!dlg&&(choosing()||building())&&sel<0;if($('btnA').dataset.idle!==String(idle)){$('btnA').dataset.idle=idle;$('btnA').style.opacity=idle?'.45':''}}  // a question with nothing selected: A would do nothing, so it dims
 }
 const dark=document.createElement('canvas');dark.width=cv.width;dark.height=cv.height;const dg=dark.getContext('2d');
 /* a scene can point the camera at a tile (step cam:[x,y]); it glides there, and back to the player when the step says cam:null
@@ -631,7 +631,8 @@ function render(t){
    if(n.sleep)for(let i=0;i<2;i++){const p=(t/900+i/2)%1,zx=X+11+Math.round(p*4),zy=Y-2-Math.round(p*10),c='#2E3550';g.globalAlpha=1-p*.7;r(zx,zy,4,1,c);r(zx+2,zy+1,1,1,c);r(zx+1,zy+2,1,1,c);r(zx,zy+3,4,1,c);g.globalAlpha=1}  // asleep: z's drifting up
    // no marker over the player standing just above, over the one you're talking to (or whoever a proxy stands for), or when nomark says so
    const talking=dlg&&(dlg.npc===n||(n.proxy&&dlg.npc===n.proxy())),off=typeof n.nomark==='function'?n.nomark():n.nomark;
-   if(!(player.x===nx&&player.y<ny&&player.y>=ny-1-Math.ceil(artLift(n.look)/TS))&&!talking&&!off){const st=status(n),al=st==='star'?starFade(n):1;if(al>0){g.globalAlpha=al;marker(X+(n.markDx||0),Y-artLift(n.look)+(n.markDy??(n.look?0:7)),t,st);g.globalAlpha=1}}}}});  // no look (a stand-in for an object: a chair, a shelf, embers): the mark sits on its own tile, not over whatever is above it
+   if(!(player.x===nx&&player.y<ny&&player.y>=ny-1-Math.ceil(artLift(n.look)/TS))&&!talking&&!off){const st=status(n),al=st==='star'?starFade(n):1;if(al>0){g.globalAlpha=al;const by=n.look&&n.markDy==null&&!n.markDx&&someoneAt(nx,ny-1);  // someone right above: the mark would sit on their face, so it goes beside this person's head (the free side)
+    by?marker(X+(someoneAt(nx+1,ny)&&!someoneAt(nx-1,ny)?-11:11),Y+13-artLift(n.look),t,st):marker(X+(n.markDx||0),Y-artLift(n.look)+(n.markDy??(n.look?0:7)),t,st);g.globalAlpha=1}}}}});  // no look (a stand-in for an object: a chair, a shelf, embers): the mark sits on its own tile, not over whatever is above it
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){

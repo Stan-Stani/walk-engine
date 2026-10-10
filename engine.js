@@ -745,6 +745,12 @@ const NOTE_KINDS={culture:{name:'문화 노트',data:CULTURE,seen:cultureSeen,re
  grammar:{name:'문법 노트',data:GRAMMAR,seen:grammarSeen,read:grammarRead,key:'grammar',list:'gnotes',card:'gnoteCard'}};
 if(!Object.keys(GRAMMAR).length)for(const id of ['gnotesH','gnotes','gnoteCard'])$(id)?.remove();  // a game without 문법 노트 shows no heading for them
 {const st=document.createElement('style');st.textContent='body:has(#panel:not([hidden])) #noteChip{display:none!important}';document.head.appendChild(st)}  // the chip stays out of sight while the 일지 is open (it sat on top of the notes); its own state is unchanged
+/* starting a chapter over forgets the notes it unlocks (found in its source: culture:'id' / grammar:'id'), so they come back as you replay
+   it; notes from other chapters stay */
+function forgetNotes(){const src=String(CH.make),ids=new Set([...src.matchAll(/\b(culture|grammar)\s*:\s*['"]([^'"]+)['"]/g)].map(m=>m[1]+':'+m[2]));
+ for(const [K,N] of Object.entries(NOTE_KINDS)){for(const L of [N.seen,N.read])for(let i=L.length-1;i>=0;i--)if(ids.has(K+':'+L[i]))L.splice(i,1);
+  store.set(KEY(N.key),JSON.stringify(N.seen));store.set(KEY(N.key+'Read'),JSON.stringify(N.read))}
+ renderNotes();noteChip()}
 let noteLast='culture';  // the kind unlocked last: the chip shows its newest unread note first, then the rest, newest first
 const unreadNotes=K=>{const N=NOTE_KINDS[K];return N.seen.filter(k=>N.data[k]&&!N.read.includes(k))};
 function noteChip(){const el=$('noteChip');if(!el)return;const K=[noteLast,...Object.keys(NOTE_KINDS)].find(K=>unreadNotes(K).length);
@@ -1373,7 +1379,7 @@ $('resetBtn').addEventListener('click',()=>{
  const b=$('resetBtn');
  if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='한 번 더 누르면 지워져요';clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent='처음부터'},3000);return}
  b.classList.remove('armed');b.textContent='처음부터';
- state=fresh();state.seenIntro=true;save();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
+ state=fresh();state.seenIntro=true;save();forgetNotes();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
  setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);  // starting over replays the intro, like a first start
 });
 document.addEventListener('contextmenu',e=>e.preventDefault());

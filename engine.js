@@ -808,7 +808,7 @@ function show(s){
  dlg.cur=s;hideGloss();
  lastLines.push(((s.who||dlg.name||'')+': '+plain(s.say||s.ask||'')).slice(0,300));if(lastLines.length>3)lastLines.shift();
  if(s.set){s.set();save()}
- if(dlg.wrapBlack&&!s.wrapStart&&!s.review&&s.who!==LOGNAME&&!('black' in s)){$('fade').classList.remove('on');dlg.black=false;dlg.wrapBlack=false}  // the end round's black lifts at the first ordinary line after it
+ if(dlg.wrapBlack&&!s.wrapStart&&!s.review&&!s.fb&&s.who!==LOGNAME&&!('black' in s)){$('fade').classList.remove('on');dlg.black=false;dlg.wrapBlack=false}  // the end round's black lifts at the first ordinary line after it (fb: the feedback after an answer is still the question)
  if(s.wrapStart)dlg.wrapBlack=true;
  if('black' in s){$('fade').classList.toggle('on',!!s.black);dlg.black=!!s.black}  // black:1 — the line plays over a black screen (a time cut); black:0 or the end of the talk brings the room back
  if(s.walk||s.leave)queueWalks(s);
@@ -1033,11 +1033,11 @@ function choose(s,i){
   if(s.who==='나'&&!s.listenOnly||s.own||s.who==='…'||!quiz){  /* own:1 — the line is the speaker's own words, not a reply to you */
    // an ok: that isn't praise ("뭐?", "…") is the other person's reaction, so they say it next
    const react=s.ok&&!/^(맞아|정답|좋아|딩동댕)/.test(s.ok)?s.ok:null;
-   show({who:s.who||dlg.name,say:line});  // the line with its blank filled is the feedback: no 맞아요 toast (the sound and the talk going on say it was right)
-   if(react)dlg.next={who:s.reactWho||dlg.name,say:react}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line)});
+   show({who:s.who||dlg.name,say:line,fb:1});  // the line with its blank filled is the feedback: no 맞아요 toast (the sound and the talk going on say it was right)
+   if(react)dlg.next={who:s.reactWho||dlg.name,say:react,fb:1}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line),fb:1});
  }else{
   sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);
-  dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||'다시 해 봐요.'});  // after your own line, the hint is narration
+  dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||'다시 해 봐요.',fb:1});  // after your own line, the hint is narration
  }
 }
 function advance(){

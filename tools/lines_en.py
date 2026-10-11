@@ -16,10 +16,30 @@ STR=re.compile(r"'((?:[^'\\\n]|\\.)*)'|`([^`]*)`|\"((?:[^\"\\\n]|\\.)*)\"")
 ANSWER=re.compile(r"\[(['\"])((?:[^'\"\\]|\\.)*)\1,1[,\]]")
 plain=lambda t:re.sub(r'\{([^|}]+)\|[^}]+\}',r'\1',t)
 files=sorted((repo/'src/chapters').glob('ch*.js'),key=lambda p:int(re.search(r'\d+',p.stem).group()))+[q for q in [repo/'src/school.js'] if q.exists()]
+def uncomment(src):
+    """Blank out /* */ and // comments (not inside strings), keeping line breaks: an apostrophe in a comment ("다온's …")
+    would otherwise open a fake string."""
+    out=[];i=0;q=None;n=len(src)
+    while i<n:
+        c=src[i]
+        if q:
+            out.append(c)
+            if c=='\\' and i+1<n: out.append(src[i+1]); i+=2; continue
+            if c==q or (c=='\n' and q!='`'): q=None
+            i+=1; continue
+        if c in '\'"`': q=c; out.append(c); i+=1; continue
+        if src.startswith('/*',i):
+            j=src.find('*/',i+2); j=n if j<0 else j+2
+            out.append(re.sub(r'[^\n]',' ',src[i:j])); i=j; continue
+        if src.startswith('//',i) and (i==0 or src[i-1]!=':'):  # not the // in a URL outside a string (none expected)
+            j=src.find('\n',i); j=n if j<0 else j
+            out.append(' '*(j-i)); i=j; continue
+        out.append(c); i+=1
+    return ''.join(out)
 lines={}  # ko → {answer?, file}
 dynamic=0
 for p in files:
-    rows=p.read_text(encoding='utf-8').split('\n')
+    rows=uncomment(p.read_text(encoding='utf-8')).split('\n')
     for i,row in enumerate(rows):
         if '/*nolex*/' in row: continue
         for m in STR.finditer(row):

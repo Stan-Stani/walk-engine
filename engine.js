@@ -477,6 +477,10 @@ function drawAndy(L,X,Y,dir,step,t){
  r(X+7,Y-2,2,2,ol);r(X+7,Y-3,2,1,Math.floor(t/500)%2?L.visor:'#5F6B72');
 }
 const pet={x:0,y:0,fx:0,fy:0,dir:'down',on:false};
+function petArrive(){if(!petOn()||pet.on)return;  // the follower appears: drawn the first time, and after a door before the room's greeting turns you
+ petReset();const n=dlg&&dlg.npc;if(n&&n.name===C.FOLLOW.name){const [x,y]=npcPos(n);pet.x=pet.fx=x;pet.y=pet.fy=y;pet.dir=n.dir}  // joining you in a talk ("앞장서"): from where they stood, not from your square
+ else{const [dx,dy]=D[player.dir],b=[[-dx,-dy],[dy,dx],[-dy,-dx]].map(([ax,ay])=>[player.x+ax,player.y+ay]).find(([x,y])=>walkable(x,y)&&!npcAt(x,y));if(b){pet.x=pet.fx=b[0];pet.y=pet.fy=b[1]}}  // after a door: one step behind you (or beside), not hidden on your square until you move
+ pet.on=true}
 const petOn=()=>!!(C.FOLLOW&&C.FOLLOW.when());
 function petReset(){pet.x=pet.fx=player.x;pet.y=pet.fy=player.y;pet.dir=player.dir}
 
@@ -551,7 +555,7 @@ function arrive(){
 function goZone(id,x,y,dir){
  warping=true;sfx('door');$('fade').classList.add('on');
  setTimeout(()=>{loadZone(id,x,y,dir);updateQuest();save();if(held&&held!==dir)held=null;  // turned around by the warp: let go of the held direction
-  if(greet()&&dlg.black){warping=false;return}  // the room's greeting starts over black (a ride told on the way): the screen stays dark, no flash of the room first
+  petArrive();if(greet()&&dlg.black){warping=false;return}  // the room's greeting starts over black (a ride told on the way): the screen stays dark, no flash of the room first
   $('fade').classList.remove('on');setTimeout(()=>{warping=false;if(!dlg&&!greet())tryMove()},120)},230);
 }
 function loadZone(id,x,y,dir){
@@ -638,9 +642,7 @@ function render(t){
  ghosts=ghosts.filter(gh=>{const wk=walkAt(gh,t);if(!wk)return false;const [wx,wy,wd,wf]=wk;ents.push({y:wy,f:()=>drawChar(gh.look,Math.round(wx*TS-cx),Math.round(wy*TS-cy-2),wd,wf)});return true});
  const walk=player.moving?(player.t<.5?player.step:0):0;
  if(petOn()){
-  if(!pet.on){petReset();const n=dlg&&dlg.npc;if(n&&n.name===C.FOLLOW.name){const [x,y]=npcPos(n);pet.x=pet.fx=x;pet.y=pet.fy=y;pet.dir=n.dir}  // joining you in a talk ("앞장서"): from where they stood, not from your square
-   else{const [dx,dy]=D[player.dir],b=[[-dx,-dy],[dy,dx],[-dy,-dx]].map(([ax,ay])=>[player.x+ax,player.y+ay]).find(([x,y])=>walkable(x,y)&&!npcAt(x,y));if(b){pet.x=pet.fx=b[0];pet.y=pet.fy=b[1]}}  // after a door: one step behind you (or beside), not hidden on your square until you move
-   pet.on=true}
+  petArrive();
   const qx=player.moving?pet.fx+(pet.x-pet.fx)*player.t:pet.x,qy=player.moving?pet.fy+(pet.y-pet.fy)*player.t:pet.y;
   if(player.moving||pet.x!==player.x||pet.y!==player.y)ents.push({y:qy-.01,f:()=>drawChar(C.FOLLOW.look,Math.round(qx*TS-cx),Math.round(qy*TS-cy-2),pet.dir,walk?3-walk:0)});  // not while it shares your square
  }else pet.on=false;

@@ -845,9 +845,10 @@ function show(s){
  if(s.award)award(s.award);
  if(s.listen)s=prepListen(s);
  $('who').textContent=s.who||dlg.name;
+ setEn(s.ask||s.build||s.listen?null:lineEn(s.enKey||s.say||''));  // an open question has no English (it would give the answer away); answered, its whole line has
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;
  const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
- if(!s.build&&!s.ask)logTalk(s.who||dlg.name,text);  // a question is logged once, as the line it becomes when answered
+ if(!s.build&&!s.ask)logTalk(s.who||dlg.name,text,s.enKey);  // a question is logged once, as the line it becomes when answered
  typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)renderChoices(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);
  if(readOn&&!s.listenOnly)speak(s.listen?'':text);
@@ -886,6 +887,20 @@ function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; Engli
  el.innerHTML=rows.map(([h,d])=>`<div class="gr"><b>${h}</b>${d.k}<span class="en" hidden>${d.e||''}</span></div>`).join('')+'<button class="q" type="button" aria-label="영어로 보기">?</button><button class="gx" type="button" aria-label="닫기">×</button>';
  el.hidden=false;el.querySelector('.q').addEventListener('click',e=>{e.stopPropagation();el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden)});
 }
+/* English for a whole line, the last aid after tapping words: a game's src/lines-en.json (built in as window.LINES_EN, Korean line as
+   written, without gloss markup → close English). The ? sits by the speaker button only when the line has English; the English shows
+   under the Korean until the next line. Lines made at run time (names, counts) have none. */
+const lineEn=t=>{const L=window.LINES_EN;return L&&t?L[plain(t)]||null:null};
+function enUI(){let b=$('enBtn');if(b)return b;
+ b=document.createElement('button');b.id='enBtn';b.className='spk enq';b.type='button';b.textContent='?';b.setAttribute('aria-label','영어로 보기');$('spk').before(b);
+ const d=document.createElement('div');d.id='txtEn';d.className='txt-en';d.hidden=true;$('txt').after(d);
+ b.addEventListener('click',e=>{e.stopPropagation();d.hidden=!d.hidden;b.classList.toggle('on',!d.hidden);b.blur()});  // blur: A/Enter go on talking, not toggle it again
+ const st=document.createElement('style');st.textContent='.spk.enq{margin-left:auto;font:700 .9rem/1 var(--body,sans-serif)}.spk.enq+.spk{margin-left:0}'
+  +'.txt-en{font-family:var(--body,sans-serif);font-size:.86rem;line-height:1.4;opacity:.8;margin-top:6px;word-break:normal}'
+  +'.tl .tq{margin-left:6px;padding:0 5px;font:700 .72rem/1.4 var(--body,sans-serif);color:inherit;background:none;border:1px solid currentColor;border-radius:4px;opacity:.55;cursor:pointer;vertical-align:1px}'
+  +'.tl .ten{display:block;font-weight:400;font-size:.84rem;opacity:.75;margin-top:2px;word-break:normal}';
+ document.head.appendChild(st);return b}
+function setEn(en){if(!window.LINES_EN)return;const b=enUI(),d=$('txtEn');b.hidden=!en;b.classList.remove('on');d.hidden=true;d.textContent=en||''}
 function typeText(text,done){
  text=text.replace(/ ___/g,'\u00A0___').replace(/___(?=\S)/g,'___\u2060');  // a blank never starts or ends a line on its own ("국어 수행 ___ / 예요")
  clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.innerHTML='<span style="visibility:hidden">'+p.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</span>';let i=0;
@@ -938,15 +953,16 @@ function hideGloss(){$('gloss').hidden=true}
 let talk=[];
 const talkKey=()=>CH.save+'-talk';
 function loadTalk(){talk=[];try{talk=JSON.parse(localStorage.getItem(talkKey())||'[]')}catch(e){}}
-function logTalk(who,text){
+function logTalk(who,text,enKey){
  if(!text)return;const last=talk[talk.length-1];if(last&&last[0]===who&&last[1]===text)return;
- talk.push([who,text]);if(talk.length>150)talk=talk.slice(-150);
+ talk.push(enKey?[who,text,enKey]:[who,text]);if(talk.length>150)talk=talk.slice(-150);
  try{localStorage.setItem(talkKey(),JSON.stringify(talk))}catch(e){}
 }
 function openTalk(){
  const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- $('talkList').innerHTML=talk.length?talk.map(([w,t])=>`<div class="tl"><span class="tw">${esc(w)}</span><span class="tt txt">${glossHTML(t)}</span></div>`).join('')
+ $('talkList').innerHTML=talk.length?talk.map(([w,t,k])=>{const en=lineEn(k||t);return `<div class="tl"><span class="tw">${esc(w)}</span><span class="tt txt">${glossHTML(t)}${en?`<button class="tq" type="button" aria-label="영어로 보기">?</button><span class="ten" hidden>${esc(en)}</span>`:''}</span></div>`}).join('')
   :'<p class="tl-empty">아직 대화가 없어요.</p>';
+ $('talkList').onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();q.nextElementSibling.hidden=!q.nextElementSibling.hidden}};if(window.LINES_EN)enUI();  // enUI: the ?'s style
  $('talkPanel').hidden=false;document.body.classList.add('talkopen');
  const L=$('talkList');L.scrollTop=L.scrollHeight;
 }
@@ -1047,13 +1063,13 @@ function choose(s,i){
   sfx('ok');
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';
-  const line=s.done||(s.ask.includes('___')?answered(s.ask,o[0]):o[0]);
+  const line=s.done||(s.ask.includes('___')?answered(s.ask,o[0]):o[0]),enKey=!s.done&&s.ask.includes('___')?s.ask:undefined;  // the filled line's English is kept under the question as written
   const quiz=/["“][^"”]*___[^"”]*["”]/.test(s.ask)||s.listenOnly;
   if(s.who==='나'&&!s.listenOnly||s.own||s.who==='…'||!quiz){  /* own:1 — the line is the speaker's own words, not a reply to you */
    // an ok: that isn't praise ("뭐?", "…") is the other person's reaction, so they say it next
    const react=s.ok&&!/^(맞아|정답|좋아|딩동댕)/.test(s.ok)?s.ok:null;
-   show({who:s.who||dlg.name,say:line,fb:1});  // the line with its blank filled is the feedback: no 맞아요 toast (the sound and the talk going on say it was right)
-   if(react)dlg.next={who:s.reactWho||dlg.name,say:react,fb:1}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line),fb:1});
+   show({who:s.who||dlg.name,say:line,fb:1,enKey});  // the line with its blank filled is the feedback: no 맞아요 toast (the sound and the talk going on say it was right)
+   if(react)dlg.next={who:s.reactWho||dlg.name,say:react,fb:1}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line),fb:1,enKey:s.listenOnly?undefined:enKey});
  }else{
   sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);
   dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||'다시 해 봐요.',fb:1});  // after your own line, the hint is narration

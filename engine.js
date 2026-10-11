@@ -550,7 +550,9 @@ function arrive(){
 }
 function goZone(id,x,y,dir){
  warping=true;sfx('door');$('fade').classList.add('on');
- setTimeout(()=>{loadZone(id,x,y,dir);updateQuest();save();$('fade').classList.remove('on');if(held&&held!==dir)held=null;setTimeout(()=>{warping=false;if(!greet())tryMove()},120)},230);  // turned around by the warp: let go of the held direction
+ setTimeout(()=>{loadZone(id,x,y,dir);updateQuest();save();if(held&&held!==dir)held=null;  // turned around by the warp: let go of the held direction
+  if(greet()&&dlg.black){warping=false;return}  // the room's greeting starts over black (a ride told on the way): the screen stays dark, no flash of the room first
+  $('fade').classList.remove('on');setTimeout(()=>{warping=false;if(!dlg&&!greet())tryMove()},120)},230);
 }
 function loadZone(id,x,y,dir){
  ZID=id;Z=C.ZONES[id];state.zone=id;
@@ -799,8 +801,22 @@ function greet(){
  talkWith(n);return true}
 function openDialog(name,steps,opts={}){
  steps=steps.filter(s=>!s.when||s.when());
- talkN++;dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review};
+ talkN++;dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review,snap:opts.snap||JSON.stringify(state)};
  $('tag').hidden=!opts.review;$('dlg').hidden=false;$('zone').classList.add('dim');show(dlg.steps[0]);placeBox(talkRows());  // the room label never shows through a box at the top
+}
+/* a black line can show a small scene instead of plain black (a lift ride, a launch): step scene:'name' plays the chapter's
+   SCENES[name] on the black, in the game's own pixels, until the black lifts (scene:null stops it sooner). A scene is {ms,draw(g,p,t,band)}:
+   p runs 0→1 over ms (the scene eases it), t is ms since it began, band is the [top,bottom] the dialogue box leaves free — keep the subject
+   there. Reduced motion: its last frame, still. */
+let sceneRun=null;
+function playScene(name){
+ const fade=$('fade'),S=name&&(C.SCENES||{})[name];let c=fade.querySelector('canvas');sceneRun=null;
+ if(!S){if(c)c.hidden=true;return}
+ if(!c){c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;c.style.cssText='position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated';fade.appendChild(c)}
+ c.hidden=false;const g=c.getContext('2d'),ms=S.ms||6000,still=matchMedia('(prefers-reduced-motion: reduce)').matches,me=sceneRun={t0:performance.now(),n:0};
+ const frame=now=>{if(sceneRun!==me)return;const t=still?ms:now-me.t0;g.clearRect(0,0,c.width,c.height);S.draw(g,Math.min(1,t/ms),t,dlg?freeBand():[0,c.height]);
+  if(!still||me.n++<2)requestAnimationFrame(frame)};  // still: a frame or two more, once the box has its place
+ frame(performance.now());
 }
 function show(s){
  if(s&&(s.set||s.award||s.give||s.take||s.go)&&dlg)dlg.moved=1;  // a story beat (spaced review counts them)
@@ -808,9 +824,10 @@ function show(s){
  dlg.cur=s;hideGloss();
  lastLines.push(((s.who||dlg.name||'')+': '+plain(s.say||s.ask||'')).slice(0,300));if(lastLines.length>3)lastLines.shift();
  if(s.set){s.set();save()}
- if(dlg.wrapBlack&&!s.wrapStart&&!s.review&&!s.fb&&s.who!==LOGNAME&&!('black' in s)){$('fade').classList.remove('on');dlg.black=false;dlg.wrapBlack=false}  // the end round's black lifts at the first ordinary line after it (fb: the feedback after an answer is still the question)
+ if(dlg.wrapBlack&&!s.wrapStart&&!s.review&&!s.fb&&s.who!==LOGNAME&&!('black' in s)){$('fade').classList.remove('on');dlg.black=false;dlg.wrapBlack=false;playScene(null)}  // the end round's black lifts at the first ordinary line after it (fb: the feedback after an answer is still the question)
  if(s.wrapStart)dlg.wrapBlack=true;
- if('black' in s){$('fade').classList.toggle('on',!!s.black);dlg.black=!!s.black}  // black:1 — the line plays over a black screen (a time cut); black:0 or the end of the talk brings the room back
+ if('black' in s){$('fade').classList.toggle('on',!!s.black);dlg.black=!!s.black;if(!s.black)playScene(null)}  // black:1 — the line plays over a black screen (a time cut); black:0 or the end of the talk brings the room back
+ if('scene' in s)playScene(s.scene);  // with black:1: a small scene plays on the black (playScene)
  if(s.walk||s.leave)queueWalks(s);
  if(s.move)moveNpcs(s);
  if(s.phone)openPhone(s.phone);
@@ -1052,8 +1069,8 @@ function advance(){
 }
 let closedAt=0;
 function closeDialog(){
- const wasBlack=dlg&&dlg.black;if(wasBlack)$('fade').classList.remove('on');
- closedAt=performance.now();if(dlg&&dlg.moved)beat();dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
+ const wasBlack=dlg&&dlg.black;if(wasBlack){$('fade').classList.remove('on');playScene(null)}
+ closedAt=performance.now();if(dlg&&dlg.moved){pushBack(dlg.snap);beat()}dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();
  if(C.afterTalk)C.afterTalk();  // a chapter's own check after every conversation (단어 마을: the cartridge is complete, every word is ★)
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
@@ -1155,6 +1172,7 @@ function chatPair(n){
 }
 /* a conversation with n, as when you press A facing them (also a room's greeting) */
 function talkWith(n){
+ const snap=JSON.stringify(state);  // the save from before this talk (a script may change flags as it starts): 한 단계 뒤로 puts it back
  if(n.proxy){const p=n.proxy();if(p)n=p}
  const pair=chatPair(n);  // two people talking to each other: they keep facing each other, and the one who started speaks first
  if(!pair&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
@@ -1170,7 +1188,7 @@ function talkWith(n){
  {const id=npcId(n);if(id&&!metIds().includes(id)){metIds().push(id);save()}if(id&&status(n)==='star')starAcc[id]=Math.max(starAcc[id]||0,STAR_MS)}  // met: from now on they can review and chat; a ★ over them starts to fade once you've talked
  if(pair&&isReview&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // a review question is for you: the one asking turns to you (and back to their friend after, as after any talk)
  if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
- openDialog(n.name,steps,{npc:n,review:isReview});
+ openDialog(n.name,steps,{npc:n,review:isReview,snap});
 }
 function interact(){
  if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}if(typing&&!typing.finished){typing.fin();return}closePhone();return}  // A finishes the line, then puts the phone away
@@ -1355,6 +1373,16 @@ $('talkPanel').addEventListener('click',e=>{if(e.target.id==='talkPanel'){closeT
 /* debug (START → 디버그, saved per game): a 건너뛰기 button on every conversation runs it to the end — right answers, finished word
    orders, every flag / item / word it sets, quietly — and stops at a real decision (a plain choice like "2교시로 갈까요?"). For testing. */
 let debugOn=store.get(KEY('debug'))==='1';
+/* 한 단계 뒤로 (debug: in the 일지, by 처음부터): every talk that moves the story keeps this chapter's save from just before it (the
+   last 12). The button puts the last one back and loads the chapter from it, as the chapter menu would, so nothing is undone by hand
+   and nothing is left half undone. The talk's own story steps are gone; words you met still count (the shared word memory stays). */
+const backKey=()=>CH.save+'~back';
+function backList(){try{return JSON.parse(store.get(backKey())||'[]')||[]}catch(e){return []}}
+function pushBack(snap){if(!snap)return;const L=backList();L.push({s:snap,b:beats()});store.set(backKey(),JSON.stringify(L.slice(-12)));updBack()}
+function updBack(){const b=$('backBtn');if(!b)return;const n=backList().length;b.hidden=!debugOn;b.disabled=!n;b.textContent='한 단계 뒤로'+(n?` (${n})`:'')}
+function stepBack(){const L=backList(),e=L.pop();if(!e)return;
+ store.set(backKey(),JSON.stringify(L));store.set(CH.save,e.s);store.set(KEY('beats'),String(e.b||0));beatsN=null;
+ boot(CH.id);sfx('door');toast('한 단계 뒤로 · '+C.questText())}
 function skipTalk(){
  const snd=soundOn;soundOn=false;
  for(let n=0;dlg&&n<500;n++){
@@ -1370,9 +1398,11 @@ function skipTalk(){
 (()=>{const grid=document.querySelector('#startPanel .mgrid');if(!grid)return;
  grid.insertAdjacentHTML('beforeend','<button class="mi toggle" id="dbgBtn" aria-pressed="false">디버그</button>');
  $('spk').insertAdjacentHTML('beforebegin','<button class="spk" id="skipBtn" type="button" hidden style="width:auto;padding:0 8px;margin-left:auto;margin-right:6px;font-size:.8rem;font-weight:700">건너뛰기</button>');
- const upd=()=>{$('dbgBtn').setAttribute('aria-pressed',debugOn?'true':'false');$('skipBtn').hidden=!debugOn};upd();
+ $('resetBtn').insertAdjacentHTML('beforebegin','<button class="btn" id="backBtn" type="button" hidden>한 단계 뒤로</button>');
+ const upd=()=>{$('dbgBtn').setAttribute('aria-pressed',debugOn?'true':'false');$('skipBtn').hidden=!debugOn;updBack()};upd();
  $('dbgBtn').addEventListener('click',()=>{debugOn=!debugOn;store.set(KEY('debug'),debugOn?'1':'0');upd();sfx('ok');toast(debugOn?'디버그: 대화에 건너뛰기 버튼':'디버그 꺼짐')});
  $('skipBtn').addEventListener('click',e=>{e.stopPropagation();skipTalk()});
+ $('backBtn').addEventListener('click',stepBack);
 })();
 $('sndBtn').addEventListener('click',()=>{soundOn=!soundOn;store.set(KEY('sound'),soundOn?'1':'0');updateSound();sfx('ok')});
 if($('listenBtn')){const upd=()=>$('listenBtn').setAttribute('aria-pressed',String(listenOn));upd();  // a game's shell may offer the 듣기 문제 toggle
@@ -1388,7 +1418,7 @@ $('resetBtn').addEventListener('click',()=>{
  const b=$('resetBtn');
  if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='한 번 더 누르면 지워져요';clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent='처음부터'},3000);return}
  b.classList.remove('armed');b.textContent='처음부터';
- state=fresh();state.seenIntro=true;save();forgetNotes();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
+ state=fresh();state.seenIntro=true;save();forgetNotes();store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
  setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);  // starting over replays the intro, like a first start
 });
 document.addEventListener('contextmenu',e=>e.preventDefault());
@@ -1418,7 +1448,7 @@ function boot(id){
  loadState();loadTalk();
  loadZone(state.zone,state.x,state.y,state.dir);
  $('chName').textContent=CH.n;
- updateHud();updateQuest();
+ updateHud();updateQuest();updBack();
  if(G.onBoot)G.onBoot(CH,C);  // the game's own page parts for this chapter (단어 마을: tips, news sources)
  if(!state.seenIntro){state.seenIntro=true;save();const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
  else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over

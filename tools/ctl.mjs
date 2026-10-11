@@ -7,6 +7,8 @@
 //   node $C key <Key> [n]   press a key n times: ArrowUp/Down/Left/Right, z (A), x (B), m (START), Enter, 1–4
 //   node $C walk <dir> <n>  take n steps (up/down/left/right)
 //   node $C tap <x> <y>     tap the screen at a point (CSS px of the 400×820 screenshot)
+//   node $C drag <ms> x1 y1 x2 y2 …   one finger: press at x1 y1, slide through the points (holding <ms> at each), lift — e.g. a thumb
+//                           sliding over the D-pad from → to ↓ without lifting
 //   node $C tapword <word>  tap the first visible word with this text (as a finger would)
 //   node $C shot            just look
 //   node $C look            look closer, like holding the phone up to your eyes: the game screen around you, 6× and unsmoothed
@@ -48,6 +50,9 @@ if(cmd==='start'||cmd==='resume'){await cdp('Page.navigate',{url:`file://${DIR}/
 else if(cmd==='key'){for(let i=0;i<(+args[1]||1);i++)await press(args[0]);await wait(500)}
 else if(cmd==='walk'){const k={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[args[0]];for(let i=0;i<(+args[1]||1);i++){await press(k,170);await wait(80)}await wait(300)}
 else if(cmd==='tap'){await tap(+args[0],+args[1]);await wait(300)}
+else if(cmd==='drag'){const hold=+args[0]||400,pts=[];for(let i=1;i+1<args.length;i+=2)pts.push({x:+args[i],y:+args[i+1],id:1});
+ for(let i=0;i<pts.length;i++){await cdp('Input.dispatchTouchEvent',{type:i?'touchMove':'touchStart',touchPoints:[pts[i]]});await wait(hold)}
+ await cdp('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await wait(300)}
 else if(cmd==='tapword'){const r=await ev(`(()=>{const w=[...document.querySelectorAll('.w,.gl,button,.mo,.mi,.choice,.tile,a')].find(e=>!e.closest("[hidden]")&&e.getClientRects().length&&e.textContent.trim()===${JSON.stringify(args.join(' '))});if(!w)return null;const b=w.getBoundingClientRect();return [b.x+b.width/2,b.y+b.height/2]})()`);
   if(!r){console.log('no visible "'+args.join(' ')+'" to tap')}else{await tap(r[0],r[1]);await wait(300)}}
 else if(cmd==='look'){

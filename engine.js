@@ -1261,12 +1261,17 @@ function dirPress(d){
  if(choosing()||building()){moveSel(d==='up'||d==='left'?-1:1);return true}
  return false;
 }
-document.querySelectorAll('.dpad button').forEach(b=>{
- const on=e=>{e.preventDefault();b.classList.add('on');const d=b.dataset.d;if(dirPress(d))return;held=d;pressN++;if(dlg)return;tryMove()};
- const off=()=>{b.classList.remove('on');if(held===b.dataset.d)held=null};
- b.addEventListener('pointerdown',e=>{b.setPointerCapture?.(e.pointerId);on(e)});
- b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off);
-});
+/* The D-pad follows the thumb: press anywhere on it and slide to another arrow without lifting. The direction is the side of the pad
+   the thumb is on, from its centre (the longer of across/down wins); a small middle zone keeps the last one, so it doesn't flicker. */
+{const pad=$('dpad'),btn=d=>pad.querySelector(`button[data-d="${d}"]`);let pid=null,cur=null;
+ const dirAt=e=>{const r=pad.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),dz=r.width/8;
+  if(Math.abs(dx)<dz&&Math.abs(dy)<dz)return cur;return Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up')};
+ const set=d=>{if(d===cur)return;if(cur){btn(cur)?.classList.remove('on');if(held===cur)held=null}cur=d;if(!d)return;
+  btn(d)?.classList.add('on');if(dirPress(d))return;held=d;pressN++;if(dlg)return;tryMove()};  // each new direction is a new press (menus move once, the follower rule counts it)
+ pad.addEventListener('pointerdown',e=>{e.preventDefault();if(pid!==null)return;pid=e.pointerId;try{pad.setPointerCapture(e.pointerId)}catch(_){}set(dirAt(e))});
+ pad.addEventListener('pointermove',e=>{if(e.pointerId===pid)set(dirAt(e))});
+ const off=e=>{if(e.pointerId!==pid)return;pid=null;set(null)};
+ for(const t of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(t,off);}
 $('btnA').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
 $('btnB').addEventListener('pointerdown',e=>{e.preventDefault();cancel()});
 $('dlg').addEventListener('click',e=>{const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.textContent);return}if(e.target.closest('#spk'))return;advance()});

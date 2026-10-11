@@ -805,12 +805,12 @@ function openDialog(name,steps,opts={}){
  $('tag').hidden=!opts.review;$('dlg').hidden=false;$('zone').classList.add('dim');show(dlg.steps[0]);placeBox(talkRows());  // the room label never shows through a box at the top
 }
 /* a black line can show a small scene instead of plain black (a lift ride, a launch): step scene:'name' plays the chapter's
-   SCENES[name] on the black, in the game's own pixels, until the black lifts (scene:null stops it sooner). A scene is {ms,draw(g,p,t,band)}:
+   SCENES[name] (or the game's, GAME.scenes) on the black, in the game's own pixels, until the black lifts (scene:null stops it sooner). A scene is {ms,draw(g,p,t,band)}:
    p runs 0→1 over ms (the scene eases it), t is ms since it began, band is the [top,bottom] the dialogue box leaves free — keep the subject
    there. Reduced motion: its last frame, still. */
 let sceneRun=null;
 function playScene(name){
- const fade=$('fade'),S=name&&(C.SCENES||{})[name];let c=fade.querySelector('canvas');sceneRun=null;
+ const fade=$('fade'),S=name&&((C.SCENES||{})[name]||(G.scenes||{})[name]);let c=fade.querySelector('canvas');sceneRun=null;
  if(!S){if(c)c.hidden=true;return}
  if(!c){c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;c.style.cssText='position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated';fade.appendChild(c)}
  c.hidden=false;const g=c.getContext('2d'),ms=S.ms||6000,still=matchMedia('(prefers-reduced-motion: reduce)').matches,me=sceneRun={t0:performance.now(),n:0};

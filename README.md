@@ -53,7 +53,24 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - The ! / ? marker of the character you're talking to is hidden while you talk.
 - 목표 line: refreshed after every step, except that a `take:` step (with no `set:`) holds it until a later step's `set:` or the end of
   the conversation, so handing an item over doesn't flash the goal that asks you to go and fetch it.
-- Review questions (the ? marker) are asked by the narrator, not in the NPC's voice: the sentences are generic examples.
+- Review in character (a chapter's `REVIEW`; every chapter of 성실호, 형제 and 점심 방송 has one): a list of lines people say in
+  their own scenes, each with a learned word blanked: `{w, by:'npcId'|'이름'|[…], ask, opts, pre?:[lines said first],
+  when?:()=>bool, who?:'나'}`. When a word is due, someone with a line for it that is true right now (`when`) gets the ? and asks
+  it in their own voice (a classmate about the poster on the wall, a friend right after the scene in the gym), graded like any
+  review. With `srs.shared` a line may use a word from an earlier chapter, so earlier words come back inside this chapter's
+  scenes. Rules: someone still teaching teaches first; the first talk with anyone is never a review; at most one review per
+  person per story beat; a talk that moves the story comes first and the review waits for the next one; their weakest word
+  first, their own badge word before someone else's, a line you haven't heard before one you have. About a third of them (sound
+  on) are asked by ear: they say the line and you pick the word you heard. With nothing of theirs due, a person says one of their
+  lines you haven't heard yet as plain talk, the word filled in, ungraded. `who:'나'` makes the line yours (you finish your own
+  sentence). A chapter without `REVIEW` (단어 마을) has the narrator ask a person's own badge words in generic example sentences
+  from `Q`/`BANK`. The review spot (`terminal`) always asks the generic `BANK` sentences, never a line from someone's scene.
+- Time passing (`classTime(CLASS, parts)`, as a step `{expand:()=>classTime(CLASS,['국어','영어'])}`): each part narrates a beat
+  (a class, a shift, a journey), then someone says one of its lines with a word you've learned, graded like a review: a due word
+  of this chapter, else a due word from another chapter, else any of yours. `CLASS={part:{say, lines:[{w, who, ask, opts}]}}`.
+- End of a chapter (`{expand:()=>wrapUp()}` in `DONE`): over black, one more go at this chapter's words not yet ★ (weakest
+  first; each in someone's `REVIEW` line from this chapter, under their name, else a `BANK` sentence), then due words from other
+  chapters in their own `BANK` sentences, at most four in all.
 - Review only levels up a word that is due: answering it again before then keeps its level (a wrong answer still resets it).
   Someone whose words you all have asks a review question only when one of them is due; otherwise they say their after line.
 - A question step with `scene:1` quotes its own scene ("끓는 약에 ___을 입었어요"): review never asks it, so a review card can't play a

@@ -1359,7 +1359,9 @@ if(CREATOR)$('meOk').addEventListener('click',()=>closeMe(true));
 if(CREATOR)$('meBtn').addEventListener('click',()=>openMe());
 /* START: everything that isn't the game itself (logs, dictionary, chapters, reading aloud, sound) */
 /* 문제 알리기: a report goes to the word-reports inbox on seldoncortex.com. Artifacts can't call other sites, so 보내기 is a
-   plain link that carries the report after the # (never in server logs); the page there posts it once and says thanks. */
+   plain link that carries the report after the # (never in server logs); the page there posts it once and says thanks.
+   보내기 stays dim (no link) until the note says something: the page sends as soon as it opens, so a curious tap once sent an
+   empty report. */
 const REPORT_URL='https://seldoncortex.com/word-reports/';let lastLines=[],repKind='game',lastWord='';
 function reportCtx(){
  return {chapter:CH.n+' '+CH.title,place:roomName||Z.name,zone:ZID,pos:player.x+','+player.y,objective:(C.questText&&C.questText())||'',
@@ -1381,13 +1383,15 @@ function openReport(){
   document.body.append(P);
   P.addEventListener('click',e=>{if(e.target===P)closeReport()});$('repClose').addEventListener('click',closeReport);
   $('repGame').addEventListener('click',()=>setRepKind('game'));$('repKo').addEventListener('click',()=>setRepKind('korean'));
-  $('repNote').addEventListener('input',()=>{$('repSend').href=reportHref()});
-  $('repSend').addEventListener('click',()=>{$('repSend').href=reportHref();setTimeout(()=>{closeReport();$('repNote').value='';toast('고마워요!')},300)});
+  $('repNote').addEventListener('input',syncSend);
+  $('repSend').addEventListener('click',e=>{if(!$('repNote').value.trim()){e.preventDefault();$('repNote').focus();return}
+   $('repSend').href=reportHref();setTimeout(()=>{closeReport();$('repNote').value='';syncSend();toast('고마워요!')},300)});
  }
  const c=reportCtx();$('repCtx').textContent=[c.chapter+' · '+c.place,c.line||lastLines[lastLines.length-1]||'',c.word?'단어: '+c.word:''].filter(Boolean).join('\n');
  setRepKind(repKind);$('repPanel').hidden=false;document.body.classList.add('talkopen');hideGloss();
 }
-function setRepKind(k){repKind=k;$('repGame').classList.toggle('on',k==='game');$('repKo').classList.toggle('on',k==='korean');$('repSend').href=reportHref()}
+function setRepKind(k){repKind=k;$('repGame').classList.toggle('on',k==='game');$('repKo').classList.toggle('on',k==='korean');syncSend()}
+function syncSend(){const ok=!!$('repNote').value.trim(),a=$('repSend');if(ok)a.href=reportHref();else a.removeAttribute('href');a.setAttribute('aria-disabled',String(!ok));a.style.opacity=ok?'':'.45'}  // no note, no link
 function closeReport(){$('repPanel').hidden=true;document.body.classList.remove('talkopen')}
 function toggleStart(){const P=$('startPanel');if(P.hidden&&panelOpen())return;P.hidden=!P.hidden;hideGloss()}
 {const g=$('startPanel').querySelector('.mgrid'),odd=g.querySelectorAll('.mi:not(.wide)').length%2;  // fill the gap next to a lone item, else a full row

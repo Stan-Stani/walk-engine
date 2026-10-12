@@ -1215,7 +1215,8 @@ function talkWith(n){
  }
  {const id=npcId(n);if(id&&!metIds().includes(id)){metIds().push(id);save()}if(id&&status(n)==='star')starAcc[id]=Math.max(starAcc[id]||0,STAR_MS)}  // met: from now on they can review and chat; a ★ over them starts to fade once you've talked
  if(pair&&isReview&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // a review question is for you: the one asking turns to you (and back to their friend after, as after any talk)
- if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])]}
+ if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])];
+  for(const m of pair){const id=npcId(m);if(id&&!metIds().includes(id)){metIds().push(id);save()}}}  // both of them spoke: both count as met, so either can ask a review next time (not only the one you faced)
  openDialog(n.name,steps,{npc:n,review:isReview,snap});
 }
 function interact(){

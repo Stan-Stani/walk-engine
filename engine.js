@@ -1086,6 +1086,13 @@ function advance(){
  show(dlg.steps[dlg.i]);
 }
 let closedAt=0;
+/* leave whatever conversation is open without finishing it (처음부터, switching chapters): its black, scene, box, phone and queued
+   walks go with it. Starting over during a review round (it plays over black) once kept the screen black for good. */
+function dropTalk(){
+ walks.length=0;leaves.length=0;ghosts=[];pending=null;
+ if(dlg){dlg=null;camT=null;clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}}
+ $('fade').classList.remove('on');playScene(null);
+}
 function closeDialog(){
  const wasBlack=dlg&&dlg.black;if(wasBlack){$('fade').classList.remove('on');playScene(null)}
  closedAt=performance.now();if(dlg&&dlg.moved){pushBack(dlg.snap);beat()}dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
@@ -1436,7 +1443,7 @@ $('resetBtn').addEventListener('click',()=>{
  const b=$('resetBtn');
  if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='한 번 더 누르면 지워져요';clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent='처음부터'},3000);return}
  b.classList.remove('armed');b.textContent='처음부터';
- state=fresh();state.seenIntro=true;save();forgetNotes();store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
+ dropTalk();state=fresh();state.seenIntro=true;save();forgetNotes();store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
  setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);  // starting over replays the intro, like a first start
 });
 document.addEventListener('contextmenu',e=>e.preventDefault());
@@ -1460,8 +1467,7 @@ function boot(id){
  C=CH.make();mergeLooks();
  Object.keys(TILES).forEach(k=>{if(!(k in BASE_TILES))delete TILES[k]});Object.assign(TILES,C.TILES||{});
  player.look=typeof C.PLAYER==='function'?myLook():myLook(C.PLAYER||CREW_LOOK);  // PLAYER as a function = a disguise, drawn at render time // a chapter may put the player in someone else's shoes (5장: Terence)
- if(dlg){dlg=null;clearInterval(typing?.id);$('dlg').hidden=true}
- pending=null;held=null;warping=false;$('panel').hidden=true;$('chPanel').hidden=true;$('toast').hidden=true;logSel=null;
+ dropTalk();held=null;warping=false;$('panel').hidden=true;$('chPanel').hidden=true;$('toast').hidden=true;logSel=null;
  store.set(KEY('chapter'),CH.id);
  loadState();loadTalk();
  loadZone(state.zone,state.x,state.y,state.dir);

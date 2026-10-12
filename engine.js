@@ -802,7 +802,8 @@ function greet(){
  player.dir=Math.abs(dx)>=Math.abs(dy)&&dx?(dx>0?'right':'left'):(dy>0?'down':'up');state.dir=player.dir;  // look at them
  talkWith(n);return true}
 function openDialog(name,steps,opts={}){
- steps=steps.filter(s=>!s.when||s.when());
+ steps=(steps||[]).filter(s=>s&&(!s.when||s.when()));
+ if(!steps.length)return;  // nothing to say: never an empty box
  talkN++;dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review,snap:opts.snap||JSON.stringify(state)};
  $('tag').hidden=!opts.review;$('dlg').hidden=false;$('zone').classList.add('dim');show(dlg.steps[0]);placeBox(talkRows());  // the room label never shows through a box at the top
 }
@@ -821,6 +822,7 @@ function playScene(name){
  frame(performance.now());
 }
 function show(s){
+ if(!s||!dlg){if(dlg)closeDialog();return}  // a step that isn't there closes the talk instead of leaving a blank box
  if(s&&(s.set||s.award||s.give||s.take||s.go)&&dlg)dlg.moved=1;  // a story beat (spaced review counts them)
  if(s&&s.expand){const more=says(s.expand()||[]);dlg.steps.splice(dlg.i,1,...more);if(dlg.i>=dlg.steps.length){closeDialog();return}return show(dlg.steps[dlg.i])}  // expand:()=>steps, made when it's reached (class time picks words you have by then)
  dlg.cur=s;hideGloss();
@@ -911,7 +913,8 @@ function typeText(text,done){
  if(reduce)return fin();
  const seg=(()=>{try{return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(p)].map(x=>x.segment)}catch(e){return Array.from(p)}})();  // whole characters: never half an emoji (it shows as ? for a tick)
  const esc=x=>x.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));  // the whole line is laid out from the start: words never jump down a line
- typing.id=setInterval(()=>{i++;el.innerHTML=esc(seg.slice(0,i).join(''))+'<span style="visibility:hidden">'+esc(seg.slice(i).join(''))+'</span>';if(i>=seg.length)fin()},26);
+ const t0=performance.now();  // by elapsed time, not ticks: a phone that slows timers (battery saver) shows more per tick, never a blank box
+ typing.id=setInterval(()=>{const k=Math.min(seg.length,1+Math.floor((performance.now()-t0)/26));if(k===i)return;i=k;el.innerHTML=esc(seg.slice(0,i).join(''))+'<span style="visibility:hidden">'+esc(seg.slice(i).join(''))+'</span>';if(i>=seg.length)fin()},26);
 }
 let allDicts=null;
 const otherDict=k=>{if(!allDicts){allDicts={};for(const ch of CHAPTERS)if(ch!==CH)try{Object.assign(allDicts,ch.make().DICT||{})}catch(e){}}return allDicts[k]};
@@ -1113,7 +1116,7 @@ function cancel(){
  if(choosing()||building()){speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.ask||'');return} // B never throws away a question; it replays it
  if(dlg)closeDialog();
 }
-const says=a=>(Array.isArray(a)?a:[a]).map(t=>typeof t==='string'?{say:t}:t);  // a line, or a full step (set:, sfx:, …)
+const says=a=>(Array.isArray(a)?a:[a]).filter(t=>t!=null&&t!=='').map(t=>typeof t==='string'?{say:t}:t);  // a missing line (an NPC with no after:) is no step, not a crash  // a line, or a full step (set:, sfx:, …)
 
 function allQuestions(){
  const out=[...(C.BANK||[])];Object.keys(C.Q).forEach(k=>{if(k!=='cafe')out.push(...C.Q[k])});return out;

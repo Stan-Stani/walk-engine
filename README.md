@@ -90,6 +90,10 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   counter-clockwise), `ART.flipH` / `ART.flipV` mirror it, `ART.put(rows, pal, X, Y)` draws it top-down (no bottom-alignment, for
   pieces of a tile). Draw a picture once, upright, and turn it to fit: e.g. 점심 방송's 방송실 east windows show an upright street
   turned with `ART.rot(street, 1)` (sky to the outer edge, road to the room); a west wall would use `-1`.
+- First-time hints, no instruction text (one record, `walk-hints`, for every game on the site: browsers keep saved data per site, and
+  the games share stan-stani.github.io): a line on screen 4 s with no word ever tapped → its longest word bobs, dotted underline
+  (stops once any word is tapped, or after 6 showings); the word popup's ? pulses until used (3 popups); once words are tapped, the
+  line's ? pulses until used (12 lines). The word-order tile hint uses the same record, so it shows once across the games.
 - Word help (tap a word) stays open until ×, A, B or the next line. Word-order tiles have no instruction text: only in the very first
   word-order question a player ever meets (per game, saved), after a 4 s pause the first right tile gets the `hint` class (bobbing,
   via each game's shell CSS). Never again after that, and never past the first tile. Number keys 1–9 place the nth tile still on the

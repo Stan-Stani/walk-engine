@@ -887,7 +887,8 @@ function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; Engli
  if(!rows.length){hideGloss();toast('사전에 없는 말이에요.');return}
  const el=$('gloss');
  el.innerHTML=rows.map(([h,d])=>`<div class="gr"><b>${h}</b>${d.k}<span class="en" hidden>${d.e||''}</span></div>`).join('')+'<button class="q" type="button" aria-label="영어로 보기">?</button><button class="gx" type="button" aria-label="닫기">×</button>';
- el.hidden=false;el.querySelector('.q').addEventListener('click',e=>{e.stopPropagation();el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden)});
+ el.hidden=false;const q=el.querySelector('.q');if(hints.glossQ!==1){q.classList.add('hintq');hintSeen('glossQ',3)}
+ q.addEventListener('click',e=>{e.stopPropagation();hintDone('glossQ');q.classList.remove('hintq');el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden)});
 }
 /* English for a whole line, the last aid after tapping words: a game's src/lines-en.json (built in as window.LINES_EN, Korean line as
    written, without gloss markup → close English). The ? sits by the speaker button only when the line has English; the English shows
@@ -896,19 +897,20 @@ const lineEn=t=>{const L=window.LINES_EN;return L&&t?L[plain(t)]||null:null};
 function enUI(){let b=$('enBtn');if(b)return b;
  b=document.createElement('button');b.id='enBtn';b.className='spk enq';b.type='button';b.textContent='?';b.setAttribute('aria-label','영어로 보기');$('spk').before(b);
  const d=document.createElement('div');d.id='txtEn';d.className='txt-en';d.hidden=true;$('txt').after(d);
- b.addEventListener('click',e=>{e.stopPropagation();d.hidden=!d.hidden;b.classList.toggle('on',!d.hidden);b.blur()});  // blur: A/Enter go on talking, not toggle it again
+ b.addEventListener('click',e=>{e.stopPropagation();hintDone('lineQ');b.classList.remove('hintq');d.hidden=!d.hidden;b.classList.toggle('on',!d.hidden);b.blur()});  // blur: A/Enter go on talking, not toggle it again
  const st=document.createElement('style');st.textContent='.spk.enq{margin-left:auto;font:700 .9rem/1 var(--body,sans-serif)}.spk.enq+.spk{margin-left:0}'
   +'.txt-en{font-family:var(--body,sans-serif);font-size:.86rem;line-height:1.4;opacity:.8;margin-top:6px;word-break:normal}'
   +'.tl .tq{margin-left:6px;padding:0 5px;font:700 .72rem/1.4 var(--body,sans-serif);color:inherit;background:none;border:1px solid currentColor;border-radius:4px;opacity:.55;cursor:pointer;vertical-align:1px}'
   +'.tl .ten{display:block;font-weight:400;font-size:.84rem;opacity:.75;margin-top:2px;word-break:normal}';
  document.head.appendChild(st);return b}
-function setEn(en){if(!window.LINES_EN)return;const b=enUI(),d=$('txtEn');b.hidden=!en;b.classList.remove('on');d.hidden=true;d.textContent=en||''}
+function setEn(en){if(!window.LINES_EN)return;const b=enUI(),d=$('txtEn');b.hidden=!en;b.classList.remove('on');d.hidden=true;d.textContent=en||'';
+ const h=!!en&&hints.word===1&&hints.lineQ!==1;b.classList.toggle('hintq',h);if(h)hintSeen('lineQ',12)}  // after the word hint: the line's ? pulses
 function typeText(text,done){
  text=text.replace(/ ___/g,'\u00A0___').replace(/___(?=\S)/g,'___\u2060');  // a blank never starts or ends a line on its own ("국어 수행 ___ / 예요")
  clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.innerHTML='<span style="visibility:hidden">'+p.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</span>';let i=0;
  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
  typing={id:null,finished:false};
- const fin=()=>{clearInterval(typing.id);el.innerHTML=glossHTML(text);typing.finished=true;done()};
+ const fin=()=>{clearInterval(typing.id);el.innerHTML=glossHTML(text);typing.finished=true;hintWord();done()};
  typing.fin=fin;
  if(reduce)return fin();
  const seg=(()=>{try{return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(p)].map(x=>x.segment)}catch(e){return Array.from(p)}})();  // whole characters: never half an emoji (it shows as ? for a tick)
@@ -923,7 +925,25 @@ function showWord(w){const rows=lexLookup(w);noteTap(rows);popGloss(rows);lastWo
 /* ---------- 찾아본 말: every tap that finds a definition — how many times, and when last (all chapters, one list) ---------- */
 const TAPS_KEY=KEY('taps');let taps={},tapSort='t';
 try{taps=JSON.parse(store.get(TAPS_KEY)||'{}')||{}}catch(e){taps={}}
-function noteTap(rows){const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;store.set(TAPS_KEY,JSON.stringify(taps))}
+/* ---------- first-time hints, no instruction text: tap a word · the popup's ? (English) · the line's ? (the line in English) ----------
+   One record for every game on this site, not per game: browsers keep saved data per site, and all the walk games live on
+   stan-stani.github.io, so a player who learned to tap words in one game isn't shown it again in another. Each hint ends for good once
+   the player does the thing (or after a few showings, so a player who never wants it isn't nagged). The tile hint uses it too. */
+const HINTS_KEY='walk-hints';let hints={};try{hints=JSON.parse(store.get(HINTS_KEY)||'{}')||{}}catch(e){hints={}}
+function hintDone(k){if(hints[k]===1)return;hints[k]=1;store.set(HINTS_KEY,JSON.stringify(hints))}
+function hintSeen(k,max){hints[k+'N']=(hints[k+'N']||0)+1;if(hints[k+'N']>=max)hintDone(k);else store.set(HINTS_KEY,JSON.stringify(hints))}
+if(Object.keys(taps).length)hintDone('word');  // this game's 찾아본 말 has taps already: they know
+{const st=document.createElement('style');st.textContent='@keyframes wHint{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}'
+ +'.txt .w.hintw{display:inline-block;animation:wHint 1s ease-in-out infinite;text-decoration:underline dotted;text-underline-offset:3px}'
+ +'@keyframes qHint{0%,100%{box-shadow:0 0 0 0 rgba(242,180,80,0)}50%{box-shadow:0 0 0 4px rgba(242,180,80,.8)}}.hintq{animation:qHint 1.1s ease-in-out infinite}';
+ document.head.appendChild(st)}
+function unhintWord(){clearTimeout(hintWord.t);document.querySelectorAll('.hintw').forEach(e=>e.classList.remove('hintw'))}
+function hintWord(){  // a line has been on the screen 4 s and no word has ever been tapped: its longest word bobs
+ unhintWord();if(hints.word===1)return;const cur=dlg&&dlg.cur;
+ hintWord.t=setTimeout(()=>{if(!dlg||dlg.cur!==cur||hints.word===1||!$('gloss').hidden||phoneOpen)return;
+  const ws=[...$('txt').querySelectorAll('.w')],w=ws.filter(e=>e.textContent.length>=2).sort((a,b)=>b.textContent.length-a.textContent.length)[0]||ws[0];
+  if(w){w.classList.add('hintw');hintSeen('word',6)}},4000)}
+function noteTap(rows){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;store.set(TAPS_KEY,JSON.stringify(taps))}
 function ago(t){const m=Math.floor((Date.now()-t)/60000);if(m<1)return '방금';if(m<60)return m+'분 전';const h=Math.floor(m/60);if(h<24)return h+'시간 전';const d=Math.floor(h/24);return d===1?'어제':d+'일 전'}
 function openTaps(){
  const esc=x=>String(x||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1019,10 +1039,10 @@ function renderBuild(s){
  do order=shuffle(s.build.map((_,i)=>i));while(s.build.length>1&&solved(order));  /* never start already solved (in any right order) */
  $('tiles').innerHTML=order.map(i=>`<button class="tile" data-i="${i}">${s.build[i]}</button>`).join('');
  $('tiles').querySelectorAll('.tile').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();pickTile(s,b)}));
- sel=-1;choicesAt=performance.now();markSel();if(s.hintOK===undefined)s.hintOK=firstTime('tileHint');hintTile(s,4000);
+ sel=-1;choicesAt=performance.now();markSel();if(s.hintOK===undefined){s.hintOK=hints.tile!==1&&firstTime('tileHint');hintDone('tile')}  // once per player across the games (walk-hints), not per gamehintTile(s,4000);
 }
-/* the very first word-order question a player meets: after a pause its first right tile bobs, a hint without instruction text.
-   Never again after that, and never past the first tile: from then on the player knows how tiles work. */
+/* the very first word-order question a player meets (in any of the games): after a pause its first right tile bobs, a hint without
+   instruction text. Never again after that, and never past the first tile: from then on the player knows how tiles work. */
 function hintTile(s,ms){
  clearTimeout(hintTile.t);$('tiles').querySelectorAll('.hint').forEach(b=>b.classList.remove('hint'));
  if(!s.hintOK||s.got>0)return;

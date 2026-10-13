@@ -98,6 +98,10 @@ let soundOn=store.get(KEY('sound'))!=='0';
 /* 듣기 문제 (START menu): review may ask a word by sound alone. On by default; ?listen=0 in the URL turns it off and saves that
    (the playtest tools do, since testers can't hear) */
 let listenOn=store.get(KEY('listen'))!=='0';{const q=new URLSearchParams(location.search).get('listen');if(q==='0'||q==='1'){listenOn=q==='1';store.set(KEY('listen'),q)}}
+/* ?en=1: a link for testers without Korean: each line's English shows under it, as if its ? were already open (questions still
+   have none, as for everyone). Remembered in this browser; ?en=0 turns it off. Not in the menus, so learners read Korean first. */
+const enQ=new URLSearchParams(location.search).get('en');let enAll=store.get(KEY('enAll'))==='1';
+if(enQ==='0'||enQ==='1'){enAll=enQ==='1';store.set(KEY('enAll'),enQ)}
 let readOn=store.get(KEY('read'))==='1';
 
 /* ---------- sound ---------- */
@@ -903,8 +907,8 @@ function enUI(){let b=$('enBtn');if(b)return b;
   +'.tl .tq{margin-left:6px;padding:0 5px;font:700 .72rem/1.4 var(--body,sans-serif);color:inherit;background:none;border:1px solid currentColor;border-radius:4px;opacity:.55;cursor:pointer;vertical-align:1px}'
   +'.tl .ten{display:block;font-weight:400;font-size:.84rem;opacity:.75;margin-top:2px;word-break:normal}';
  document.head.appendChild(st);return b}
-function setEn(en){if(!window.LINES_EN)return;const b=enUI(),d=$('txtEn');b.hidden=!en;b.classList.remove('on');d.hidden=true;d.textContent=en||'';
- const h=!!en&&hints.word===1&&hints.lineQ!==1;b.classList.toggle('hintq',h);if(h)hintSeen('lineQ',12)}  // after the word hint: the line's ? pulses
+function setEn(en){if(!window.LINES_EN)return;const b=enUI(),d=$('txtEn');b.hidden=!en;b.classList.toggle('on',enAll&&!!en);d.hidden=!(enAll&&en);d.textContent=en||'';
+ const h=!!en&&!enAll&&hints.word===1&&hints.lineQ!==1;b.classList.toggle('hintq',h);if(h)hintSeen('lineQ',12)}  // after the word hint: the line's ? pulses
 function typeText(text,done){
  text=text.replace(/ ___/g,'\u00A0___').replace(/___(?=\S)/g,'___\u2060');  // a blank never starts or ends a line on its own ("국어 수행 ___ / 예요")
  clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.innerHTML='<span style="visibility:hidden">'+p.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</span>';let i=0;
@@ -1570,6 +1574,7 @@ function start(){
  boot(CHAPTERS.some(c=>c.id===want)?want:CHAPTERS[0].id); // first visit starts at chapter 1; after that, the last chapter played
  const upd=store.get(KEY('updated'));if(upd)store.set(KEY('updated'),'');
  if(upd&&upd===VER.v)setTimeout(()=>toast('새 버전으로 업데이트했어요.'),1500);else countPlay('open');  // our own reload isn't a new visit
+ if(window.LINES_EN&&(enQ==='0'||enQ==='1'))setTimeout(()=>toast(enAll?'English under every line (tester link).':'영어 자동 보기를 껐어요.'),2600);
  if(countQ==='0'||countQ==='1')setTimeout(()=>toast(countQ==='0'?'이 브라우저는 이제 통계에서 빠져요.':'이 브라우저도 다시 통계에 들어가요.'),1200);
  requestAnimationFrame(loop);
 }

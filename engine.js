@@ -1269,6 +1269,7 @@ function award(words){
  if(state.badges.length>=C.WORDS.length&&!state.f.allWords){state.f.allWords=1;save();const all=TERM.allWords(C.WORDS.length);if(all&&all.length)pending=says(all)}  // term.allWords(n): the note when the last word is in ([] = none)
 }
 function finish(pre){
+ if(!state.counted){state.counted=1;save();countPlay('done')}  // once per chapter in this browser
  $('fade').classList.add('on');sfx('star');
  setTimeout(()=>{$('fade').classList.remove('on');const nx=nextChapterAsk('');openDialog('…',(pre||[]).map(s=>({who:LOGNAME,...s})).concat(says(C.DONE),nx.steps||[]))  /* the ending is narration, then: on to the next chapter? */},900);
 }
@@ -1378,6 +1379,15 @@ if(CREATOR)$('meRandom').addEventListener('click',()=>{const pick=a=>a[Math.rand
 if(CREATOR)$('meOk').addEventListener('click',()=>closeMe(true));
 if(CREATOR)$('meBtn').addEventListener('click',()=>openMe());
 /* START: everything that isn't the game itself (logs, dictionary, chapters, reading aloud, sound) */
+/* 통계: three anonymous counts go to the same server: the game opened (each page load), a chapter started (its first time in
+   this browser) and finished. No ID and no cookie: the server only keeps the day and a tag that changes every day (people per
+   day). Only from the published site, so the playtests (file://) never count, nor a browser that says it's automated
+   (navigator.webdriver); the server also drops bots by user agent. Opening any game once with ?count=0 leaves that browser
+   out for good (all the games share stan-stani.github.io, so one visit covers them all); ?count=1 puts it back. */
+const COUNT_URL='https://seldoncortex.com/api/word-reports/count',countQ=new URLSearchParams(location.search).get('count');
+if(countQ==='0'||countQ==='1')store.set('walk-count',countQ);
+const COUNT_ON=location.hostname==='stan-stani.github.io'&&!navigator.webdriver&&store.get('walk-count')!=='0';
+function countPlay(ev){if(COUNT_ON)try{navigator.sendBeacon(COUNT_URL,JSON.stringify({game:G.prefix,ev,ch:CH.id}))}catch(e){}}
 /* 문제 알리기: a report goes to the word-reports inbox on seldoncortex.com. Artifacts can't call other sites, so 보내기 is a
    plain link that carries the report after the # (never in server logs); the page there posts it once and says thanks.
    보내기 stays dim (no link) until the note says something: the page sends as soon as it opens, so a curious tap once sent an
@@ -1399,7 +1409,8 @@ function openReport(){
    <div class="row tapsort"><button class="btn" id="repGame">게임이 이상해요</button><button class="btn" id="repKo">한국어가 이상해요</button></div>
    <div id="repCtx" style="font-size:.85rem;opacity:.75;white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0"></div>
    <textarea id="repNote" rows="3" maxlength="1000" placeholder="무엇이 이상해요?" style="width:100%;box-sizing:border-box;font:inherit;padding:8px;border-radius:8px"></textarea>
-   <div class="row" style="justify-content:flex-end;margin-top:8px"><a class="btn" id="repSend" target="_blank" rel="noopener" style="text-decoration:none">보내기</a></div></div>`;
+   <div class="row" style="justify-content:flex-end;margin-top:8px"><a class="btn" id="repSend" target="_blank" rel="noopener" style="text-decoration:none">보내기</a></div>
+   <p style="font-size:.75rem;opacity:.6;margin:10px 0 0">이 게임은 숫자만 세요: 게임을 연 수, 시작한 수, 끝낸 수. 누가 했는지는 몰라요.</p></div>`;
   document.body.append(P);
   P.addEventListener('click',e=>{if(e.target===P)closeReport()});$('repClose').addEventListener('click',closeReport);
   $('repGame').addEventListener('click',()=>setRepKind('game'));$('repKo').addEventListener('click',()=>setRepKind('korean'));
@@ -1502,7 +1513,7 @@ function boot(id){
  $('chName').textContent=CH.n;
  updateHud();updateQuest();updBack();
  if(G.onBoot)G.onBoot(CH,C);  // the game's own page parts for this chapter (단어 마을: tips, news sources)
- if(!state.seenIntro){state.seenIntro=true;save();const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
+ if(!state.seenIntro){state.seenIntro=true;save();countPlay('start');const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
  else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over
 }
 function chapterProgress(c){try{const s=JSON.parse(store.get(c.save)||'null');return s?{got:(s.badges||[]).length,done:!!(s.f&&s.f.done)}:{got:0,done:false}}catch(e){return {got:0,done:false}}}
@@ -1522,6 +1533,7 @@ function start(){
  updateSound();updateRead();
  const want=new URLSearchParams(location.search).get('ch')||store.get(KEY('chapter'));
  boot(CHAPTERS.some(c=>c.id===want)?want:CHAPTERS[0].id); // first visit starts at chapter 1; after that, the last chapter played
+ countPlay('open');if(countQ==='0'||countQ==='1')setTimeout(()=>toast(countQ==='0'?'이 브라우저는 이제 통계에서 빠져요.':'이 브라우저도 다시 통계에 들어가요.'),1200);
  requestAnimationFrame(loop);
 }
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();

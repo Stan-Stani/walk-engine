@@ -1281,7 +1281,7 @@ function updateHud(){const n=state.badges.length,st=C.WORDS.filter(w=>has(w)&&lv
 function fitReg(){const e=$('reg');if(!e)return;e.style.letterSpacing=e.style.fontSize='';const f0=parseFloat(getComputedStyle(e).fontSize);
  for(const [ls,k] of [['.08em',1],['.03em',1],['.02em',.92],['0',.86]]){if(e.scrollWidth<=e.clientWidth)return;e.style.letterSpacing=ls;e.style.fontSize=k<1?f0*k+'px':''}}
 addEventListener('resize',()=>fitReg());
-function updateQuest(){$('questTxt').textContent=C.questText();$('quest').classList.toggle('late',!!(C.questLate&&C.questLate()))}  // questLate: the goal is overdue (shell CSS .quest.late)
+function updateQuest(){$('questTxt').textContent=C.questText();countStep();$('quest').classList.toggle('late',!!(C.questLate&&C.questLate()))}  // questLate: the goal is overdue (shell CSS .quest.late)
 function updateRead(){$('readBtn').setAttribute('aria-pressed',readOn&&canSpeak()?'true':'false');$('spk').hidden=!canSpeak()}
 function updateSound(){$('sndBtn').setAttribute('aria-pressed',soundOn?'true':'false')}
 let logSel=null,showEn=false;
@@ -1379,15 +1379,23 @@ if(CREATOR)$('meRandom').addEventListener('click',()=>{const pick=a=>a[Math.rand
 if(CREATOR)$('meOk').addEventListener('click',()=>closeMe(true));
 if(CREATOR)$('meBtn').addEventListener('click',()=>openMe());
 /* START: everything that isn't the game itself (logs, dictionary, chapters, reading aloud, sound) */
-/* 통계: three anonymous counts go to the same server: the game opened (each page load), a chapter started (its first time in
-   this browser) and finished. No ID and no cookie: the server only keeps the day and a tag that changes every day (people per
+/* 통계: anonymous counts go to the same server: the game opened (each page load), a chapter started (its first time in this
+   browser), each objective reached in it (how far players get; once each, in the order reached) and finished. No ID and no cookie: the server only keeps the day and a tag that changes every day (people per
    day). Only from the published site, so the playtests (file://) never count, nor a browser that says it's automated
    (navigator.webdriver); the server also drops bots by user agent. Opening any game once with ?count=0 leaves that browser
    out for good (all the games share stan-stani.github.io, so one visit covers them all); ?count=1 puts it back. */
 const COUNT_URL='https://seldoncortex.com/api/word-reports/count',countQ=new URLSearchParams(location.search).get('count');
 if(countQ==='0'||countQ==='1')store.set('walk-count',countQ);
 const COUNT_ON=location.hostname==='stan-stani.github.io'&&!navigator.webdriver&&store.get('walk-count')!=='0';
-function countPlay(ev){if(COUNT_ON)try{navigator.sendBeacon(COUNT_URL,JSON.stringify({game:G.prefix,ev,ch:CH.id}))}catch(e){}}
+function countPlay(ev,more){if(COUNT_ON)try{navigator.sendBeacon(COUNT_URL,JSON.stringify({game:G.prefix,ev,ch:CH.id,...more}))}catch(e){}}
+/* a step is the objective's text (numbers as #, so "3/9" doesn't make new steps). Only for a chapter started since steps were
+   counted (state.steps made at its start), so an old save doesn't report its current objective as step 1 */
+function countStep(){
+ if(!Array.isArray(state.steps)||state.steps.length>=40)return;
+ const q=String((C.questText&&C.questText())||'').replace(/\d+/g,'#').trim().slice(0,60);
+ if(!q||state.steps.includes(q))return;
+ state.steps.push(q);save();countPlay('step',{step:q,n:state.steps.length});
+}
 /* 문제 알리기: a report goes to the word-reports inbox on seldoncortex.com. Artifacts can't call other sites, so 보내기 is a
    plain link that carries the report after the # (never in server logs); the page there posts it once and says thanks.
    보내기 stays dim (no link) until the note says something: the page sends as soon as it opens, so a curious tap once sent an
@@ -1410,7 +1418,7 @@ function openReport(){
    <div id="repCtx" style="font-size:.85rem;opacity:.75;white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0"></div>
    <textarea id="repNote" rows="3" maxlength="1000" placeholder="무엇이 이상해요?" style="width:100%;box-sizing:border-box;font:inherit;padding:8px;border-radius:8px"></textarea>
    <div class="row" style="justify-content:flex-end;margin-top:8px"><a class="btn" id="repSend" target="_blank" rel="noopener" style="text-decoration:none">보내기</a></div>
-   <p style="font-size:.75rem;opacity:.6;margin:10px 0 0">이 게임은 숫자만 세요: 게임을 연 수, 시작한 수, 끝낸 수. 누가 했는지는 몰라요.</p></div>`;
+   <p style="font-size:.75rem;opacity:.6;margin:10px 0 0">이 게임은 숫자만 세요: 게임을 연 수, 시작한 수, 어디까지 했는지, 끝낸 수. 누가 했는지는 몰라요.</p></div>`;
   document.body.append(P);
   P.addEventListener('click',e=>{if(e.target===P)closeReport()});$('repClose').addEventListener('click',closeReport);
   $('repGame').addEventListener('click',()=>setRepKind('game'));$('repKo').addEventListener('click',()=>setRepKind('korean'));
@@ -1513,7 +1521,7 @@ function boot(id){
  $('chName').textContent=CH.n;
  updateHud();updateQuest();updBack();
  if(G.onBoot)G.onBoot(CH,C);  // the game's own page parts for this chapter (단어 마을: tips, news sources)
- if(!state.seenIntro){state.seenIntro=true;save();countPlay('start');const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
+ if(!state.seenIntro){state.seenIntro=true;state.steps=[];save();countPlay('start');countStep();const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
  else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over
 }
 function chapterProgress(c){try{const s=JSON.parse(store.get(c.save)||'null');return s?{got:(s.badges||[]).length,done:!!(s.f&&s.f.done)}:{got:0,done:false}}catch(e){return {got:0,done:false}}}

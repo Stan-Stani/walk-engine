@@ -25,6 +25,11 @@ const DIR=path.join(process.env.HOME,'.cache/walk-ctl',path.basename(ROOT)+'-man
 const [,,cmd,...args]=process.argv;const wait=ms=>new Promise(r=>setTimeout(r,ms));
 fs.mkdirSync(DIR+'/shots',{recursive:true});
 if(cmd==='stop'){try{execSync(`pkill -9 -f "user-data-dir=${DIR}/[p]rof"`)}catch(e){}console.log('stopped');process.exit(0)}
+/* a session nobody stopped keeps rendering the game in software and slows every other test (four of them once ran for a day and a
+   half): starting or resuming one closes any other session idle for 2 hours (no screenshot or start since; resume reopens it) */
+if(cmd==='start'||cmd==='resume')for(const d of fs.readdirSync(path.dirname(DIR))){const p=path.join(path.dirname(DIR),d);if(p===DIR)continue;
+  let last=0;for(const f of ['index.html',...(fs.existsSync(p+'/shots')?fs.readdirSync(p+'/shots').map(f=>'shots/'+f):[])])try{last=Math.max(last,fs.statSync(p+'/'+f).mtimeMs)}catch(e){}
+  if(Date.now()-last>2*3600e3)try{execSync(`pkill -9 -f "user-data-dir=${p}/[p]rof"`)}catch(e){}}
 if(cmd==='resume'){  // relaunch Chrome on the same profile: the game's saves (localStorage) are still there
   try{execSync(`pkill -9 -f "user-data-dir=${DIR}/[p]rof"`)}catch(e){}await wait(500);
   if(!fs.existsSync(DIR+'/index.html'))fs.copyFileSync(ROOT+'/index.html',DIR+'/index.html');

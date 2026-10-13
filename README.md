@@ -21,7 +21,8 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - 문제 알리기 (START menu, added by the engine): game or Korean problem, plus a note; 보내기 stays dim until the note says something (the
   report page sends as soon as it opens, so a curious tap once sent an empty report). Context is attached automatically: chapter, room, position, objective, the last lines and the last looked-up word. 보내기 links to the word-reports inbox (`https://seldoncortex.com/word-reports/#…`); see the word-reports repo.
 - Play counts (통계): each game sends three anonymous counts to the same server (`/api/word-reports/count`): opened (each page
-  load), a chapter started (its first time in that browser) and finished (`finish()`, once). No ID and no cookie; the server keeps
+  load), a chapter started (its first time in that browser), each objective reached (`questText()`, numbers as #, once each with its
+  order; only for chapters started since steps were counted) and finished (`finish()`, once). No ID and no cookie; the server keeps
   only the day and a tag that changes daily (people per day). Sent only from stan-stani.github.io (playtests load file://, so they
   never count) and not when `navigator.webdriver` is set. **To leave your own browser out:** open any game once with `?count=0`
   (e.g. `https://stan-stani.github.io/jeomsim-bangsong/?count=0`); it's stored for the whole site, so all four games in that

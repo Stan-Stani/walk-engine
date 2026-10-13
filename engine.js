@@ -1379,14 +1379,41 @@ if(CREATOR)$('meRandom').addEventListener('click',()=>{const pick=a=>a[Math.rand
 if(CREATOR)$('meOk').addEventListener('click',()=>closeMe(true));
 if(CREATOR)$('meBtn').addEventListener('click',()=>openMe());
 /* START: everything that isn't the game itself (logs, dictionary, chapters, reading aloud, sound) */
+/* 업데이트: build.py stamps globalThis.BUILD {v: a hash of the whole game, t: when that version first appeared} and writes the same to
+   version.json next to the page. START shows when it was updated; reports carry v. A game left open (phones keep tabs for days)
+   checks version.json when the player comes back to it and every 30 minutes; on a newer one it reloads at a calm moment (no talk,
+   no panel, not walking or between rooms, so everything is saved) and says so in a toast. Each new version is tried once per tab
+   (sessionStorage), so a cache still serving the old page right after a push can't loop; ?v= asks for a fresh copy. */
+const VER=globalThis.BUILD||{};let newVer=null;
+async function checkVersion(){
+ if(!VER.v||location.protocol==='file:'||newVer)return;
+ try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}),j=r.ok?await r.json():{};
+  let tried=null;try{tried=sessionStorage.getItem(KEY('tried'))}catch(e){}
+  if(j.v&&j.v!==VER.v&&j.v!==tried)newVer=j.v}catch(e){}
+}
+function updateNow(){
+ if(!newVer||!state||dlg||panelOpen()||document.querySelector('.panel:not([hidden])')||warping||player.moving||held)return;
+ try{sessionStorage.setItem(KEY('tried'),newVer)}catch(e){}
+ save();store.set(KEY('updated'),newVer);
+ const u=new URL(location.href);u.searchParams.delete('count');u.searchParams.set('v',newVer);location.replace(u.href);
+}
+addEventListener('visibilitychange',()=>{if(!document.hidden)checkVersion()});
+setInterval(checkVersion,30*60e3);setTimeout(checkVersion,60e3);setInterval(updateNow,1000);
+const buildDate=()=>{const d=new Date(VER.t||'');return isNaN(d)?'':d.toLocaleString('ko-KR',{month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})};
+if(VER.v){const p=document.createElement('p');p.id='verLine';p.style.cssText='font-size:.72rem;opacity:.55;margin:12px 0 0;text-align:center';
+ p.textContent=(buildDate()?'업데이트 '+buildDate()+' · ':'')+VER.v;$('startPanel').querySelector('.sheet').append(p)}
 /* 통계: anonymous counts go to the same server: the game opened (each page load), a chapter started (its first time in this
-   browser), each objective reached in it (how far players get; once each, in the order reached) and finished. No ID and no cookie: the server only keeps the day and a tag that changes every day (people per
+   browser), each objective reached in it (how far players get; once each, in the order reached), finished, and the first real
+   tap or key in a visit (so the dashboard counts people, not bots that only load the page). No ID and no cookie: the server only keeps the day and a tag that changes every day (people per
    day). Only from the published site, so the playtests (file://) never count, nor a browser that says it's automated
    (navigator.webdriver); the server also drops bots by user agent. Opening any game once with ?count=0 leaves that browser
    out for good (all the games share stan-stani.github.io, so one visit covers them all); ?count=1 puts it back. */
 const COUNT_URL='https://seldoncortex.com/api/word-reports/count',countQ=new URLSearchParams(location.search).get('count');
 if(countQ==='0'||countQ==='1')store.set('walk-count',countQ);
 const COUNT_ON=location.hostname==='stan-stani.github.io'&&!navigator.webdriver&&store.get('walk-count')!=='0';
+/* the first real tap or key in a visit: a person, not a bot that only loads the page (script-made events aren't trusted) */
+{let touched=false;const first=e=>{if(touched||!e.isTrusted||!CH)return;touched=true;countPlay('input')};
+ addEventListener('keydown',first,true);addEventListener('pointerdown',first,true)}
 function countPlay(ev,more){if(COUNT_ON)try{navigator.sendBeacon(COUNT_URL,JSON.stringify({game:G.prefix,ev,ch:CH.id,...more}))}catch(e){}}
 /* a step is the objective's text (numbers as #, so "3/9" doesn't make new steps). Only for a chapter started since steps were
    counted (state.steps made at its start), so an old save doesn't report its current objective as step 1 */
@@ -1406,7 +1433,7 @@ function reportCtx(){
   line:dlg&&dlg.cur?lastLines[lastLines.length-1]:'',lines:lastLines.join('\n'),word:lastWord}
 }
 function reportHref(){
- const r={game:G.prefix,kind:repKind,note:$('repNote').value.trim().slice(0,1000),build:CH.id,ctx:reportCtx()};
+ const r={game:G.prefix,kind:repKind,note:$('repNote').value.trim().slice(0,1000),build:(VER.v||'dev')+' '+CH.id,ctx:reportCtx()};
  const b=new TextEncoder().encode(JSON.stringify(r));let bin='';b.forEach(x=>bin+=String.fromCharCode(x));
  return REPORT_URL+'#'+btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
@@ -1541,7 +1568,9 @@ function start(){
  updateSound();updateRead();
  const want=new URLSearchParams(location.search).get('ch')||store.get(KEY('chapter'));
  boot(CHAPTERS.some(c=>c.id===want)?want:CHAPTERS[0].id); // first visit starts at chapter 1; after that, the last chapter played
- countPlay('open');if(countQ==='0'||countQ==='1')setTimeout(()=>toast(countQ==='0'?'이 브라우저는 이제 통계에서 빠져요.':'이 브라우저도 다시 통계에 들어가요.'),1200);
+ const upd=store.get(KEY('updated'));if(upd)store.set(KEY('updated'),'');
+ if(upd&&upd===VER.v)setTimeout(()=>toast('새 버전으로 업데이트했어요.'),1500);else countPlay('open');  // our own reload isn't a new visit
+ if(countQ==='0'||countQ==='1')setTimeout(()=>toast(countQ==='0'?'이 브라우저는 이제 통계에서 빠져요.':'이 브라우저도 다시 통계에 들어가요.'),1200);
  requestAnimationFrame(loop);
 }
 window.claude?.hot?.ready?window.claude.hot.ready(start):start();

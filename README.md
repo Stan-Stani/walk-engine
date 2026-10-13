@@ -164,6 +164,8 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   The game's build puts the file in as `globalThis.LINES_EN`; with no file there is no ?. The key is the exact Korean, so editing
   a line drops its English silently: the tool counts "English entries no longer in the game" and gives the edited line the old line
   and English ("was"/"was_en") to translate again. A game's build.py should run it when lines-en.json exists (점심 방송's does).
+  Tester link for people without Korean: `?en=1` shows every line's English under it (as if its ? were open; questions still
+  have none). Remembered per game in that browser; `?en=0` turns it off. Not in any menu, so learners read Korean first.
 - `tools/zonedump.mjs` + `tools/zonediff.py`: pixel-checked refactors. `node ../walk-engine/tools/zonedump.mjs out/ [ch1,ch2]` draws every
   zone of every chapter whole (no people), with the story flags off, all on and in two fixed random mixes, at two clock moments, with
   Math.random seeded (deterministic: two dumps of the same build are identical). `python3 ../walk-engine/tools/zonediff.py before/ after/

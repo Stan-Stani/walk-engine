@@ -1464,8 +1464,18 @@ function setRepKind(k){repKind=k;$('repGame').classList.toggle('on',k==='game');
 function syncSend(){const ok=!!$('repNote').value.trim(),a=$('repSend');if(ok)a.href=reportHref();else a.removeAttribute('href');a.setAttribute('aria-disabled',String(!ok));a.style.opacity=ok?'':'.45'}  // no note, no link
 function closeReport(){$('repPanel').hidden=true;document.body.classList.remove('talkopen')}
 function toggleStart(){const P=$('startPanel');if(P.hidden&&panelOpen())return;P.hidden=!P.hidden;hideGloss()}
-{const g=$('startPanel').querySelector('.mgrid'),odd=g.querySelectorAll('.mi:not(.wide)').length%2;  // fill the gap next to a lone item, else a full row
- const b=document.createElement('button');b.className=odd?'mi':'mi wide';b.id='repBtn';b.textContent='문제 알리기';b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});$('startPanel').querySelector('.mgrid').append(b)}
+/* a button the engine adds to the START menu goes into the first gap (a lone half-width button before a wide one, e.g. 소리 above
+   듣기 문제), else after the last lone one, else on a row of its own */
+function menuAdd(b){const g=$('startPanel').querySelector('.mgrid');if(!g)return;let col=0;
+ for(const c of g.children){if(c.hidden||getComputedStyle(c).display==='none')continue;
+  if(c.classList.contains('wide')){if(col===1){g.insertBefore(b,c);return}col=0}else col^=1}
+ if(col===0)b.classList.add('wide');g.append(b)}
+/* 영어 자막: the on/off for ?en=1's English under every line, only for someone who has opened that link (others never see it) */
+if(window.LINES_EN&&store.get(KEY('enAll'))!==null){const b=document.createElement('button');b.className='mi toggle';b.id='enAllBtn';b.textContent='영어 자막';
+ const upd=()=>b.setAttribute('aria-pressed',String(enAll));upd();menuAdd(b);
+ b.addEventListener('click',()=>{enAll=!enAll;store.set(KEY('enAll'),enAll?'1':'0');upd();sfx('ok');
+  const d=$('txtEn');if(d&&d.textContent){d.hidden=!enAll;$('enBtn').classList.toggle('on',enAll)}toast(enAll?'영어 자막을 켰어요.':'영어 자막을 껐어요.')})}
+{const b=document.createElement('button');b.className='mi';b.id='repBtn';b.textContent='문제 알리기';b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});menuAdd(b)}
 $('startBtn').addEventListener('click',toggleStart);$('startClose').addEventListener('click',()=>$('startPanel').hidden=true);
 $('startPanel').addEventListener('click',e=>{if(e.target.id==='startPanel'){$('startPanel').hidden=true;return}
  const mi=e.target.closest('.mi');if(mi&&!mi.classList.contains('toggle')){fromMenu=!$('startPanel').hidden&&['talkBtn','tapBtn'].includes(mi.id);$('startPanel').hidden=true}},true);  // capture: close the menu before the item opens its panel (the talk log and dictionary go back to it on 닫기)
@@ -1475,7 +1485,11 @@ $('tapPanel').addEventListener('click',e=>{if(e.target.id==='tapPanel'){closeTap
 $('talkPanel').addEventListener('click',e=>{if(e.target.id==='talkPanel'){closeTalk();return}const gl=e.target.closest('.gl');if(gl){showGloss(gl.dataset.k);return}const w=e.target.closest('.w');if(w)showWord(w.textContent)});
 /* debug (START → 디버그, saved per game): a 건너뛰기 button on every conversation runs it to the end — right answers, finished word
    orders, every flag / item / word it sets, quietly — and stops at a real decision (a plain choice like "2교시로 갈까요?"). For testing. */
-let debugOn=store.get(KEY('debug'))==='1';
+/* only for development: shown off the published site (file://, localhost: the playtests) and in a browser that opened ?debug=1 once
+   (all the games share it; ?debug=0 hides it again), so players never get a skip button */
+{const q=new URLSearchParams(location.search).get('debug');if(q==='0'||q==='1')store.set('walk-debug-ok',q)}
+const debugOK=location.hostname!=='stan-stani.github.io'||store.get('walk-debug-ok')==='1';
+let debugOn=debugOK&&store.get(KEY('debug'))==='1';
 /* 한 단계 뒤로 (debug: in the 일지, by 처음부터): every talk that moves the story keeps this chapter's save from just before it (the
    last 12). The button puts the last one back and loads the chapter from it, as the chapter menu would, so nothing is undone by hand
    and nothing is left half undone. The talk's own story steps are gone; words you met still count (the shared word memory stays). */
@@ -1499,11 +1513,11 @@ function skipTalk(){
  soundOn=snd;if(TTS)try{speechSynthesis.cancel()}catch(e){}
 }
 (()=>{const grid=document.querySelector('#startPanel .mgrid');if(!grid)return;
- grid.insertAdjacentHTML('beforeend','<button class="mi toggle" id="dbgBtn" aria-pressed="false">디버그</button>');
+ if(debugOK){const b=document.createElement('button');b.className='mi toggle';b.id='dbgBtn';b.setAttribute('aria-pressed','false');b.textContent='디버그';menuAdd(b)}
  $('spk').insertAdjacentHTML('beforebegin','<button class="spk" id="skipBtn" type="button" hidden style="width:auto;padding:0 8px;margin-left:auto;margin-right:6px;font-size:.8rem;font-weight:700">건너뛰기</button>');
  $('resetBtn').insertAdjacentHTML('beforebegin','<button class="btn" id="backBtn" type="button" hidden>한 단계 뒤로</button>');
- const upd=()=>{$('dbgBtn').setAttribute('aria-pressed',debugOn?'true':'false');$('skipBtn').hidden=!debugOn;updBack()};upd();
- $('dbgBtn').addEventListener('click',()=>{debugOn=!debugOn;store.set(KEY('debug'),debugOn?'1':'0');upd();sfx('ok');toast(debugOn?'디버그: 대화에 건너뛰기 버튼':'디버그 꺼짐')});
+ const upd=()=>{$('dbgBtn')?.setAttribute('aria-pressed',debugOn?'true':'false');$('skipBtn').hidden=!debugOn;updBack()};upd();
+ $('dbgBtn')?.addEventListener('click',()=>{debugOn=!debugOn;store.set(KEY('debug'),debugOn?'1':'0');upd();sfx('ok');toast(debugOn?'디버그: 대화에 건너뛰기 버튼':'디버그 꺼짐')});
  $('skipBtn').addEventListener('click',e=>{e.stopPropagation();skipTalk()});
  $('backBtn').addEventListener('click',stepBack);
 })();

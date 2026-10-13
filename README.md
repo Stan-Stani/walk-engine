@@ -165,7 +165,10 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   a line drops its English silently: the tool counts "English entries no longer in the game" and gives the edited line the old line
   and English ("was"/"was_en") to translate again. A game's build.py should run it when lines-en.json exists (점심 방송's does).
   Tester link for people without Korean: `?en=1` shows every line's English under it (as if its ? were open; questions still
-  have none). Remembered per game in that browser; `?en=0` turns it off. Not in any menu, so learners read Korean first.
+  have none). Remembered per game in that browser; `?en=0` turns it off. Whoever has opened it gets a 영어 자막 on/off in START
+  (in the gap next to 소리); nobody else sees it, so learners read Korean first. START's 디버그 shows only off the published site
+  (file://, localhost) or in a browser that opened `?debug=1` once (shared by all the games; `?debug=0` hides it). Buttons the engine
+  adds to START (`menuAdd`) go into the first gap in the grid.
 - `tools/zonedump.mjs` + `tools/zonediff.py`: pixel-checked refactors. `node ../walk-engine/tools/zonedump.mjs out/ [ch1,ch2]` draws every
   zone of every chapter whole (no people), with the story flags off, all on and in two fixed random mixes, at two clock moments, with
   Math.random seeded (deterministic: two dumps of the same build are identical). `python3 ../walk-engine/tools/zonediff.py before/ after/

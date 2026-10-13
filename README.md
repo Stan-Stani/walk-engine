@@ -20,10 +20,15 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   where they stood, so they don't blink out. Pressing toward them turns you to face them; pressing again swaps places.
 - 문제 알리기 (START menu, added by the engine): game or Korean problem, plus a note; 보내기 stays dim until the note says something (the
   report page sends as soon as it opens, so a curious tap once sent an empty report). Context is attached automatically: chapter, room, position, objective, the last lines and the last looked-up word. 보내기 links to the word-reports inbox (`https://seldoncortex.com/word-reports/#…`); see the word-reports repo.
+- Version and updates: each game's build.py stamps `globalThis.BUILD` {v: a hash of the whole built game, t: when that version first
+  appeared} and keeps the same in `version.json` (the time only moves when the hash does, so a rebuild with no change leaves
+  index.html alone). START shows `업데이트 10월 13일 오후 3:40 · v`; 문제 알리기 reports carry v. A game left open checks
+  version.json when the player returns to the tab and every 30 minutes, and on a newer one reloads at a calm moment (no talk,
+  no panel, not walking or between rooms) with a toast; each new version is tried once per tab, so a stale cache can't loop.
 - Play counts (통계): each game sends three anonymous counts to the same server (`/api/word-reports/count`): opened (each page
   load), a chapter started (its first time in that browser), each objective reached (`questText()`, numbers as #, once each with its
   order; only for chapters started since steps were counted) and finished (`finish()`, once). No ID and no cookie; the server keeps
-  only the day and a tag that changes daily (people per day). Sent only from stan-stani.github.io (playtests load file://, so they
+  only the day and a tag that changes daily (people per day). Also the first real (trusted) tap or key in a visit, so the dashboard counts people, not bots that only load the page. Sent only from stan-stani.github.io (playtests load file://, so they
   never count) and not when `navigator.webdriver` is set. **To leave your own browser out:** open any game once with `?count=0`
   (e.g. `https://stan-stani.github.io/jeomsim-bangsong/?count=0`); it's stored for the whole site, so all four games in that
   browser stop counting. `?count=1` undoes it. A line at the bottom of 문제 알리기 tells players what is counted. Read the counts

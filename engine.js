@@ -857,7 +857,7 @@ function show(s){
  if(s.listen)s=prepListen(s);
  $('who').textContent=s.who||dlg.name;
  setEn(s.ask||s.build||s.listen?null:lineEn(s.enKey||s.say||''));  // an open question has no English (it would give the answer away); answered, its whole line has
- $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;
+ $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;writeKbOff();
  const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
  if(!s.build&&!s.ask)logTalk(s.who||dlg.name,text,s.enKey);  // a question is logged once, as the line it becomes when answered
  typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)(writeQ(s)?renderWrite(s):renderChoices(s));else if(s.build)renderBuild(s);else $('more').hidden=false});
@@ -1008,6 +1008,7 @@ const choosing=()=>!!dlg&&!$('choices').hidden&&choiceBtns().length>0;
 const building=()=>!!dlg&&!$('build').hidden;
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function renderChoices(s){
+ writeKbOff();  // 보기 after a 쓰기 문제: the controls come back
  const box=$('choices');box.hidden=false;
  const order=shuffle(s.opts.map((_,i)=>i));
  box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${String(s.opts[i][0]).replace(/[가-힣]+/g,w=>`<span class="cw">${w}</span>`)}</button>`).join('');
@@ -1045,16 +1046,23 @@ function hgKeys(t){  // text → key jamo (to pick up typing from a device keybo
   else out.push(...(V[ch]||F[ch]||[ch]))}
  return out}
 let ownKb=store.get(KEY('ownKb'))==='1';
-function hgPad(inp,own){  // own: the player chose their device's keyboard
+/* the built-in keyboard takes the controls' place (.pad and .startrow: D-pad, A/B, START) while you write, so the question stays in view;
+   they come back when the line changes or the talk ends */
+function writeKbOn(el){writeKbOff();el.id='hgPad';el.classList.add('inpad');const pad=document.querySelector('.pad');
+ if(!pad){$('choices').append(el);el.classList.remove('inpad');return}
+ for(const q of ['.pad','.startrow']){const e=document.querySelector(q);if(e)e.style.display='none'}pad.after(el)}
+function writeKbOff(){const k=$('hgPad');if(!k)return;k.remove();for(const q of ['.pad','.startrow']){const e=document.querySelector(q);if(e)e.style.display=''}}
+
+function hgPad(inp,own,submit){  // own: the player chose their device's keyboard; submit: 확인
  const box=document.createElement('div');box.className='hgk';let seq=hgKeys(inp.value),shift=false;
  const R=[['ㅂ','ㅈ','ㄷ','ㄱ','ㅅ','ㅛ','ㅕ','ㅑ','ㅐ','ㅔ'],['ㅁ','ㄴ','ㅇ','ㄹ','ㅎ','ㅗ','ㅓ','ㅏ','ㅣ'],['⇧','ㅋ','ㅌ','ㅊ','ㅍ','ㅠ','ㅜ','ㅡ','⌫']],
   SH={'ㅂ':'ㅃ','ㅈ':'ㅉ','ㄷ':'ㄸ','ㄱ':'ㄲ','ㅅ':'ㅆ','ㅐ':'ㅒ','ㅔ':'ㅖ'};
  const draw=()=>{box.innerHTML=R.map(r=>`<div class="hgr">${r.map(k=>`<button type="button" class="hk${k==='⇧'||k==='⌫'?' hkw':''}${k==='⇧'&&shift?' on':''}" data-k="${k}">${shift&&SH[k]?SH[k]:k}</button>`).join('')}</div>`).join('')
-  +'<div class="hgr"><button type="button" class="hk hkw hkown" data-k="own">내 자판</button><button type="button" class="hk hksp" data-k=" ">띄어쓰기</button></div>'};
+  +'<div class="hgr"><button type="button" class="hk hkw hkown" data-k="own">내 자판</button><button type="button" class="hk hksp" data-k=" ">띄어쓰기</button><button type="button" class="hk hkok" data-k="ok">확인</button></div>'};
  draw();
  box.addEventListener('pointerdown',e=>{if(e.target.closest('.hk'))e.preventDefault()});  // keep the box's caret, no focus jump
  box.addEventListener('click',e=>{e.stopPropagation();const b=e.target.closest('.hk');if(!b)return;const k=b.dataset.k;
-  if(k==='own'){own();return}
+  if(k==='own'){own();return}if(k==='ok'){submit();return}
   if(k==='⇧'){shift=!shift;draw();return}
   if(k==='⌫')seq.pop();else{seq.push(shift&&SH[k]?SH[k]:k);if(shift){shift=false;draw()}}
   inp.value=hgJoin(seq)});
@@ -1077,27 +1085,29 @@ function writeUI(){if($('writeCss'))return;const st=document.createElement('styl
   +'.choices .wqok,.choices .wqhb{font:600 .95rem/1 var(--body,sans-serif);padding:6px 11px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#eee);color:var(--glass-ink,#111);cursor:pointer}'
   +'.choices .wqhb{opacity:.85}'
   +'.choices .wqkb{flex:0 0 auto;font:600 .8rem/1 var(--body,sans-serif);padding:5px 9px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:none;color:inherit;opacity:.75;cursor:pointer}'
-  +'.choices .hgk{flex:1 1 100%;display:flex;flex-direction:column;gap:4px;margin-top:2px;user-select:none;-webkit-user-select:none}'
+  +'.hgk{display:flex;flex-direction:column;gap:4px;margin-top:2px;user-select:none;-webkit-user-select:none;flex:1 1 100%}'
   +'.hgk .hgr{display:flex;gap:3px;justify-content:center}'
   +'.hgk .hk{flex:1 1 0;min-width:0;max-width:40px;height:34px;padding:0;font:600 1.05rem/1 var(--body,sans-serif);border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#eee);color:var(--glass-ink,#111);cursor:pointer;touch-action:manipulation}'
   +'.hgk .hk:active{filter:brightness(1.3)}.hgk .hkw{max-width:52px;font-size:.95rem}.hgk .hk.on{outline:2px solid var(--amber,#E8962A)}'
-  +'.hgk .hksp{max-width:none;flex:3 1 0;font-size:.85rem}.hgk .hkown{flex:1.4 1 0;max-width:none;font-size:.8rem}';
+  +'.hgk .hksp{max-width:none;flex:3 1 0;font-size:.85rem}.hgk .hkown{flex:1.4 1 0;max-width:none;font-size:.8rem}.hgk .hkok{flex:1.4 1 0;max-width:none;font-size:.9rem;background:var(--amber,#E8962A);color:var(--amber-ink,#1B1E2B);border-color:transparent}'
+  +'.hgk.inpad{width:100%;max-width:560px;margin:10px auto 0;padding:8px 6px;gap:7px;box-sizing:border-box;border-radius:12px;background:var(--glass,#1B1E24)}'
+  +'.hgk.inpad .hgr{gap:5px}.hgk.inpad .hk{max-width:none;height:50px;font-size:1.3rem}.hgk.inpad .hkw,.hgk.inpad .hkown,.hgk.inpad .hksp,.hgk.inpad .hkok{font-size:1rem}';
  document.head.appendChild(st)}
 function renderWrite(s){
  writeUI();const box=$('choices');box.hidden=false;const right=s.opts.find(o=>o[1])[0],keep=$('writeIn')?$('writeIn').value:'';
  box.innerHTML=(s.hint1?`<div class="wqh">힌트: ${writeHint(right)}</div>`:'')
   +`<div class="wq"><input id="writeIn" class="wqin" type="text" lang="ko" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="빈칸에 쓰세요" aria-label="빈칸에 들어갈 말">`
-  +`<button class="wqok" type="button">확인</button><button class="wqhb" type="button">${s.hint1?'보기':'힌트'}</button></div>`
+  +`${ownKb?'<button class="wqok" type="button">확인</button>':''}<button class="wqhb" type="button">${s.hint1?'보기':'힌트'}</button></div>`  // the built-in keyboard has its own 확인
   +(ownKb?'<button class="wqkb" type="button">한글 자판</button>':'');
  const inp=$('writeIn');inp.value=keep;inp.inputMode=ownKb?'text':'none';  // the built-in keyboard: no device keyboard over it
- if(!ownKb)box.append(hgPad(inp,()=>{ownKb=true;store.set(KEY('ownKb'),'1');renderWrite(s);$('writeIn').focus()}));
+ if(!ownKb)writeKbOn(hgPad(inp,()=>{ownKb=true;store.set(KEY('ownKb'),'1');renderWrite(s);$('writeIn').focus()},()=>submit()));else writeKbOff();
  box.querySelector('.wqkb')?.addEventListener('click',e=>{e.stopPropagation();ownKb=false;store.set(KEY('ownKb'),'0');renderWrite(s)});
  const submit=()=>{const v=writeNorm(inp.value);if(!v)return;inp.blur();
   const i=s.opts.findIndex(o=>writeNorm(o[0])===v);if(i>=0){choose(s,i);return}  // right, or a wrong option you wrote (its explanation)
   sfx('no');s.missed=true;if(s.w){dlg.missed.add(s.w);askedIn[s.w]=talkN}
   dlg.next=s;show({who:s.who==='나'?'…':s.who,say:'아니에요. 보기에서 골라 봐요.',fb:1})};
  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();submit()}});
- box.querySelector('.wqok').addEventListener('click',e=>{e.stopPropagation();submit()});
+ box.querySelector('.wqok')?.addEventListener('click',e=>{e.stopPropagation();submit()});
  box.querySelector('.wqhb').addEventListener('click',e=>{e.stopPropagation();s.hinted=1;
   if(!s.hint1){s.hint1=1;renderWrite(s);$('writeIn').focus()}else{s.choices=1;renderChoices(s)}});  // 보기: the usual choices
  box.addEventListener('click',e=>e.stopPropagation());
@@ -1212,6 +1222,7 @@ function dropTalk(){
  $('fade').classList.remove('on');playScene(null);
 }
 function closeDialog(){
+ writeKbOff();
  const wasBlack=dlg&&dlg.black;if(wasBlack){$('fade').classList.remove('on');playScene(null)}
  closedAt=performance.now();if(dlg&&dlg.moved){pushBack(dlg.snap);beat()}dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
  updateQuest();

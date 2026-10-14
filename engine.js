@@ -97,7 +97,7 @@ const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s
 let soundOn=store.get(KEY('sound'))!=='0';
 /* 듣기 문제 (START menu): review may ask a word by sound alone. On by default; ?listen=0 in the URL turns it off and saves that
    (the playtest tools do, since testers can't hear) */
-let writeOn=store.get(KEY('write'))!=='0';{const q=new URLSearchParams(location.search).get('write');if(q==='0'||q==='1'){writeOn=q==='1';store.set(KEY('write'),q)}}  // 쓰기 문제 (START), ?write=0/1
+let writeOn=store.get(KEY('write'))==='1';{const q=new URLSearchParams(location.search).get('write');if(q==='0'||q==='1'){writeOn=q==='1';store.set(KEY('write'),q)}}  // 쓰기 문제 (START): off until the player turns it on; ?write=0/1
 let listenOn=store.get(KEY('listen'))!=='0';{const q=new URLSearchParams(location.search).get('listen');if(q==='0'||q==='1'){listenOn=q==='1';store.set(KEY('listen'),q)}}
 /* ?en=1: a link for testers without Korean: each line's English shows under it, as if its ? were already open (questions still
    have none, as for everyone). Remembered in this browser; ?en=0 turns it off. Not in the menus, so learners read Korean first. */
@@ -1072,7 +1072,7 @@ function hgPad(inp,own,submit){  // own: the player chose their device's keyboar
    into the blank instead of picking it. 힌트 shows its first syllable (놓○○); 힌트 again gives the usual choices. A right answer
    after a hint doesn't raise the word's level (grade held); a wrong one counts as a miss and the question comes back as choices.
    Only for a graded review step whose blank takes the right option (Hangul), never a listening question. START → 쓰기 문제
-   turns it off (?write=0/1). */
+   turns it on (off by default; ?write=0/1). */
 const writing=()=>!!dlg&&!$('choices').hidden&&!!$('writeIn');
 function writeQ(s){const o=(s.opts||[]).find(x=>x[1]);
  return writeOn&&!!s.w&&!!(s.review||dlg.review)&&!s.missed&&!s.choices&&!s.listenOnly&&/___/.test(s.ask||'')&&!!o&&/[가-힣]/.test(o[0])&&lv(s.w).b>=(SRS().writeAt??3)}

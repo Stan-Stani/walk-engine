@@ -1018,6 +1018,48 @@ function renderChoices(s){
   b.addEventListener('click',e=>{e.stopPropagation();if(defined){defined=false;return}choose(s,+b.dataset.i)})});
  sel=-1;choicesAt=performance.now();markSel();  // nothing selected: A can't answer by accident
 }
+/* the 쓰기 문제's own 한글 keyboard (두벌식), for players without a Korean keyboard: jamo keys that join into syllables as you
+   tap (ㅂ ㅣ → 비, a final consonant moves on when a vowel follows: 비 ㅁ ㅣ → 비미), ⇧ for ㅃㅉㄸㄲㅆㅒㅖ, ⌫ takes back one jamo.
+   내 자판 switches to the device's own keyboard (remembered); a desktop keyboard with a Korean IME types into the box either way. */
+const HG={CHO:'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ',JUNG:'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ',
+ JONG:['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'],
+ V2:{'ㅗㅏ':'ㅘ','ㅗㅐ':'ㅙ','ㅗㅣ':'ㅚ','ㅜㅓ':'ㅝ','ㅜㅔ':'ㅞ','ㅜㅣ':'ㅟ','ㅡㅣ':'ㅢ'},
+ F2:{'ㄱㅅ':'ㄳ','ㄴㅈ':'ㄵ','ㄴㅎ':'ㄶ','ㄹㄱ':'ㄺ','ㄹㅁ':'ㄻ','ㄹㅂ':'ㄼ','ㄹㅅ':'ㄽ','ㄹㅌ':'ㄾ','ㄹㅍ':'ㄿ','ㄹㅎ':'ㅀ','ㅂㅅ':'ㅄ'}};
+const hgC=j=>HG.CHO.includes(j),hgV=j=>'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅛㅜㅠㅡㅣ'.includes(j);
+function hgJoin(seq){  // key jamo → text
+ let out='',c=null,v=null,f=[];
+ const flush=()=>{if(c&&v){const F=f.length?(f.length>1?HG.F2[f.join('')]:f[0]):'';out+=String.fromCharCode(0xAC00+(HG.CHO.indexOf(c)*21+HG.JUNG.indexOf(v))*28+HG.JONG.indexOf(F))}
+  else out+=(c||'')+(v||'');c=null;v=null;f=[]};
+ for(const j of seq){
+  if(hgC(j)){if(!c&&!v)c=j;else if(!v||!c){flush();c=j}
+   else if(!f.length&&!'ㄸㅃㅉ'.includes(j))f=[j];else if(f.length===1&&HG.F2[f[0]+j])f=[f[0],j];else{flush();c=j}}
+  else if(hgV(j)){if(!v){if(c)v=j;else{flush();v=j}}
+   else if(f.length){const k=f.pop();flush();c=k;v=j}
+   else if(c&&HG.V2[v+j])v=HG.V2[v+j];else if(!c&&HG.V2[v+j])v=HG.V2[v+j];else{flush();v=j}}
+  else{flush();out+=j}}
+ flush();return out}
+function hgKeys(t){  // text → key jamo (to pick up typing from a device keyboard)
+ const V={},F={};for(const [k,x] of Object.entries(HG.V2))V[x]=[...k];for(const [k,x] of Object.entries(HG.F2))F[x]=[...k];
+ const out=[];for(const ch of t){const n=ch.charCodeAt(0)-0xAC00;
+  if(n>=0&&n<11172){out.push(HG.CHO[Math.floor(n/588)]);const v=HG.JUNG[Math.floor(n%588/28)];out.push(...(V[v]||[v]));const fz=HG.JONG[n%28];if(fz)out.push(...(F[fz]||[fz]))}
+  else out.push(...(V[ch]||F[ch]||[ch]))}
+ return out}
+let ownKb=store.get(KEY('ownKb'))==='1';
+function hgPad(inp,own){  // own: the player chose their device's keyboard
+ const box=document.createElement('div');box.className='hgk';let seq=hgKeys(inp.value),shift=false;
+ const R=[['ㅂ','ㅈ','ㄷ','ㄱ','ㅅ','ㅛ','ㅕ','ㅑ','ㅐ','ㅔ'],['ㅁ','ㄴ','ㅇ','ㄹ','ㅎ','ㅗ','ㅓ','ㅏ','ㅣ'],['⇧','ㅋ','ㅌ','ㅊ','ㅍ','ㅠ','ㅜ','ㅡ','⌫']],
+  SH={'ㅂ':'ㅃ','ㅈ':'ㅉ','ㄷ':'ㄸ','ㄱ':'ㄲ','ㅅ':'ㅆ','ㅐ':'ㅒ','ㅔ':'ㅖ'};
+ const draw=()=>{box.innerHTML=R.map(r=>`<div class="hgr">${r.map(k=>`<button type="button" class="hk${k==='⇧'||k==='⌫'?' hkw':''}${k==='⇧'&&shift?' on':''}" data-k="${k}">${shift&&SH[k]?SH[k]:k}</button>`).join('')}</div>`).join('')
+  +'<div class="hgr"><button type="button" class="hk hkw hkown" data-k="own">내 자판</button><button type="button" class="hk hksp" data-k=" ">띄어쓰기</button></div>'};
+ draw();
+ box.addEventListener('pointerdown',e=>{if(e.target.closest('.hk'))e.preventDefault()});  // keep the box's caret, no focus jump
+ box.addEventListener('click',e=>{e.stopPropagation();const b=e.target.closest('.hk');if(!b)return;const k=b.dataset.k;
+  if(k==='own'){own();return}
+  if(k==='⇧'){shift=!shift;draw();return}
+  if(k==='⌫')seq.pop();else{seq.push(shift&&SH[k]?SH[k]:k);if(shift){shift=false;draw()}}
+  inp.value=hgJoin(seq)});
+ inp.addEventListener('input',()=>{seq=hgKeys(inp.value)});  // typed on a desktop or device keyboard
+ return box}
 /* 쓰기 문제: a review question about a word you know well (level SRS().writeAt, default 3 = ★) asks you to write the answer
    into the blank instead of picking it. 힌트 shows its first syllable (놓○○); 힌트 again gives the usual choices. A right answer
    after a hint doesn't raise the word's level (grade held); a wrong one counts as a miss and the question comes back as choices.
@@ -1033,14 +1075,23 @@ function writeUI(){if($('writeCss'))return;const st=document.createElement('styl
   +'.choices .wq{flex:1 1 100%;display:flex;gap:6px;min-width:0}'
   +'.choices .wqin{flex:1;min-width:0;font:600 1.05rem/1.3 var(--body,sans-serif);padding:6px 9px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#fff);color:var(--glass-ink,#111)}'
   +'.choices .wqok,.choices .wqhb{font:600 .95rem/1 var(--body,sans-serif);padding:6px 11px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#eee);color:var(--glass-ink,#111);cursor:pointer}'
-  +'.choices .wqhb{opacity:.85}';
+  +'.choices .wqhb{opacity:.85}'
+  +'.choices .wqkb{flex:0 0 auto;font:600 .8rem/1 var(--body,sans-serif);padding:5px 9px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:none;color:inherit;opacity:.75;cursor:pointer}'
+  +'.choices .hgk{flex:1 1 100%;display:flex;flex-direction:column;gap:4px;margin-top:2px;user-select:none;-webkit-user-select:none}'
+  +'.hgk .hgr{display:flex;gap:3px;justify-content:center}'
+  +'.hgk .hk{flex:1 1 0;min-width:0;max-width:40px;height:34px;padding:0;font:600 1.05rem/1 var(--body,sans-serif);border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#eee);color:var(--glass-ink,#111);cursor:pointer;touch-action:manipulation}'
+  +'.hgk .hk:active{filter:brightness(1.3)}.hgk .hkw{max-width:52px;font-size:.95rem}.hgk .hk.on{outline:2px solid var(--amber,#E8962A)}'
+  +'.hgk .hksp{max-width:none;flex:3 1 0;font-size:.85rem}.hgk .hkown{flex:1.4 1 0;max-width:none;font-size:.8rem}';
  document.head.appendChild(st)}
 function renderWrite(s){
  writeUI();const box=$('choices');box.hidden=false;const right=s.opts.find(o=>o[1])[0],keep=$('writeIn')?$('writeIn').value:'';
  box.innerHTML=(s.hint1?`<div class="wqh">힌트: ${writeHint(right)}</div>`:'')
   +`<div class="wq"><input id="writeIn" class="wqin" type="text" lang="ko" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="빈칸에 쓰세요" aria-label="빈칸에 들어갈 말">`
-  +`<button class="wqok" type="button">확인</button><button class="wqhb" type="button">${s.hint1?'보기':'힌트'}</button></div>`;
- const inp=$('writeIn');inp.value=keep;
+  +`<button class="wqok" type="button">확인</button><button class="wqhb" type="button">${s.hint1?'보기':'힌트'}</button></div>`
+  +(ownKb?'<button class="wqkb" type="button">한글 자판</button>':'');
+ const inp=$('writeIn');inp.value=keep;inp.inputMode=ownKb?'text':'none';  // the built-in keyboard: no device keyboard over it
+ if(!ownKb)box.append(hgPad(inp,()=>{ownKb=true;store.set(KEY('ownKb'),'1');renderWrite(s);$('writeIn').focus()}));
+ box.querySelector('.wqkb')?.addEventListener('click',e=>{e.stopPropagation();ownKb=false;store.set(KEY('ownKb'),'0');renderWrite(s)});
  const submit=()=>{const v=writeNorm(inp.value);if(!v)return;inp.blur();
   const i=s.opts.findIndex(o=>writeNorm(o[0])===v);if(i>=0){choose(s,i);return}  // right, or a wrong option you wrote (its explanation)
   sfx('no');s.missed=true;if(s.w){dlg.missed.add(s.w);askedIn[s.w]=talkN}
@@ -1051,7 +1102,7 @@ function renderWrite(s){
   if(!s.hint1){s.hint1=1;renderWrite(s);$('writeIn').focus()}else{s.choices=1;renderChoices(s)}});  // 보기: the usual choices
  box.addEventListener('click',e=>e.stopPropagation());
  if(firstTime('writeQ'))setTimeout(()=>toast('★ 단어는 직접 써 봐요. 모르면 힌트!'),300);
- setTimeout(()=>{if($('writeIn')===inp)inp.focus()},60);
+ setTimeout(()=>{if($('writeIn')===inp)inp.focus()},60);  // with the built-in keyboard: a caret, no device keyboard (inputmode none)
 }
 /* a plain choice (not a quiz): each button closes the conversation and runs its action, e.g. going on to the next chapter */
 function renderPick(s){

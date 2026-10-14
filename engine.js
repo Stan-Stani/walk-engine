@@ -723,24 +723,28 @@ let dlg=null,typing=null,pending=null,sel=0;
    journal under its own heading (#gnotesH), after the 문화 노트. Each kind keeps its own seen/read lists; without GRAMMAR_NOTES the
    문법 노트 heading and list are taken out of the journal. */
 let phoneOpen=false,curPhone=null;
+/* English on the phone (when the game has lines-en): a ? by each post, comment and caption that has English shows it under the line
+   (the phone's own .tq/.ten); with 영어 자막 on it is already showing */
+const pEnQ=t=>lineEn(t)?`<button class="tq${enAll?' on':''}" type="button" aria-label="영어로 보기">?</button>`:'';
+const pEn=t=>{const e=lineEn(t);return e?`<span class="ten"${enAll?'':' hidden'}>${e.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</span>`:''};
 function openPhone(p){
  if(!$('phonePanel'))return;curPhone=p;
  const bars='<i class="sig"><b></b><b></b><b></b><b class="off"></b></i>',bat=p.battery??60;
  if(p.photo){  // an album photo: a pixel picture (a look's portrait, made old) with its caption
   $('pscr').innerHTML=`<div class="pstat"><span>${p.time||'12:30'}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
-   +`<div class="pbar"><span>${p.app||'사진'}</span><span>●●●</span></div><div class="pphoto${p.photo.old?' old':''}"><canvas width="48" height="48"></canvas><div class="pcap txt">${glossHTML(p.photo.caption||'')}</div></div>`;
+   +`<div class="pbar"><span>${p.app||'사진'}</span><span>●●●</span></div><div class="pphoto${p.photo.old?' old':''}"><canvas width="48" height="48"></canvas><div class="pcap txt">${glossHTML(p.photo.caption||'')}</div>${p.photo.caption&&lineEn(p.photo.caption)?`<div class="pcapen">${pEnQ(p.photo.caption)}${pEn(p.photo.caption)}</div>`:''}</div>`;
   const cv=$('pscr').querySelector('canvas');drawPortrait(cv,p.photo.look,p.photo.face||'happy',false);
   if(p.photo.mic){const c=cv.getContext('2d');const R=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h)};R(33,27,7,7,'#1B1E2B');R(34,28,5,5,'#8A8E96');R(35,29,1,1,'#C9CDD4');R(35,34,3,14,'#1B1E2B');R(36,34,1,14,'#3A3E48')}  // a microphone in front
   $('phonePanel').hidden=false;phoneOpen=true;return}
- const c=p.comments.map(([n,t])=>`<div class="pc"><span class="pn">${n}</span><span class="pt txt">${glossHTML(t)}</span></div>`).join('');
+ const c=p.comments.map(([n,t])=>`<div class="pc"><span class="pn">${n}${pEnQ(t)}</span><span class="pt txt">${glossHTML(t)}</span>${pEn(t)}</div>`).join('');
  const more=p.count-p.comments.length;
  $('pscr').innerHTML=`<div class="pstat"><span>${p.time||'12:30'}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
-  +`<div class="pbar"><span>${p.app}</span><span>●●●</span></div><div class="ppost"><b class="txt">${glossHTML(p.post)}</b><span class="pmeta">${p.by} · ${p.when}</span></div>`
+  +`<div class="pbar"><span>${p.app}</span><span>●●●</span></div><div class="ppost"><b class="txt">${glossHTML(p.post)}</b><span class="pmeta">${p.by} · ${p.when}${pEnQ(p.post)}</span>${pEn(p.post)}</div>`
   +`<div class="pcount txt">${glossHTML('댓글 '+p.count+'개')}</div><div class="plist">${c}${more>0?`<div class="pmore txt">${glossHTML('댓글 '+more+'개 더 보기')}</div>`:''}</div>`;
  $('phonePanel').hidden=false;phoneOpen=true;
 }
 function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidden=true;hideGloss();if(curPhone&&curPhone.culture)unlockCulture(curPhone.culture);if(curPhone&&curPhone.grammar)unlockGrammar(curPhone.grammar);curPhone=null}
-if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
+if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten');if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
 const CULTURE=globalThis.CULTURE_NOTES||{};  // a game's notes (its own file sets globalThis.CULTURE_NOTES)
 let cultureSeen=[];try{cultureSeen=JSON.parse(store.get(KEY('culture'))||'[]')}catch(e){}
 /* A new note waits on the screen as a tappable chip (#noteChip, made here when the shell has a notes section) until you

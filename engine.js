@@ -27,9 +27,9 @@ const known=w=>has(w)||(!!SRS().shared&&carrySet.has(w)&&!C.WORDS.includes(w));
 let talkN=0;const askedIn={};  // conversations opened so far, and the one each word was last asked in
 const isDue=w=>known(w)&&dueL(lv(w))&&!(askedIn[w]>=talkN-1);  // never in the conversation right after it was asked (타이밍, then 타이밍 again)
 function spaced(b){const bg=SRS().beats;return {b,due:now()+gapAt(b),beat:bg&&bg[b]!=null?beats()+bg[b]:null}}
-function grade(w,ok){
+function grade(w,ok,held){  // held: right, but with a hint (쓰기 문제): asked again later at the same level
  let L={...lv(w)};
- if(!ok)L={b:0,due:now(),beat:null};else if(dueL(L))L=spaced(Math.min(5,L.b+1));  // a right answer before the word is due doesn't level it up (asking again and again can't max a word)
+ if(!ok)L={b:0,due:now(),beat:null};else if(dueL(L))L=spaced(held?L.b:Math.min(5,L.b+1));  // a right answer before the word is due doesn't level it up (asking again and again can't max a word)
  state.lv[w]=L;save();return L.b;
 }
 let carryDs=null;
@@ -97,6 +97,7 @@ const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s
 let soundOn=store.get(KEY('sound'))!=='0';
 /* 듣기 문제 (START menu): review may ask a word by sound alone. On by default; ?listen=0 in the URL turns it off and saves that
    (the playtest tools do, since testers can't hear) */
+let writeOn=store.get(KEY('write'))!=='0';{const q=new URLSearchParams(location.search).get('write');if(q==='0'||q==='1'){writeOn=q==='1';store.set(KEY('write'),q)}}  // 쓰기 문제 (START), ?write=0/1
 let listenOn=store.get(KEY('listen'))!=='0';{const q=new URLSearchParams(location.search).get('listen');if(q==='0'||q==='1'){listenOn=q==='1';store.set(KEY('listen'),q)}}
 /* ?en=1: a link for testers without Korean: each line's English shows under it, as if its ? were already open (questions still
    have none, as for everyone). Remembered in this browser; ?en=0 turns it off. Not in the menus, so learners read Korean first. */
@@ -859,7 +860,7 @@ function show(s){
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;
  const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
  if(!s.build&&!s.ask)logTalk(s.who||dlg.name,text,s.enKey);  // a question is logged once, as the line it becomes when answered
- typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)renderChoices(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
+ typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)(writeQ(s)?renderWrite(s):renderChoices(s));else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);
  if(readOn&&!s.listenOnly)speak(s.listen?'':text);
  if(s.listen)setTimeout(()=>speak(s.listenLine||s.listen),readOn?1200:150);
@@ -1017,6 +1018,41 @@ function renderChoices(s){
   b.addEventListener('click',e=>{e.stopPropagation();if(defined){defined=false;return}choose(s,+b.dataset.i)})});
  sel=-1;choicesAt=performance.now();markSel();  // nothing selected: A can't answer by accident
 }
+/* 쓰기 문제: a review question about a word you know well (level SRS().writeAt, default 3 = ★) asks you to write the answer
+   into the blank instead of picking it. 힌트 shows its first syllable (놓○○); 힌트 again gives the usual choices. A right answer
+   after a hint doesn't raise the word's level (grade held); a wrong one counts as a miss and the question comes back as choices.
+   Only for a graded review step whose blank takes the right option (Hangul), never a listening question. START → 쓰기 문제
+   turns it off (?write=0/1). */
+const writing=()=>!!dlg&&!$('choices').hidden&&!!$('writeIn');
+function writeQ(s){const o=(s.opts||[]).find(x=>x[1]);
+ return writeOn&&!!s.w&&!!(s.review||dlg.review)&&!s.missed&&!s.choices&&!s.listenOnly&&/___/.test(s.ask||'')&&!!o&&/[가-힣]/.test(o[0])&&lv(s.w).b>=(SRS().writeAt??3)}
+const writeNorm=t=>String(t).replace(/[\s.,!?~…"'“”‘’·]/g,'');
+const writeHint=a=>{let n=0;return [...a].map(c=>/[가-힣]/.test(c)?(n++?'○':c):c).join('')};
+function writeUI(){if($('writeCss'))return;const st=document.createElement('style');st.id='writeCss';
+ st.textContent='.choices .wqh{flex:1 1 100%;font:600 .9rem/1.3 var(--body,sans-serif);opacity:.8;letter-spacing:.12em}'
+  +'.choices .wq{flex:1 1 100%;display:flex;gap:6px;min-width:0}'
+  +'.choices .wqin{flex:1;min-width:0;font:600 1.05rem/1.3 var(--body,sans-serif);padding:6px 9px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#fff);color:var(--glass-ink,#111)}'
+  +'.choices .wqok,.choices .wqhb{font:600 .95rem/1 var(--body,sans-serif);padding:6px 11px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#eee);color:var(--glass-ink,#111);cursor:pointer}'
+  +'.choices .wqhb{opacity:.85}';
+ document.head.appendChild(st)}
+function renderWrite(s){
+ writeUI();const box=$('choices');box.hidden=false;const right=s.opts.find(o=>o[1])[0],keep=$('writeIn')?$('writeIn').value:'';
+ box.innerHTML=(s.hint1?`<div class="wqh">힌트: ${writeHint(right)}</div>`:'')
+  +`<div class="wq"><input id="writeIn" class="wqin" type="text" lang="ko" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="빈칸에 쓰세요" aria-label="빈칸에 들어갈 말">`
+  +`<button class="wqok" type="button">확인</button><button class="wqhb" type="button">${s.hint1?'보기':'힌트'}</button></div>`;
+ const inp=$('writeIn');inp.value=keep;
+ const submit=()=>{const v=writeNorm(inp.value);if(!v)return;inp.blur();
+  const i=s.opts.findIndex(o=>writeNorm(o[0])===v);if(i>=0){choose(s,i);return}  // right, or a wrong option you wrote (its explanation)
+  sfx('no');s.missed=true;if(s.w){dlg.missed.add(s.w);askedIn[s.w]=talkN}
+  dlg.next=s;show({who:s.who==='나'?'…':s.who,say:'아니에요. 보기에서 골라 봐요.',fb:1})};
+ inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();submit()}});
+ box.querySelector('.wqok').addEventListener('click',e=>{e.stopPropagation();submit()});
+ box.querySelector('.wqhb').addEventListener('click',e=>{e.stopPropagation();s.hinted=1;
+  if(!s.hint1){s.hint1=1;renderWrite(s);$('writeIn').focus()}else{s.choices=1;renderChoices(s)}});  // 보기: the usual choices
+ box.addEventListener('click',e=>e.stopPropagation());
+ if(firstTime('writeQ'))setTimeout(()=>toast('★ 단어는 직접 써 봐요. 모르면 힌트!'),300);
+ setTimeout(()=>{if($('writeIn')===inp)inp.focus()},60);
+}
 /* a plain choice (not a quiz): each button closes the conversation and runs its action, e.g. going on to the next chapter */
 function renderPick(s){
  const box=$('choices');box.hidden=false;
@@ -1077,7 +1113,7 @@ let explained={};try{explained=JSON.parse(localStorage.getItem(KEY('explained'))
 function firstTime(k){if(explained[k])return false;explained[k]=1;try{localStorage.setItem(KEY('explained'),JSON.stringify(explained))}catch(e){}return true}
 function gradeStep(s){
  if(!s.w)return;
- const before=lv(s.w).b,b=grade(s.w,!s.missed);
+ const before=lv(s.w).b,b=grade(s.w,!s.missed,!!s.hinted);
  updateHud();
  if(s.missed)setTimeout(()=>toast(`"${s.w}" 다시 연습해요`),250);
  if(!s.missed&&b>=3&&before<3){setTimeout(()=>{toast('★ '+s.w+' 기억했어요!');sfx('star')},250)}
@@ -1526,6 +1562,9 @@ function skipTalk(){
  $('backBtn').addEventListener('click',stepBack);
 })();
 $('sndBtn').addEventListener('click',()=>{soundOn=!soundOn;store.set(KEY('sound'),soundOn?'1':'0');updateSound();sfx('ok')});
+{const b=document.createElement('button');b.className='mi toggle';b.id='writeBtn';b.textContent='쓰기 문제';  // 쓰기 문제 on/off (every game)
+ const upd=()=>b.setAttribute('aria-pressed',String(writeOn));upd();menuAdd(b);
+ b.addEventListener('click',()=>{writeOn=!writeOn;store.set(KEY('write'),writeOn?'1':'0');upd();sfx('ok');toast(writeOn?'★ 단어는 직접 써요.':'쓰기 문제를 껐어요. 보기에서 골라요.')})}
 if($('listenBtn')){const upd=()=>$('listenBtn').setAttribute('aria-pressed',String(listenOn));upd();  // a game's shell may offer the 듣기 문제 toggle
  $('listenBtn').addEventListener('click',()=>{listenOn=!listenOn;store.set(KEY('listen'),listenOn?'1':'0');upd();sfx('ok');toast(listenOn?'복습에 듣기 문제가 나와요.':'듣기 문제를 껐어요.')})}
 $('readBtn').addEventListener('click',()=>{

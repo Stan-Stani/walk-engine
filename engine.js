@@ -29,7 +29,8 @@ const isDue=w=>known(w)&&dueL(lv(w))&&!(askedIn[w]>=talkN-1);  // never in the c
 function spaced(b){const bg=SRS().beats;return {b,due:now()+gapAt(b),beat:bg&&bg[b]!=null?beats()+bg[b]:null}}
 function grade(w,ok,held){  // held: right, but with a hint (쓰기 문제): asked again later at the same level
  let L={...lv(w)};
- if(!ok)L={b:0,due:now(),beat:null};else if(dueL(L))L=spaced(held?L.b:Math.min(5,L.b+1));  // a right answer before the word is due doesn't level it up (asking again and again can't max a word)
+ if(!ok)L={b:writeOn&&writeStep?Math.max(0,L.b-1):0,due:now(),beat:null};  // the 쓰기 ladder: a miss takes a word down one rung, not back to the start
+ else if(dueL(L))L=spaced(held?L.b:Math.min(5,L.b+1));  // a right answer before the word is due doesn't level it up (asking again and again can't max a word)
  state.lv[w]=L;save();return L.b;
 }
 let carryDs=null;
@@ -97,7 +98,8 @@ const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s
 let soundOn=store.get(KEY('sound'))!=='0';
 /* 듣기 문제 (START menu): review may ask a word by sound alone. On by default; ?listen=0 in the URL turns it off and saves that
    (the playtest tools do, since testers can't hear) */
-let writeOn=store.get(KEY('write'))==='1';{const q=new URLSearchParams(location.search).get('write');if(q==='0'||q==='1'){writeOn=q==='1';store.set(KEY('write'),q)}}  // 쓰기 문제 (START): off until the player turns it on; ?write=0/1
+let writeOn=store.get(KEY('write'))==='1'||store.get(KEY('write'))==='step',writeStep=store.get(KEY('write'))==='step';
+{const q=new URLSearchParams(location.search).get('write');if(q==='0'||q==='1'||q==='step'){writeOn=q!=='0';writeStep=q==='step';store.set(KEY('write'),q)}}  // 쓰기 문제 (START): off until the player turns it on; ?write=0/1; ?write=step (prototype): the 쓰기 ladder
 let listenOn=store.get(KEY('listen'))!=='0';{const q=new URLSearchParams(location.search).get('listen');if(q==='0'||q==='1'){listenOn=q==='1';store.set(KEY('listen'),q)}}
 /* ?en=1: a link for testers without Korean: each line's English shows under it, as if its ? were already open (questions still
    have none, as for everyone). Remembered in this browser; ?en=0 turns it off. Not in the menus, so learners read Korean first. */
@@ -860,7 +862,7 @@ function show(s){
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;writeKbOff();
  const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
  if(!s.build&&!s.ask)logTalk(s.who||dlg.name,text,s.enKey);  // a question is logged once, as the line it becomes when answered
- typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)(writeQ(s)?renderWrite(s):renderChoices(s));else if(s.build)renderBuild(s);else $('more').hidden=false});
+ typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)renderAsk(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);
  if(readOn&&!s.listenOnly)speak(s.listen?'':text);
  if(s.listen)setTimeout(()=>speak(s.listenLine||s.listen),readOn?1200:150);
@@ -1053,12 +1055,14 @@ function writeKbOn(el){writeKbOff();el.id='hgPad';el.classList.add('inpad');cons
  for(const q of ['.pad','.startrow']){const e=document.querySelector(q);if(e)e.style.display='none'}pad.after(el)}
 function writeKbOff(){const k=$('hgPad');if(!k)return;k.remove();for(const q of ['.pad','.startrow']){const e=document.querySelector(q);if(e)e.style.display=''}}
 
-function hgPad(inp,own,submit){  // own: the player chose their device's keyboard; submit: 확인
+function hgPad(inp,own,submit,only){  // own: the player chose their device's keyboard; submit: 확인; only: the small keyboard's keys (쓰기 ladder)
  const box=document.createElement('div');box.className='hgk';let seq=hgKeys(inp.value),shift=false;
- const R=[['ㅂ','ㅈ','ㄷ','ㄱ','ㅅ','ㅛ','ㅕ','ㅑ','ㅐ','ㅔ'],['ㅁ','ㄴ','ㅇ','ㄹ','ㅎ','ㅗ','ㅓ','ㅏ','ㅣ'],['⇧','ㅋ','ㅌ','ㅊ','ㅍ','ㅠ','ㅜ','ㅡ','⌫']],
-  SH={'ㅂ':'ㅃ','ㅈ':'ㅉ','ㄷ':'ㄸ','ㄱ':'ㄲ','ㅅ':'ㅆ','ㅐ':'ㅒ','ㅔ':'ㅖ'};
- const draw=()=>{box.innerHTML=R.map(r=>`<div class="hgr">${r.map(k=>`<button type="button" class="hk${k==='⇧'||k==='⌫'?' hkw':''}${k==='⇧'&&shift?' on':''}" data-k="${k}">${shift&&SH[k]?SH[k]:k}</button>`).join('')}</div>`).join('')
-  +'<div class="hgr"><button type="button" class="hk hkw hkown" data-k="own">내 자판</button><button type="button" class="hk hksp" data-k=" ">띄어쓰기</button><button type="button" class="hk hkok" data-k="ok">확인</button></div>'};
+ const SH={'ㅂ':'ㅃ','ㅈ':'ㅉ','ㄷ':'ㄸ','ㄱ':'ㄲ','ㅅ':'ㅆ','ㅐ':'ㅒ','ㅔ':'ㅖ'};let R=[['ㅂ','ㅈ','ㄷ','ㄱ','ㅅ','ㅛ','ㅕ','ㅑ','ㅐ','ㅔ'],['ㅁ','ㄴ','ㅇ','ㄹ','ㅎ','ㅗ','ㅓ','ㅏ','ㅣ'],['⇧','ㅋ','ㅌ','ㅊ','ㅍ','ㅠ','ㅜ','ㅡ','⌫']];
+ const both=only&&Object.keys(SH).some(k=>only.has(k)&&only.has(SH[k]));
+ if(only)R=R.map(r=>r.flatMap(k=>k==='⌫'?[]:k==='⇧'?[both?k:'']:[only.has(k)?k:only.has(SH[k])?SH[k]:'']));  // each key where it sits on the full keyboard, the rest blank: the layout is learned on the way. ㄲ alone takes ㄱ's place; ⇧ only when both are needed
+ const draw=()=>{box.innerHTML=R.map(r=>`<div class="hgr">${r.map(k=>k?`<button type="button" class="hk${k==='⇧'||k==='⌫'?' hkw':''}${k==='⇧'&&shift?' on':''}" data-k="${k}">${shift&&SH[k]?SH[k]:k}</button>`:'<span class="hk hkx"></span>').join('')}</div>`).join('')
+  +(only?'<div class="hgr"><button type="button" class="hk hkw" data-k="⌫">⌫</button>'+(only.has(' ')?'<button type="button" class="hk hksp" data-k=" ">띄어쓰기</button>':'')+'<button type="button" class="hk hkok" data-k="ok">확인</button></div>'
+   :'<div class="hgr"><button type="button" class="hk hkw hkown" data-k="own">내 자판</button><button type="button" class="hk hksp" data-k=" ">띄어쓰기</button><button type="button" class="hk hkok" data-k="ok">확인</button></div>')};
  draw();
  box.addEventListener('pointerdown',e=>{if(e.target.closest('.hk'))e.preventDefault()});  // keep the box's caret, no focus jump
  box.addEventListener('click',e=>{e.stopPropagation();const b=e.target.closest('.hk');if(!b)return;const k=b.dataset.k;
@@ -1074,8 +1078,48 @@ function hgPad(inp,own,submit){  // own: the player chose their device's keyboar
    Only for a graded review step whose blank takes the right option (Hangul), never a listening question. START → 쓰기 문제
    turns it on (off by default; ?write=0/1). */
 const writing=()=>!!dlg&&!$('choices').hidden&&!!$('writeIn');
-function writeQ(s){const o=(s.opts||[]).find(x=>x[1]);
- return writeOn&&!!s.w&&!!(s.review||dlg.review)&&!s.missed&&!s.choices&&!s.listenOnly&&/___/.test(s.ask||'')&&!!o&&/[가-힣]/.test(o[0])&&lv(s.w).b>=(SRS().writeAt??3)}
+function writeBase(s){const o=(s.opts||[]).find(x=>x[1]);
+ return writeOn&&!!s.w&&!!(s.review||dlg.review)&&!s.missed&&!s.choices&&!s.listenOnly&&/___/.test(s.ask||'')&&!!o&&/[가-힣]/.test(o[0])}
+const writeQ=s=>writeBase(s)&&lv(s.w).b>=(SRS().writeAt??3);
+/* the 쓰기 ladder (?write=step, a prototype): a word climbs from choices to writing one rung per level. With writeAt 3:
+   level 0 choices, 1 syllable tiles (비·밀·번·호 and a decoy or two, tapped in order), 2 a small keyboard (only the word's jamo
+   and a few look-alikes), 3+ the full keyboard. A miss takes the word down one rung (grade). A one-syllable word skips the tiles. */
+function writeRung(s){
+ if(!writeBase(s))return null;const b=lv(s.w).b,at=SRS().writeAt??3;
+ if(b>=at)return 'full';if(!writeStep||b<1)return null;
+ if(b===at-1)return 'mini';
+ return [...s.opts.find(o=>o[1])[0]].filter(c=>/[가-힣]/.test(c)).length>1?'syl':'mini'}
+function renderAsk(s){const r=writeRung(s);s.rung=r;if(r==='syl')renderSyl(s);else if(r)renderWrite(s);else renderChoices(s)}
+/* look-alike jamo for decoys (the small keyboard) and decoy syllables (the tiles) */
+const HGLIKE={'ㄱ':'ㅋㄲ','ㅋ':'ㄱ','ㄲ':'ㄱ','ㄷ':'ㅌㄸ','ㅌ':'ㄷ','ㄸ':'ㄷ','ㅂ':'ㅍㅃ','ㅍ':'ㅂ','ㅃ':'ㅂ','ㅈ':'ㅊㅉ','ㅊ':'ㅈ','ㅉ':'ㅈ',
+ 'ㅅ':'ㅆ','ㅆ':'ㅅ','ㄴ':'ㄹ','ㄹ':'ㄴ','ㅇ':'ㅎ','ㅎ':'ㅇ','ㅁ':'ㅂ','ㅏ':'ㅓ','ㅓ':'ㅗㅏ','ㅗ':'ㅓㅜ','ㅜ':'ㅗㅡ','ㅡ':'ㅜ','ㅣ':'ㅡ',
+ 'ㅐ':'ㅔ','ㅔ':'ㅐ','ㅑ':'ㅕ','ㅕ':'ㅑ','ㅛ':'ㅠ','ㅠ':'ㅛ','ㅒ':'ㅖ','ㅖ':'ㅒ'};
+function sylDecoys(ans,opts,n){  // syllables from the wrong options first, then the answer's own syllables with one jamo swapped
+ const have=new Set(ans),out=[];
+ for(const o of shuffle(opts.filter(o=>!o[1]).map(o=>o[0])))for(const c of o)if(/[가-힣]/.test(c)&&!have.has(c)&&!out.includes(c))out.push(c);
+ shuffle(out);out.length=Math.min(out.length,Math.ceil(n/2));
+ for(let k=0;out.length<n&&k<40;k++){const c=ans[Math.random()*ans.length|0],x=c.charCodeAt(0)-0xAC00,i=[x/588|0,x%588/28|0];
+  const cho=HG.CHO[i[0]],jung=HG.JUNG[i[1]],useV=Math.random()<.5&&HGLIKE[jung],l=useV?HGLIKE[jung]:HGLIKE[cho];if(!l)continue;
+  const sw=l[Math.random()*l.length|0],ci=useV?i[0]:HG.CHO.indexOf(sw),vi=useV?HG.JUNG.indexOf(sw):i[1];if(ci<0||vi<0)continue;
+  const d=String.fromCharCode(0xAC00+(ci*21+vi)*28+x%28);if(!have.has(d)&&!out.includes(d))out.push(d)}
+ return out}
+function renderSyl(s){
+ writeKbOff();writeUI();const box=$('choices');box.hidden=false;const right=s.opts.find(o=>o[1])[0],ans=[...right].filter(c=>/[가-힣]/.test(c));
+ const tiles=shuffle([...ans,...sylDecoys(ans,s.opts,ans.length>3?3:2)]);let got=0,bad=0;
+ const shown=()=>{let n=0;return [...right].map(c=>/[가-힣]/.test(c)?(n++<got?c:'○'):c).join('')};
+ box.innerHTML=`<div class="wqh syls" id="sylQ">${shown()}</div>`+tiles.map((t,i)=>`<button class="choice sy" data-t="${t}">${t}</button>`).join('')
+  +'<button class="wqhb" type="button">보기</button>';
+ box.querySelectorAll('.sy').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();if(!b.classList.contains('choice'))return;
+  if(b.dataset.t!==ans[got]){sfx('no');b.classList.remove('bad');void b.offsetWidth;b.classList.add('bad');
+   if(++bad>=2){s.missed=true;if(s.w){dlg.missed.add(s.w);askedIn[s.w]=talkN}}else s.hinted=1;return}  // one slip holds the level, two is a miss
+  sfx('move');got++;b.classList.remove('choice','sel');b.classList.add('used');b.disabled=true;$('sylQ').textContent=shown();
+  if(got===ans.length){choose(s,s.opts.findIndex(o=>o[1]));return}
+  sel=Math.min(Math.max(sel,0),choiceBtns().length-1);markSel()}));
+ box.querySelector('.wqhb').addEventListener('click',e=>{e.stopPropagation();s.hinted=1;s.choices=1;renderChoices(s)});
+ box.addEventListener('click',e=>e.stopPropagation());
+ if(firstTime('sylQ'))setTimeout(()=>toast('글자를 순서대로 눌러요.'),300);
+ sel=-1;choicesAt=performance.now();markSel();
+}
 const writeNorm=t=>String(t).replace(/[\s.,!?~…"'“”‘’·]/g,'');
 const writeHint=a=>{let n=0;return [...a].map(c=>/[가-힣]/.test(c)?(n++?'○':c):c).join('')};
 function writeUI(){if($('writeCss'))return;const st=document.createElement('style');st.id='writeCss';
@@ -1085,22 +1129,29 @@ function writeUI(){if($('writeCss'))return;const st=document.createElement('styl
   +'.choices .wqok,.choices .wqhb{font:600 .95rem/1 var(--body,sans-serif);padding:6px 11px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#eee);color:var(--glass-ink,#111);cursor:pointer}'
   +'.choices .wqhb{opacity:.85}'
   +'.choices .wqkb{flex:0 0 auto;font:600 .8rem/1 var(--body,sans-serif);padding:5px 9px;border-radius:5px;border:1px solid var(--glass-edge,#888);background:none;color:inherit;opacity:.75;cursor:pointer}'
+  +'.choices .syls{letter-spacing:.3em;font-size:1.25rem;opacity:1}.choices .sy{flex:0 0 auto;min-width:44px;font-size:1.2rem}.choices .sy.used{opacity:.25}'
+  +'.choices .sy.bad{animation:wqshake .3s}@keyframes wqshake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}'
   +'.hgk{display:flex;flex-direction:column;gap:4px;margin-top:2px;user-select:none;-webkit-user-select:none;flex:1 1 100%}'
   +'.hgk .hgr{display:flex;gap:3px;justify-content:center}'
   +'.hgk .hk{flex:1 1 0;min-width:0;max-width:40px;height:34px;padding:0;font:600 1.05rem/1 var(--body,sans-serif);border-radius:5px;border:1px solid var(--glass-edge,#888);background:var(--glass-2,#eee);color:var(--glass-ink,#111);cursor:pointer;touch-action:manipulation}'
   +'.hgk .hk:active{filter:brightness(1.3)}.hgk .hkw{max-width:52px;font-size:.95rem}.hgk .hk.on{outline:2px solid var(--amber,#E8962A)}'
-  +'.hgk .hksp{max-width:none;flex:3 1 0;font-size:.85rem}.hgk .hkown{flex:1.4 1 0;max-width:none;font-size:.8rem}.hgk .hkok{flex:1.4 1 0;max-width:none;font-size:.9rem;background:var(--amber,#E8962A);color:var(--amber-ink,#1B1E2B);border-color:transparent}'
+  +'.hgk .hkx{visibility:hidden}.hgk .hksp{max-width:none;flex:3 1 0;font-size:.85rem}.hgk .hkown{flex:1.4 1 0;max-width:none;font-size:.8rem}.hgk .hkok{flex:1.4 1 0;max-width:none;font-size:.9rem;background:var(--amber,#E8962A);color:var(--amber-ink,#1B1E2B);border-color:transparent}'
   +'.hgk.inpad{width:100%;max-width:560px;margin:10px auto 0;padding:8px 6px;gap:7px;box-sizing:border-box;border-radius:12px;background:var(--glass,#1B1E24)}'
   +'.hgk.inpad .hgr{gap:5px}.hgk.inpad .hk{max-width:none;height:50px;font-size:1.3rem}.hgk.inpad .hkw,.hgk.inpad .hkown,.hgk.inpad .hksp,.hgk.inpad .hkok{font-size:1rem}';
  document.head.appendChild(st)}
+function miniKeys(a){  // the word's own jamo plus three look-alikes it doesn't use
+ const k=new Set(hgKeys(a).filter(j=>j!==' '||a.includes(' ')));const pool=shuffle([...new Set([...k].flatMap(j=>[...(HGLIKE[j]||'')]))].filter(j=>!k.has(j)&&!'ㄲㄸㅃㅉㅆㅒㅖ'.includes(j)));  // no doubled decoys: ⇧ only for a word that needs it
+ for(const j of pool.slice(0,3))k.add(j);return k}
 function renderWrite(s){
+ const mini=s.rung==='mini';
  writeUI();const box=$('choices');box.hidden=false;const right=s.opts.find(o=>o[1])[0],keep=$('writeIn')?$('writeIn').value:'';
  box.innerHTML=(s.hint1?`<div class="wqh">힌트: ${writeHint(right)}</div>`:'')
   +`<div class="wq"><input id="writeIn" class="wqin" type="text" lang="ko" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="빈칸에 쓰세요" aria-label="빈칸에 들어갈 말">`
-  +`${ownKb?'<button class="wqok" type="button">확인</button>':''}<button class="wqhb" type="button">${s.hint1?'보기':'힌트'}</button></div>`  // the built-in keyboard has its own 확인
-  +(ownKb?'<button class="wqkb" type="button">한글 자판</button>':'');
- const inp=$('writeIn');inp.value=keep;inp.inputMode=ownKb?'text':'none';  // the built-in keyboard: no device keyboard over it
- if(!ownKb)writeKbOn(hgPad(inp,()=>{ownKb=true;store.set(KEY('ownKb'),'1');renderWrite(s);$('writeIn').focus()},()=>submit()));else writeKbOff();
+  +`${ownKb&&!mini?'<button class="wqok" type="button">확인</button>':''}<button class="wqhb" type="button">${s.hint1?'보기':'힌트'}</button></div>`  // the built-in keyboard has its own 확인
+  +(ownKb&&!mini?'<button class="wqkb" type="button">한글 자판</button>':'');
+ const inp=$('writeIn');inp.value=keep;inp.inputMode=ownKb&&!mini?'text':'none';  // the built-in keyboard: no device keyboard over it
+ if(mini)writeKbOn(hgPad(inp,null,()=>submit(),miniKeys(right)));  // the small keyboard: always the built-in one
+ else if(!ownKb)writeKbOn(hgPad(inp,()=>{ownKb=true;store.set(KEY('ownKb'),'1');renderWrite(s);$('writeIn').focus()},()=>submit()));else writeKbOff();
  box.querySelector('.wqkb')?.addEventListener('click',e=>{e.stopPropagation();ownKb=false;store.set(KEY('ownKb'),'0');renderWrite(s)});
  const submit=()=>{const v=writeNorm(inp.value);if(!v)return;inp.blur();
   const i=s.opts.findIndex(o=>writeNorm(o[0])===v);if(i>=0){choose(s,i);return}  // right, or a wrong option you wrote (its explanation)
@@ -1111,7 +1162,7 @@ function renderWrite(s){
  box.querySelector('.wqhb').addEventListener('click',e=>{e.stopPropagation();s.hinted=1;
   if(!s.hint1){s.hint1=1;renderWrite(s);$('writeIn').focus()}else{s.choices=1;renderChoices(s)}});  // 보기: the usual choices
  box.addEventListener('click',e=>e.stopPropagation());
- if(firstTime('writeQ'))setTimeout(()=>toast('★ 단어는 직접 써 봐요. 모르면 힌트!'),300);
+ if(mini?firstTime('miniQ'):firstTime('writeQ'))setTimeout(()=>toast(mini?'이 단어는 써 봐요. 필요한 키만 있어요.':'★ 단어는 직접 써 봐요. 모르면 힌트!'),300);
  setTimeout(()=>{if($('writeIn')===inp)inp.focus()},60);  // with the built-in keyboard: a caret, no device keyboard (inputmode none)
 }
 /* a plain choice (not a quiz): each button closes the conversation and runs its action, e.g. going on to the next chapter */
@@ -1624,9 +1675,9 @@ function skipTalk(){
  $('backBtn').addEventListener('click',stepBack);
 })();
 $('sndBtn').addEventListener('click',()=>{soundOn=!soundOn;store.set(KEY('sound'),soundOn?'1':'0');updateSound();sfx('ok')});
-{const b=document.createElement('button');b.className='mi toggle';b.id='writeBtn';b.textContent='쓰기 문제';  // 쓰기 문제 on/off (every game)
+{const b=document.createElement('button');b.className='mi toggle';b.id='writeBtn';b.textContent=writeStep?'쓰기 문제 · 단계별':'쓰기 문제';  // 쓰기 문제 on/off (every game); 단계별 = the ladder (?write=step)
  const upd=()=>b.setAttribute('aria-pressed',String(writeOn));upd();menuAdd(b);
- b.addEventListener('click',()=>{writeOn=!writeOn;store.set(KEY('write'),writeOn?'1':'0');upd();sfx('ok');toast(writeOn?'★ 단어는 직접 써요.':'쓰기 문제를 껐어요. 보기에서 골라요.')})}
+ b.addEventListener('click',()=>{writeOn=!writeOn;store.set(KEY('write'),writeOn?(writeStep?'step':'1'):'0');upd();sfx('ok');toast(writeOn?'★ 단어는 직접 써요.':'쓰기 문제를 껐어요. 보기에서 골라요.')})}
 if($('listenBtn')){const upd=()=>$('listenBtn').setAttribute('aria-pressed',String(listenOn));upd();  // a game's shell may offer the 듣기 문제 toggle
  $('listenBtn').addEventListener('click',()=>{listenOn=!listenOn;store.set(KEY('listen'),listenOn?'1':'0');upd();sfx('ok');toast(listenOn?'복습에 듣기 문제가 나와요.':'듣기 문제를 껐어요.')})}
 $('readBtn').addEventListener('click',()=>{

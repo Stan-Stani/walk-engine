@@ -28,10 +28,10 @@ let talkN=0;const askedIn={};  // conversations opened so far, and the one each 
 const isDue=w=>known(w)&&dueL(lv(w))&&!(askedIn[w]>=talkN-1);  // never in the conversation right after it was asked (타이밍, then 타이밍 again)
 function spaced(b){const bg=SRS().beats;return {b,due:now()+gapAt(b),beat:bg&&bg[b]!=null?beats()+bg[b]:null}}
 function grade(w,ok,held){  // held: right, but with a hint (쓰기 문제): asked again later at the same level
- let L={...lv(w)};
- if(!ok)L={b:writeOn&&writeStep?Math.max(0,L.b-1):0,due:now(),beat:null};  // the 쓰기 ladder: a miss takes a word down one rung, not back to the start
+ let L={...lv(w)};const wr=L.wr;  // wr: the word's own 쓰기 rung (the ladder), kept whatever happens to its level
+ if(!ok)L={b:0,due:now(),beat:null};
  else if(dueL(L))L=spaced(held?L.b:Math.min(5,L.b+1));  // a right answer before the word is due doesn't level it up (asking again and again can't max a word)
- state.lv[w]=L;save();return L.b;
+ if(wr!=null)L.wr=wr;state.lv[w]=L;save();return L.b;
 }
 let carryDs=null;
 function carryBank(){  // other chapters' BANK questions by word, and their DICT entries (a carried word taps to the sense you learned)
@@ -44,7 +44,7 @@ const carryDict=w=>{if(!SRS().shared||!carrySet.has(w))return null;carryBank();r
 function refreshCarry(){  // other chapters' saves: their words, and their levels merged into the shared record (the higher level wins)
  carrySet=new Set();carryQs=null;if(!SRS().shared)return;
  let all={};try{all=JSON.parse(store.get(KEY('lv'))||'{}')||{}}catch(e){}
- const take=(w,L)=>{const A=all[w];if(!A||L.b>A.b||(L.b===A.b&&L.due>A.due))all[w]=L};
+ const take=(w,L)=>{const A=all[w];if(!A||L.b>A.b||(L.b===A.b&&L.due>A.due)){const wr=A&&A.wr!=null?A.wr:L.wr;all[w]={...L};if(wr!=null)all[w].wr=wr}};  // the shared record's 쓰기 rung is the latest
  for(const ch of CHAPTERS){let sv=null;try{sv=ch===CH?state:JSON.parse(store.get(ch.save)||'null')}catch(e){}if(!sv)continue;
   if(ch!==CH)(sv.badges||[]).forEach(w=>carrySet.add(w));Object.entries(sv.lv||{}).forEach(([w,L])=>take(w,L))}
  state.lv=all;store.set(KEY('lv'),JSON.stringify(all));
@@ -1081,14 +1081,25 @@ const writing=()=>!!dlg&&!$('choices').hidden&&!!$('writeIn');
 function writeBase(s){const o=(s.opts||[]).find(x=>x[1]);
  return writeOn&&!!s.w&&!!(s.review||dlg.review)&&!s.missed&&!s.choices&&!s.listenOnly&&/___/.test(s.ask||'')&&!!o&&/[가-힣]/.test(o[0])}
 const writeQ=s=>writeBase(s)&&lv(s.w).b>=(SRS().writeAt??3);
-/* the 쓰기 ladder (?write=step, a prototype): a word climbs from choices to writing one rung per level. With writeAt 3:
-   level 0 choices, 1 syllable tiles (비·밀·번·호 and a decoy or two, tapped in order), 2 a small keyboard (only the word's jamo
-   and a few look-alikes), 3+ the full keyboard. A miss takes the word down one rung (grade). A one-syllable word skips the tiles. */
+/* the 쓰기 ladder (?write=step, a prototype). Each word has two records: its level (lv(w).b, did you know it) and its own 쓰기 rung
+   (lv(w).wr, can you write it): 0 syllable tiles (비·밀·번·호 and a decoy or two, tapped in order), 1 a small keyboard (only the
+   word's jamo and a few look-alikes), 2 the full keyboard. Turning 쓰기 on starts every word at the tiles, however well you know it.
+   A clean answer takes the word up a rung; giving up (보기, a spelling that isn't an option, two wrong tiles) takes it down one; a
+   hint or one wrong tile leaves it. A word is written only once you have got it right once (level 1+); a new or just-missed word
+   is a choice. The level counts only whether you knew it: a spelling you couldn't finish comes back as choices and holds the
+   level (never a miss), so choices alone master a word. A one-syllable word skips the tiles. */
+const WR_NAME=['글자 조각','작은 자판','자판'];
+function rampNote(s,res){  // res: true clean, false gave up, null neither
+ if(!writeStep||!s.rung||s.ramped||!s.w||!state.lv[s.w])return;s.ramped=1;
+ const L=state.lv[s.w],r0=L.wr||0,r=Math.max(0,Math.min(2,r0+(res===true?1:res===false?-1:0)));
+ if(r===r0)return;L.wr=r;save();setTimeout(()=>toast(`"${s.w}" 쓰기 ${r>r0?'↑':'↓'} ${WR_NAME[r]}`),900)}
 function writeRung(s){
- if(!writeBase(s))return null;const b=lv(s.w).b,at=SRS().writeAt??3;
- if(b>=at)return 'full';if(!writeStep||b<1)return null;
- if(b===at-1)return 'mini';
- return [...s.opts.find(o=>o[1])[0]].filter(c=>/[가-힣]/.test(c)).length>1?'syl':'mini'}
+ if(!writeBase(s))return null;const L=lv(s.w);
+ if(!writeStep)return L.b>=(SRS().writeAt??3)?'full':null;
+ if(L.b<1)return null;const r=L.wr||0;
+ return r>=2?'full':r===1||[...s.opts.find(o=>o[1])[0]].filter(c=>/[가-힣]/.test(c)).length<2?'mini':'syl'}
+/* a spelling the player couldn't finish (ladder): the question comes back as choices and the word's level holds */
+function writeGiveUp(s){s.choices=1;s.hinted=1;rampNote(s,false)}
 function renderAsk(s){const r=writeRung(s);s.rung=r;if(r==='syl')renderSyl(s);else if(r)renderWrite(s);else renderChoices(s)}
 /* look-alike jamo for decoys (the small keyboard) and decoy syllables (the tiles) */
 const HGLIKE={'ㄱ':'ㅋㄲ','ㅋ':'ㄱ','ㄲ':'ㄱ','ㄷ':'ㅌㄸ','ㅌ':'ㄷ','ㄸ':'ㄷ','ㅂ':'ㅍㅃ','ㅍ':'ㅂ','ㅃ':'ㅂ','ㅈ':'ㅊㅉ','ㅊ':'ㅈ','ㅉ':'ㅈ',
@@ -1111,11 +1122,11 @@ function renderSyl(s){
   +'<button class="wqhb" type="button">보기</button>';
  box.querySelectorAll('.sy').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();if(!b.classList.contains('choice'))return;
   if(b.dataset.t!==ans[got]){sfx('no');b.classList.remove('bad');void b.offsetWidth;b.classList.add('bad');
-   if(++bad>=2){s.missed=true;if(s.w){dlg.missed.add(s.w);askedIn[s.w]=talkN}}else s.hinted=1;return}  // one slip holds the level, two is a miss
+   if(++bad>=2){writeGiveUp(s);renderChoices(s)}return}  // one slip is allowed; two and it's choices
   sfx('move');got++;b.classList.remove('choice','sel');b.classList.add('used');b.disabled=true;$('sylQ').textContent=shown();
-  if(got===ans.length){choose(s,s.opts.findIndex(o=>o[1]));return}
+  if(got===ans.length){rampNote(s,bad?null:true);choose(s,s.opts.findIndex(o=>o[1]));return}
   sel=Math.min(Math.max(sel,0),choiceBtns().length-1);markSel()}));
- box.querySelector('.wqhb').addEventListener('click',e=>{e.stopPropagation();s.hinted=1;s.choices=1;renderChoices(s)});
+ box.querySelector('.wqhb').addEventListener('click',e=>{e.stopPropagation();writeGiveUp(s);renderChoices(s)});
  box.addEventListener('click',e=>e.stopPropagation());
  if(firstTime('sylQ'))setTimeout(()=>toast('글자를 순서대로 눌러요.'),300);
  sel=-1;choicesAt=performance.now();markSel();
@@ -1154,13 +1165,13 @@ function renderWrite(s){
  else if(!ownKb)writeKbOn(hgPad(inp,()=>{ownKb=true;store.set(KEY('ownKb'),'1');renderWrite(s);$('writeIn').focus()},()=>submit()));else writeKbOff();
  box.querySelector('.wqkb')?.addEventListener('click',e=>{e.stopPropagation();ownKb=false;store.set(KEY('ownKb'),'0');renderWrite(s)});
  const submit=()=>{const v=writeNorm(inp.value);if(!v)return;inp.blur();
-  const i=s.opts.findIndex(o=>writeNorm(o[0])===v);if(i>=0){choose(s,i);return}  // right, or a wrong option you wrote (its explanation)
-  sfx('no');s.missed=true;if(s.w){dlg.missed.add(s.w);askedIn[s.w]=talkN}
+  const i=s.opts.findIndex(o=>writeNorm(o[0])===v);if(i>=0){if(s.opts[i][1])rampNote(s,s.hint1?null:true);choose(s,i);return}  // right, or a wrong option you wrote (its explanation)
+  sfx('no');if(writeStep)writeGiveUp(s);else{s.missed=true;if(s.w){dlg.missed.add(s.w);askedIn[s.w]=talkN}}
   dlg.next=s;show({who:s.who==='나'?'…':s.who,say:'아니에요. 보기에서 골라 봐요.',fb:1})};
  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();submit()}});
  box.querySelector('.wqok')?.addEventListener('click',e=>{e.stopPropagation();submit()});
  box.querySelector('.wqhb').addEventListener('click',e=>{e.stopPropagation();s.hinted=1;
-  if(!s.hint1){s.hint1=1;renderWrite(s);$('writeIn').focus()}else{s.choices=1;renderChoices(s)}});  // 보기: the usual choices
+  if(!s.hint1){s.hint1=1;renderWrite(s);$('writeIn').focus()}else{if(writeStep)writeGiveUp(s);s.choices=1;renderChoices(s)}});  // 보기: the usual choices
  box.addEventListener('click',e=>e.stopPropagation());
  if(mini?firstTime('miniQ'):firstTime('writeQ'))setTimeout(()=>toast(mini?'이 단어는 써 봐요. 필요한 키만 있어요.':'★ 단어는 직접 써 봐요. 모르면 힌트!'),300);
  setTimeout(()=>{if($('writeIn')===inp)inp.focus()},60);  // with the built-in keyboard: a caret, no device keyboard (inputmode none)

@@ -1085,8 +1085,8 @@ const writeQ=s=>writeBase(s)&&lv(s.w).b>=(SRS().writeAt??3);
    (lv(w).wr, can you write it): 0 syllable tiles (비·밀·번·호 and a decoy or two, tapped in order), 1 a small keyboard (only the
    word's jamo and a few look-alikes), 2 the full keyboard. Turning 쓰기 on starts every word at the tiles, however well you know it.
    A clean answer takes the word up a rung; giving up (보기, a spelling that isn't an option, two wrong tiles) takes it down one; a
-   hint or one wrong tile leaves it. A word is written only once you have got it right once (level 1+); a new or just-missed word
-   is a choice. The level counts only whether you knew it: a spelling you couldn't finish comes back as choices and holds the
+   hint or one wrong tile leaves it. A word is written only once you know it (level SRS().writeAt, default 3 = ★); below that
+   it is a choice. The level counts only whether you knew it: a spelling you couldn't finish comes back as choices and holds the
    level (never a miss), so choices alone master a word. A one-syllable word skips the tiles. */
 const WR_NAME=['글자 조각','작은 자판','자판'];
 function rampNote(s,res){  // res: true clean, false gave up, null neither
@@ -1096,7 +1096,7 @@ function rampNote(s,res){  // res: true clean, false gave up, null neither
 function writeRung(s){
  if(!writeBase(s))return null;const L=lv(s.w);
  if(!writeStep)return L.b>=(SRS().writeAt??3)?'full':null;
- if(L.b<1)return null;const r=L.wr||0;
+ if(L.b<(SRS().writeAt??3))return null;const r=L.wr||0;
  return r>=2?'full':r===1||[...s.opts.find(o=>o[1])[0]].filter(c=>/[가-힣]/.test(c)).length<2?'mini':'syl'}
 /* a spelling the player couldn't finish (ladder): the question comes back as choices and the word's level holds */
 function writeGiveUp(s){s.choices=1;s.hinted=1;rampNote(s,false)}

@@ -862,7 +862,7 @@ function show(s){
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;writeKbOff();
  const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
  if(!s.build&&!s.ask)logTalk(s.who||dlg.name,text,s.enKey);  // a question is logged once, as the line it becomes when answered
- typeText(text,()=>{if(s.choose)renderPick(s);else if(s.ask)renderAsk(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
+ typeText(text,()=>{markOk(s.hl);if(s.choose)renderPick(s);else if(s.ask)renderAsk(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);
  if(readOn&&!s.listenOnly)speak(s.listen?'':text);
  if(s.listen)setTimeout(()=>speak(s.listenLine||s.listen),readOn?1200:150);
@@ -916,6 +916,21 @@ function enUI(){let b=$('enBtn');if(b)return b;
  document.head.appendChild(st);return b}
 function setEn(en){if(!window.LINES_EN)return;const b=enUI(),d=$('txtEn');b.hidden=!en;b.classList.toggle('on',enAll&&!!en);d.hidden=!(enAll&&en);d.textContent=en||'';
  const h=!!en&&!enAll&&hints.word===1&&hints.lineQ!==1;b.classList.toggle('hintq',h);if(h)hintSeen('lineQ',12)}  // after the word hint: the line's ? pulses
+/* a right answer: the words that filled the blank (or the whole line built from word tiles) take the answer color, and an underline
+   under them fades away (about a second; none with reduced motion). Never moves or covers anything: the line is the feedback. */
+function markOk(hl){
+ if(!hl||!hl.a)return;const el=$('txt'),t=el.textContent,a=hl.a;let k=-1;
+ if(hl.pre){const j=t.indexOf(hl.pre);if(j>=0&&t.substr(j+hl.pre.length,a.length)===a)k=j+hl.pre.length}
+ if(k<0)k=t.lastIndexOf(a);if(k<0)return;
+ okCss();const end=k+a.length,tw=document.createTreeWalker(el,NodeFilter.SHOW_TEXT),parts=[];let pos=0;
+ for(let n;(n=tw.nextNode());){const s0=pos,e0=pos+n.length;pos=e0;if(e0<=k||s0>=end)continue;parts.push([n,Math.max(k,s0)-s0,Math.min(end,e0)-s0])}
+ for(const [n,a0,b0] of parts){let m=n;if(a0>0)m=m.splitText(a0);if(b0-a0<m.length)m.splitText(b0-a0);if(!m.textContent.trim())continue;
+  const w=document.createElement('span');w.className='okw';m.replaceWith(w);w.append(m)}}
+function okCss(){if($('okCss'))return;const st=document.createElement('style');st.id='okCss';
+ st.textContent='.okw{color:var(--ok-ink,#8EE3A6);text-decoration:underline 2px;text-underline-offset:3px;text-decoration-color:transparent;animation:okfade 1.2s ease-out}'
+  +'@keyframes okfade{0%,25%{text-decoration-color:var(--ok-ink,#8EE3A6)}100%{text-decoration-color:transparent}}'
+  +'@media (prefers-reduced-motion:reduce){.okw{animation:none}}';
+ document.head.appendChild(st)}
 function typeText(text,done){
  text=text.replace(/ ___/g,'\u00A0___').replace(/___(?=\S)/g,'___\u2060');  // a blank never starts or ends a line on its own ("국어 수행 ___ / 예요")
  clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.innerHTML='<span style="visibility:hidden">'+p.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</span>';let i=0;
@@ -1227,7 +1242,7 @@ function pickTile(s,b){
   const line=seq.join(' ');sfx('ok');
   if(s.review||dlg.review)gradeStep(s);
   dlg.next='advance';$('build').hidden=true;
-  show({who:s.who||dlg.name,say:line+(/[.!?…]$/.test(line)?'':'.')});  // the assembled line, said whole: getting it right is the praise (no 맞아요 toast)
+  show({who:s.who||dlg.name,say:line+(/[.!?…]$/.test(line)?'':'.'),hl:{a:line}});  // the assembled line, said whole: getting it right is the praise (no 맞아요 toast)
   if(readOn)speak(line);
  }else{sel=Math.min(Math.max(sel,0),tileBtns().length-1);markSel()}  // the selection moves on to the next tile: A, A, A builds the line
 }
@@ -1255,11 +1270,12 @@ function choose(s,i){
   dlg.next='advance';
   const line=s.done||(s.ask.includes('___')?answered(s.ask,o[0]):o[0]),enKey=!s.done&&s.ask.includes('___')?s.ask:undefined;  // the filled line's English is kept under the question as written
   const quiz=/["“][^"”]*___[^"”]*["”]/.test(s.ask)||s.listenOnly;
+  const hl={a:plain(String(o[0])),pre:s.ask.includes('___')&&!s.done?plain(s.ask.slice(0,s.ask.indexOf('___'))):''};  // the answer glows where it filled the blank
   if(s.who==='나'&&!s.listenOnly||s.own||s.who==='…'||!quiz){  /* own:1 — the line is the speaker's own words, not a reply to you */
    // an ok: that isn't praise ("뭐?", "…") is the other person's reaction, so they say it next
    const react=s.ok&&!/^(맞아|정답|좋아|딩동댕)/.test(s.ok)?s.ok:null;
-   show({who:s.who||dlg.name,say:line,fb:1,enKey});  // the line with its blank filled is the feedback: no 맞아요 toast (the sound and the talk going on say it was right)
-   if(react)dlg.next={who:s.reactWho||dlg.name,say:react,fb:1}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line),fb:1,enKey:s.listenOnly?undefined:enKey});
+   show({who:s.who||dlg.name,say:line,fb:1,enKey,hl});  // the line with its blank filled is the feedback: no 맞아요 toast (the sound and the talk going on say it was right)
+   if(react)dlg.next={who:s.reactWho||dlg.name,say:react,fb:1}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line),fb:1,enKey:s.listenOnly?undefined:enKey,hl});
  }else{
   sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);
   dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||'다시 해 봐요.',fb:1});  // after your own line, the hint is narration

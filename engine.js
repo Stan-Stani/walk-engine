@@ -938,7 +938,7 @@ function typeText(text,done){
  typing={id:null,finished:false};
  const fin=()=>{clearInterval(typing.id);el.innerHTML=glossHTML(text);typing.finished=true;hintWord();done()};
  typing.fin=fin;
- if(reduce)return fin();
+ if(reduce||!p)return fin();  // nothing to type (a word-order question has no line of its own): its tiles come at once, never after a blank box and a tap
  const seg=(()=>{try{return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(p)].map(x=>x.segment)}catch(e){return Array.from(p)}})();  // whole characters: never half an emoji (it shows as ? for a tick)
  const esc=x=>x.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));  // the whole line is laid out from the start: words never jump down a line
  const t0=performance.now();  // by elapsed time, not ticks: a phone that slows timers (battery saver) shows more per tick, never a blank box

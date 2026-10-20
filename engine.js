@@ -674,7 +674,8 @@ function render(t){
  }
 }
 /* scripted walks. walk:{npc,from}: the NPC appears at `from` and walks to its own spot (e.g. the class president going back to her desk).
-   leave:{npc,to}: the NPC (hidden by the same step's flag) walks from its spot to `to` and is gone (out a door, off the map). */
+   leave:{npc,to}: the NPC (hidden by the same step's flag) walks from its spot to `to` and is gone (out a door, off the map).
+   leave:{follow:1,to}: the same for the follower (C.FOLLOW), whose when() the step's flag ends. */
 let walks=[],leaves=[],ghosts=[];const WALK_MS=230;
 function walkPath([fx,fy],[tx,ty],self){
  const k=(x,y)=>x+','+y,prev={[k(fx,fy)]:null},q=[[fx,fy]];
@@ -693,7 +694,8 @@ function queueWalks(s){  // one or a list each
  // arrivals wait for the conversation to close (until then they stand where they start, no pop to the end spot first)
  [].concat(s.walk||[]).forEach(w=>{const n=C.NPC[w.npc];if(!n)return;walks.push(w);n.walk={path:[w.from],hold:1,end:n.dir}});
  // a leave starts at once, on the line that narrates it ("후다닥 나갔어요"), so nobody lingers after the text says they left
- [].concat(s.leave||[]).forEach(w=>{const n=C.NPC[w.npc];if(!n||!NPCS.includes(n))return;const from=npcPos(n),g={look:n.look,from};
+ [].concat(s.leave||[]).forEach(w=>{const n=w.follow?null:C.NPC[w.npc];if(w.follow?!(C.FOLLOW&&pet.on):!n||!NPCS.includes(n))return;  // follow:1 — the follower walks off (the step's flag ends FOLLOW.when)
+  const from=w.follow?[pet.x,pet.y]:npcPos(n),g={look:w.follow?C.FOLLOW.look:n.look,from};
   const path=walkPath(from,w.to,null);if(path.length>1){g.walk={path,t0:performance.now()};ghosts.push(g)}});
 }
 function startWalks(){

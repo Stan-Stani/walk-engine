@@ -752,8 +752,8 @@ function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidde
 if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten');if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
 const CULTURE=globalThis.CULTURE_NOTES||{};  // a game's notes (its own file sets globalThis.CULTURE_NOTES)
 let cultureSeen=[];try{cultureSeen=JSON.parse(store.get(KEY('culture'))||'[]')}catch(e){}
-/* A new note waits on the screen as a tappable chip (#noteChip, made here when the shell has a notes section) until you
-   read it: tapping it opens the 일지 on that note. Notes seen before this existed count as read. */
+/* A new note shows on the screen for a few seconds as a tappable chip (#noteChip, made here when the shell has a notes section), then
+   fades: tapping it opens the 일지 on that note. Notes seen before this existed count as read. */
 let cultureRead;try{cultureRead=JSON.parse(store.get(KEY('cultureRead'))||'null')}catch(e){}if(!Array.isArray(cultureRead))cultureRead=cultureSeen.slice();
 const GRAMMAR=globalThis.GRAMMAR_NOTES||{};  // a game's 문법 노트 (its own file sets globalThis.GRAMMAR_NOTES)
 let grammarSeen=[],grammarRead=[];try{grammarSeen=JSON.parse(store.get(KEY('grammar'))||'[]')}catch(e){}try{grammarRead=JSON.parse(store.get(KEY('grammarRead'))||'[]')}catch(e){}
@@ -771,12 +771,19 @@ function forgetNotes(){const src=String(CH.make),ids=new Set([...src.matchAll(/\
  renderNotes();noteChip()}
 let noteLast='culture';  // the kind unlocked last: the chip shows its newest unread note first, then the rest, newest first
 const unreadNotes=K=>{const N=NOTE_KINDS[K];return N.seen.filter(k=>N.data[k]&&!N.read.includes(k))};
-function noteChip(){const el=$('noteChip');if(!el)return;const K=[noteLast,...Object.keys(NOTE_KINDS)].find(K=>unreadNotes(K).length);
- el.hidden=!K;if(K){const N=NOTE_KINDS[K],un=unreadNotes(K),k=un[un.length-1];el.dataset.kind=K;el.dataset.k=k;el.innerHTML=`<span>📖 ${N.name} · ${N.data[k].t}</span><b>›</b>`}}
+/* fresh: a note was just unlocked — the chip shows it, then fades once it has been on screen CHIP_MS (time under a talk box, where it's
+   hidden, doesn't count); the note stays unread in the 일지. Without fresh the chip only updates or hides: no old note pops back up. */
+const CHIP_MS=6000;let chipOn=0,chipTick=null;
+function noteChip(fresh){const el=$('noteChip');if(!el)return;const K=[noteLast,...Object.keys(NOTE_KINDS)].find(K=>unreadNotes(K).length);
+ if(!K||!fresh&&el.hidden){el.hidden=true;return}
+ const N=NOTE_KINDS[K],un=unreadNotes(K),k=un[un.length-1];el.dataset.kind=K;el.dataset.k=k;el.innerHTML=`<span>📖 ${N.name} · ${N.data[k].t}</span><b>›</b>`;el.hidden=false;
+ if(!fresh)return;el.style.transition='';el.style.opacity='';chipOn=0;clearInterval(chipTick);
+ chipTick=setInterval(()=>{if(el.hidden){clearInterval(chipTick);return}if(getComputedStyle(el).display!=='none')chipOn+=250;
+  if(chipOn>=CHIP_MS){clearInterval(chipTick);el.style.transition='opacity .8s';el.style.opacity='0';setTimeout(()=>{el.hidden=true;el.style.transition='';el.style.opacity=''},800)}},250)}
 function readNote(K,k){const N=NOTE_KINDS[K];if(!N.read.includes(k)){N.read.push(k);store.set(KEY(N.key+'Read'),JSON.stringify(N.read))}noteChip()}
 function unlockNote(K,k){const N=NOTE_KINDS[K];
  if(!N.data[k]||N.seen.includes(k))return;N.seen.push(k);store.set(KEY(N.key),JSON.stringify(N.seen));noteLast=K;
- setTimeout(()=>{sfx('badge');noteChip()},350);
+ setTimeout(()=>{sfx('badge');noteChip(true)},350);
 }
 const unlockCulture=k=>unlockNote('culture',k),unlockGrammar=k=>unlockNote('grammar',k);
 function renderNotes(){

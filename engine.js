@@ -1357,7 +1357,7 @@ function hear(r){if(unheard(r)){heard().push(rKey(r));save()}}
 function sayLine(n){
  const L=linesFor(n).filter(unheard);if(!L.length)return null;
  const r=L[Math.random()*L.length|0],ok=(r.opts||[]).find(o=>o[1]);hear(r);(state.heardB||(state.heardB={}))[rKey(r)]=beats();
- return [...says(r.pre||[]),{...(r.who?{who:r.who}:{}),say:answered(r.ask,ok?ok[0]:r.w)}];
+ return [...says(r.pre||[]),{...(r.who?{who:r.who}:{}),say:answered(r.ask,ok?ok[0]:r.w),enKey:r.ask}];  // its English is kept under the question as written
 }
 const usual=n=>n.badge?(n.badge.every(has)?says(n.after):null):(n.again&&metIds().includes(npcId(n))?says(typeof n.again==='function'?n.again():n.again):n.talk());  // again: what they say once you've met (no second introduction)  // what they'd say anyway (null: still teaching)
 const moves=s=>['set','give','take','award','go','walk','leave','move','phone','culture','grammar','sit','choose','finale'].some(k=>k in s);

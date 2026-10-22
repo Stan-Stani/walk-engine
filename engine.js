@@ -673,7 +673,7 @@ function render(t){
   if(Math.floor(t/600)%2){r(a*TS-cx+2,b*TS-cy+1,3,2,'#D2533F');r(c*TS-cx+11,b*TS-cy+1,3,2,'#D2533F')}
  }
 }
-/* scripted walks. walk:{npc,from}: the NPC appears at `from` and walks to its own spot (e.g. the class president going back to her desk).
+/* scripted walks. walk:{npc,from}: the NPC appears at `from` and walks to its own spot (its pos() if it has one) (e.g. the class president going back to her desk).
    leave:{npc,to}: the NPC (hidden by the same step's flag) walks from its spot to `to` and is gone (out a door, off the map).
    leave:{follow:1,to}: the same for the follower (C.FOLLOW), whose when() the step's flag ends. */
 let walks=[],leaves=[],ghosts=[];const WALK_MS=230;
@@ -701,7 +701,7 @@ function queueWalks(s){  // one or a list each
 function startWalks(){
  const t0=performance.now();
  walks.splice(0).forEach(w=>{const n=C.NPC[w.npc];if(!n)return;n.walk=null;if(n.hide&&n.hide())return;
-  const path=walkPath(w.from,[n.x,n.y],n);if(path.length>1)n.walk={path,t0,end:n.dir}});
+  const path=walkPath(w.from,n.pos?n.pos():[n.x,n.y],n);if(path.length>1)n.walk={path,t0,end:n.dir}});  // to where the story puts them now (pos), else their spot
  leaves.splice(0).forEach(([w,g])=>{const path=walkPath(g.from,w.to,null);if(path.length>1)g.walk={path,t0};else ghosts=ghosts.filter(x=>x!==g)});
 }
 function walkAt(n,t){ // → [x,y,dir,frame] while walking, null when arrived
@@ -1037,7 +1037,7 @@ function renderChoices(s){
  writeKbOff();  // 보기 after a 쓰기 문제: the controls come back
  const box=$('choices');box.hidden=false;
  const order=shuffle(s.opts.map((_,i)=>i));
- box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${String(s.opts[i][0]).replace(/[가-힣]+/g,w=>`<span class="cw">${w}</span>`)}</button>`).join('');
+ box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${plain(String(s.opts[i][0])).replace(/[가-힣]+/g,w=>`<span class="cw">${w}</span>`)}</button>`).join('');
  let pressT=null,defined=false;  // long-press a word on a choice = its definition (doesn't answer)
  box.querySelectorAll('.choice').forEach(b=>{
   b.addEventListener('pointerdown',e=>{const w=e.target.closest('.cw');defined=false;clearTimeout(pressT);if(w)pressT=setTimeout(()=>{defined=true;showWord(w.textContent)},450)});

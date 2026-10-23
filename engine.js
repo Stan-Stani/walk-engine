@@ -1720,7 +1720,7 @@ if(!(musicVol>=0&&musicVol<=100))musicVol=30;
 /* GAME.music: the credit, a string or {by,url} (the credit links there); the playing track's name comes from its file
    (audio/cafe-alps.m4a → Cafe Alps) */
 function creditUI(){const c=$('credit');if(!c)return;const M=typeof G.music==='string'?{by:G.music}:G.music;
- const t=bgmSrc.split('/').pop().replace(/\.\w+$/,'').split(/[-_]/).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');
+ const t=bgmSrc.split('/').pop().replace(/\.\w+$/,'').split(/[-_]/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');  // '' while quiet: no track name
  c.textContent='음악 · '+(t?t+' — ':'');const a=document.createElement(M.url?'a':'span');a.textContent=M.by;
  if(M.url){a.href=M.url;a.target='_blank';a.rel='noopener'}c.append(a)}
 function updateMusic(){

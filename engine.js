@@ -1717,22 +1717,28 @@ $('sndBtn').addEventListener('click',()=>{soundOn=!soundOn;store.set(KEY('sound'
    소리 off silences music too. Browsers hold audio until the first tap or key, so a blocked start retries then. */
 let musicOn=store.get(KEY('music'))!=='0',bgm=null,bgmSrc='',musicT=0,musicVol=+(store.get(KEY('musicVol'))??30);
 if(!(musicVol>=0&&musicVol<=100))musicVol=30;
+/* GAME.music: the credit, a string or {by,url} (the credit links there); the playing track's name comes from its file
+   (audio/cafe-alps.m4a → Cafe Alps) */
+function creditUI(){const c=$('credit');if(!c)return;const M=typeof G.music==='string'?{by:G.music}:G.music;
+ const t=bgmSrc.split('/').pop().replace(/\.\w+$/,'').split(/[-_]/).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');
+ c.textContent='음악 · '+(t?t+' — ':'');const a=document.createElement(M.url?'a':'span');a.textContent=M.by;
+ if(M.url){a.href=M.url;a.target='_blank';a.rel='noopener'}c.append(a)}
 function updateMusic(){
  if(!G.music)return;
  let m=Z?('music' in Z?Z.music:C.MUSIC):null;if(typeof m==='function')m=m();m=(soundOn&&musicOn&&m)||'';
- if(m===bgmSrc)return;bgmSrc=m;
+ if(m===bgmSrc)return;bgmSrc=m;creditUI();
  if(bgm){bgm.pause();bgm=null}
  if(!m)return;bgm=new Audio(m);bgm.loop=true;bgm.volume=musicVol/100;bgm.play().catch(()=>{});
 }
 if(G.music){
  const b=document.createElement('button');b.className='mi toggle';b.id='musicBtn';b.textContent='음악';
- const upd=()=>b.setAttribute('aria-pressed',String(musicOn));upd();menuAdd(b);
+ const upd=()=>b.setAttribute('aria-pressed',String(musicOn));upd();
  b.addEventListener('click',()=>{musicOn=!musicOn;store.set(KEY('music'),musicOn?'1':'0');upd();sfx('ok');updateMusic()});
- const v=document.createElement('label');v.className='vol';v.innerHTML='<span>음악 크기</span><input type="range" min="0" max="100" step="5" aria-label="음악 크기">';  // the volume (Android and desktop: iPhones ignore it, use the side buttons)
+ const v=document.createElement('div');v.className='vol';v.innerHTML='<input type="range" min="0" max="100" step="5" aria-label="음악 크기">';v.prepend(b);  // the 음악 on/off sits beside its volume, under the menu buttons  // the volume (Android and desktop: iPhones ignore it, use the side buttons)
  const r=v.querySelector('input');r.value=musicVol;$('startPanel').querySelector('.mgrid').after(v);
  r.addEventListener('input',()=>{musicVol=+r.value;store.set(KEY('musicVol'),String(musicVol));if(bgm)bgm.volume=musicVol/100;
   if(!musicOn&&musicVol>0){musicOn=true;store.set(KEY('music'),'1');upd();updateMusic()}});  // moving the slider while 음악 is off turns it back on
- const g=document.querySelector('.startsheet .games');if(g){const c=document.createElement('div');c.className='credit';c.textContent='음악 · '+G.music;g.after(c)}
+ const g=document.querySelector('.startsheet .games');if(g){const c=document.createElement('div');c.className='credit';c.id='credit';g.after(c);creditUI()}
  const wake=()=>{if(bgm&&bgm.paused&&!document.hidden)bgm.play().catch(()=>{})};
  addEventListener('pointerdown',wake,true);addEventListener('keydown',wake,true);
  document.addEventListener('visibilitychange',()=>{if(!bgm)return;if(document.hidden)bgm.pause();else wake()});

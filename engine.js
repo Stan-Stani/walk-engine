@@ -712,7 +712,7 @@ function walkAt(n,t){ // → [x,y,dir,frame] while walking, null when arrived
  return [ax+(bx-ax)*f,ay+(by-ay)*f,dir,f<.5?(i%2?1:2):0];
 }
 let last=performance.now();
-function loop(t){const dt=Math.min(50,t-last);last=t;if(Z){update(dt,t);render(t)}requestAnimationFrame(loop)}
+function loop(t){const dt=Math.min(50,t-last);last=t;if(Z){update(dt,t);render(t);if(t-musicT>500){musicT=t;updateMusic()}}requestAnimationFrame(loop)}  // music follows the room and the story twice a second
 
 /* ---------- dialogue ---------- */
 let dlg=null,typing=null,pending=null,sel=0;
@@ -1710,7 +1710,33 @@ function skipTalk(){
  $('skipBtn').addEventListener('click',e=>{e.stopPropagation();skipTalk()});
  $('backBtn').addEventListener('click',stepBack);
 })();
-$('sndBtn').addEventListener('click',()=>{soundOn=!soundOn;store.set(KEY('sound'),soundOn?'1':'0');updateSound();sfx('ok')});
+$('sndBtn').addEventListener('click',()=>{soundOn=!soundOn;store.set(KEY('sound'),soundOn?'1':'0');updateSound();sfx('ok');updateMusic()});
+/* ---------- music ---------- */
+/* A looping track per room (zone music:) or per chapter (MUSIC), a path or a function of the story so far; '' or null is quiet.
+   Only games whose game.js names a music credit (GAME.music) get the 음악 toggle and the credit line in the menu.
+   소리 off silences music too. Browsers hold audio until the first tap or key, so a blocked start retries then. */
+let musicOn=store.get(KEY('music'))!=='0',bgm=null,bgmSrc='',musicT=0,musicVol=+(store.get(KEY('musicVol'))??30);
+if(!(musicVol>=0&&musicVol<=100))musicVol=30;
+function updateMusic(){
+ if(!G.music)return;
+ let m=Z?('music' in Z?Z.music:C.MUSIC):null;if(typeof m==='function')m=m();m=(soundOn&&musicOn&&m)||'';
+ if(m===bgmSrc)return;bgmSrc=m;
+ if(bgm){bgm.pause();bgm=null}
+ if(!m)return;bgm=new Audio(m);bgm.loop=true;bgm.volume=musicVol/100;bgm.play().catch(()=>{});
+}
+if(G.music){
+ const b=document.createElement('button');b.className='mi toggle';b.id='musicBtn';b.textContent='음악';
+ const upd=()=>b.setAttribute('aria-pressed',String(musicOn));upd();menuAdd(b);
+ b.addEventListener('click',()=>{musicOn=!musicOn;store.set(KEY('music'),musicOn?'1':'0');upd();sfx('ok');updateMusic()});
+ const v=document.createElement('label');v.className='vol';v.innerHTML='<span>음악 크기</span><input type="range" min="0" max="100" step="5" aria-label="음악 크기">';  // the volume (Android and desktop: iPhones ignore it, use the side buttons)
+ const r=v.querySelector('input');r.value=musicVol;$('startPanel').querySelector('.mgrid').after(v);
+ r.addEventListener('input',()=>{musicVol=+r.value;store.set(KEY('musicVol'),String(musicVol));if(bgm)bgm.volume=musicVol/100;
+  if(!musicOn&&musicVol>0){musicOn=true;store.set(KEY('music'),'1');upd();updateMusic()}});  // moving the slider while 음악 is off turns it back on
+ const g=document.querySelector('.startsheet .games');if(g){const c=document.createElement('div');c.className='credit';c.textContent='음악 · '+G.music;g.after(c)}
+ const wake=()=>{if(bgm&&bgm.paused&&!document.hidden)bgm.play().catch(()=>{})};
+ addEventListener('pointerdown',wake,true);addEventListener('keydown',wake,true);
+ document.addEventListener('visibilitychange',()=>{if(!bgm)return;if(document.hidden)bgm.pause();else wake()});
+}
 {const b=document.createElement('button');b.className='mi toggle';b.id='writeBtn';b.textContent=writeStep?'쓰기 문제 · 단계별':'쓰기 문제';  // 쓰기 문제 on/off (every game); 단계별 = the ladder (?write=step)
  const upd=()=>b.setAttribute('aria-pressed',String(writeOn));upd();menuAdd(b);
  b.addEventListener('click',()=>{writeOn=!writeOn;store.set(KEY('write'),writeOn?(writeStep?'step':'1'):'0');upd();sfx('ok');toast(writeOn?'★ 단어는 직접 써요.':'쓰기 문제를 껐어요. 보기에서 골라요.')})}

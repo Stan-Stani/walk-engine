@@ -85,7 +85,9 @@ function wrapUp(){
  return qs.length?[{who:'…',say:TERM.wrap,black:1,wrapStart:1},...qs]:[];  // over a black screen: these are memories of people who aren't here
 }
 function nextDue(){const t=C.WORDS.filter(has).map(w=>lv(w).due).filter(d=>d>now());return t.length?Math.min(...t):null}
-function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?`${m}${T('분')}`:m<1440?`${Math.round(m/60)}${T('시간')}`:`${Math.round(m/1440)}${T('일')}`}
+const unit=(n,k)=>G.ui&&G.ui.unit?G.ui.unit(n,k):n+T(k);  // GAME.ui.unit(n,'분'): a number and its unit in the game's language (3ぷん)
+const qt=w=>G.ui&&G.ui.quote?G.ui.quote(w):`"${w}"`;  // a word quoted in a message (「水」)
+function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?unit(m,'분'):m<1440?unit(Math.round(m/60),'시간'):unit(Math.round(m/1440),'일')}
 
 /* ---------- settings ---------- */
 /* Per-game settings come from src/game.js (`var GAME={…}`), so one engine serves 성실호, 형제 and 점심 방송. */
@@ -982,12 +984,12 @@ function hintWord(){  // a line has been on the screen 4 s and no word has ever 
   const ws=[...$('txt').querySelectorAll('.w')],w=ws.filter(e=>e.textContent.length>=2).sort((a,b)=>b.textContent.length-a.textContent.length)[0]||ws[0];
   if(w){w.classList.add('hintw');hintSeen('word',6)}},4000)}
 function noteTap(rows){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;store.set(TAPS_KEY,JSON.stringify(taps))}
-function ago(t){const m=Math.floor((Date.now()-t)/60000);if(m<1)return T('방금');if(m<60)return m+T('분 전');const h=Math.floor(m/60);if(h<24)return h+T('시간 전');const d=Math.floor(h/24);return d===1?T('어제'):d+T('일 전')}
+function ago(t){const m=Math.floor((Date.now()-t)/60000);if(m<1)return T('방금');if(m<60)return unit(m,'분')+T(' 전');const h=Math.floor(m/60);if(h<24)return unit(h,'시간')+T(' 전');const d=Math.floor(h/24);return d===1?T('어제'):unit(d,'일')+T(' 전')}
 function openTaps(){
  const esc=x=>String(x||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  const rows=Object.entries(taps).sort((a,b)=>tapSort==='n'?(b[1].n-a[1].n||b[1].t-a[1].t):b[1].t-a[1].t);
- $('tapCount').textContent=rows.length?rows.length+'개':'';
- $('tapList').innerHTML=rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}</b><span class="tpm">${r.n}번 · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
+ $('tapCount').textContent=rows.length?unit(rows.length,'개'):'';
+ $('tapList').innerHTML=rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
   :'<p class="tl-empty">'+T('아직 찾아본 말이 없어요.')+'</p>';
  if(!$('tapCopy')){const b=document.createElement('button');b.className='btn';b.id='tapCopy';b.textContent=T('복사');b.style.marginLeft='auto';b.addEventListener('click',copyTaps);$('tapSortN').after(b)}
  $('tapCopy').hidden=!rows.length;if($('tapText'))$('tapText').hidden=true;
@@ -1265,9 +1267,9 @@ function gradeStep(s){
  if(!s.w)return;
  const before=lv(s.w).b,b=grade(s.w,!s.missed,!!s.hinted);
  updateHud();
- if(s.missed)setTimeout(()=>toast(`"${s.w}" ${T('다시 연습해요')}`),250);
+ if(s.missed)setTimeout(()=>toast(`${qt(s.w)} ${T('다시 연습해요')}`),250);
  if(!s.missed&&b>=3&&before<3){setTimeout(()=>{toast('★ '+s.w+T(' 기억했어요!'));sfx('star')},250)}
- if(s.missed?firstTime('reviewMiss'):firstTime('reviewLevel'))dlg.steps.splice(dlg.i+1,0,{who:LOGNAME,say:s.missed?`"${s.w}" ${T('다시 연습해요. 곧 또 나와요.')}`:`"${s.w}" ${T('기억 레벨')} ${b}/5.`+(b>=3?' ★':'')});
+ if(s.missed?firstTime('reviewMiss'):firstTime('reviewLevel'))dlg.steps.splice(dlg.i+1,0,{who:LOGNAME,say:s.missed?`${qt(s.w)} ${T('다시 연습해요. 곧 또 나와요.')}`:`${qt(s.w)} ${T('기억 레벨')} ${b}/5${T('.')}`+(b>=3?' ★':'')});
 }
 /* praise after a right answer: a step's own `ok`, else 맞아! from a friend who speaks 반말 (NPC banmal:1), else 맞아요! */
 const okWord=s=>s.ok||(dlg.npc&&dlg.npc.banmal?T('맞아!'):T('맞아요!'));
@@ -1289,7 +1291,7 @@ function choose(s,i){
    show({who:s.who||dlg.name,say:line,fb:1,enKey,hl});  // the line with its blank filled is the feedback: no 맞아요 toast (the sound and the talk going on say it was right)
    if(react)dlg.next={who:s.reactWho||dlg.name,say:react,fb:1}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line),fb:1,enKey:s.listenOnly?undefined:enKey,hl});
  }else{
-  sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);
+  sfx('no');s.missed=true;if(s.w){dlg.missed.add(s.w);if(!has(s.w)){(state.miss=state.miss||{})[s.w]=1;save()}}
   dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||T('다시 해 봐요.'),fb:1});  // after your own line, the hint is narration
  }
 }
@@ -1453,7 +1455,7 @@ function interact(){
 function award(words){
  const nw=words.filter(w=>!has(w));if(!nw.length)return;
  state.badges.push(...nw);
- const perfect=nw.filter(w=>!dlg.missed.has(w));
+ const perfect=nw.filter(w=>!dlg.missed.has(w)&&!(state.miss&&state.miss[w]));if(state.miss)nw.forEach(w=>delete state.miss[w]);  // state.miss: a word missed in a talk left early (B) still counts as missed
  const L0=SRS().start??2;  // srs.start: the level of a word answered right every time it was taught (★ is level 3)
  nw.forEach(w=>{state.lv[w]=perfect.includes(w)?spaced(L0):{b:0,due:now()}});
  save();updateHud();sfx('badge');
@@ -1490,7 +1492,7 @@ function openPanel(){
  $('wlist').innerHTML=C.WORDS.map(w=>has(w)?`<button class="wd${w===logSel?' sel':''}" data-w="${w}"><span class="w">${w}</span>${pips(w)}</button>`:`<div class="wd off"><span class="w">？</span></div>`).join('');
  $('wlist').querySelectorAll('button.wd').forEach(b=>b.addEventListener('click',()=>{logSel=b.dataset.w;showEn=false;openPanel();speak(logSel)}));
  if(logSel){const d=C.DICT[logSel],L=lv(logSel);
-  $('card').innerHTML=`<div class="top"><span class="big">${logSel}</span><button class="spk${canSpeak()?'':' '}" id="cardSpk" aria-label="듣기" ${canSpeak()?'':'hidden'}>${$('spk').innerHTML}</button></div>
+  $('card').innerHTML=`<div class="top"><span class="big">${logSel}</span>${d.r&&d.r!==logSel?`<span class="rd">${d.r}</span>`:''}<button class="spk${canSpeak()?'':' '}" id="cardSpk" aria-label="듣기" ${canSpeak()?'':'hidden'}>${$('spk').innerHTML}</button></div>
    <span class="def">${d.k}</span><span class="ex">${T('예')}: ${d.ex}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
    <span class="hj">${T('기억 레벨')} ${L.b}/5 · ${isDue(logSel)?T('지금 복습할 수 있어요'):T('다음 복습: ')+fmtWait(L.due-now())+T(' 후')}</span>
    ${showEn?`<span class="en">${d.e}</span>`:'<button class="enb" id="cardEn" aria-label="영어로 보기">?</button>'}`;
@@ -1595,9 +1597,9 @@ function updateNow(){
 }
 addEventListener('visibilitychange',()=>{if(!document.hidden)checkVersion()});
 setInterval(checkVersion,30*60e3);setTimeout(checkVersion,60e3);setInterval(updateNow,1000);
-const buildDate=()=>{const d=new Date(VER.t||'');return isNaN(d)?'':d.toLocaleString('ko-KR',{month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})};
+const buildDate=()=>{const d=new Date(VER.t||'');return isNaN(d)?'':d.toLocaleString(G.lang||'ko-KR',{month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})};
 if(VER.v){const p=document.createElement('p');p.id='verLine';p.style.cssText='font-size:.72rem;opacity:.55;margin:12px 0 0;text-align:center';
- p.textContent=(buildDate()?'업데이트 '+buildDate()+' · ':'')+VER.v;$('startPanel').querySelector('.sheet').append(p)}
+ p.textContent=(buildDate()?T('업데이트')+' '+buildDate()+' · ':'')+VER.v;$('startPanel').querySelector('.sheet').append(p)}
 /* 통계: anonymous counts go to the same server: the game opened (each page load), a chapter started (its first time in this
    browser), each objective reached in it (how far players get; once each, in the order reached), finished, and the first real
    tap or key in a visit (so the dashboard counts people, not bots that only load the page). No ID and no cookie: the server only keeps the day and a tag that changes every day (people per
@@ -1750,7 +1752,7 @@ if(!G.noWrite){const b=document.createElement('button');b.className='mi toggle';
  const upd=()=>b.setAttribute('aria-pressed',String(writeOn));upd();menuAdd(b);
  b.addEventListener('click',()=>{writeOn=!writeOn;store.set(KEY('write'),writeOn?(writeStep?'step':'1'):'0');upd();sfx('ok');toast(writeOn?'★ 단어는 직접 써요.':'쓰기 문제를 껐어요. 보기에서 골라요.')})}
 if($('listenBtn')){const upd=()=>$('listenBtn').setAttribute('aria-pressed',String(listenOn));upd();  // a game's shell may offer the 듣기 문제 toggle
- $('listenBtn').addEventListener('click',()=>{listenOn=!listenOn;store.set(KEY('listen'),listenOn?'1':'0');upd();sfx('ok');toast(listenOn?T('복습에 듣기 문제가 나와요.'):'듣기 문제를 껐어요.')})}
+ $('listenBtn').addEventListener('click',()=>{listenOn=!listenOn;store.set(KEY('listen'),listenOn?'1':'0');upd();sfx('ok');toast(listenOn?T('복습에 듣기 문제가 나와요.'):T('듣기 문제를 껐어요.'))})}
 $('readBtn').addEventListener('click',()=>{
  if(!canSpeak()){toast(T('이 기기에는 한국어 음성이 없어요.'));return}
  readOn=!readOn;store.set(KEY('read'),readOn?'1':'0');updateRead();toast(readOn?T('대사를 소리 내서 읽어요.'):T('읽기를 껐어요.'));if(readOn&&dlg)speak(dlg.cur.say||dlg.cur.ask||'');

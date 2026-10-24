@@ -983,13 +983,13 @@ function hintWord(){  // a line has been on the screen 4 s and no word has ever 
  hintWord.t=setTimeout(()=>{if(!dlg||dlg.cur!==cur||hints.word===1||!$('gloss').hidden||phoneOpen)return;
   const ws=[...$('txt').querySelectorAll('.w')],w=ws.filter(e=>e.textContent.length>=2).sort((a,b)=>b.textContent.length-a.textContent.length)[0]||ws[0];
   if(w){w.classList.add('hintw');hintSeen('word',6)}},4000)}
-function noteTap(rows){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;store.set(TAPS_KEY,JSON.stringify(taps))}
+function noteTap(rows){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;if(d.r&&d.r!==h)r.r=d.r;store.set(TAPS_KEY,JSON.stringify(taps))}
 function ago(t){const m=Math.floor((Date.now()-t)/60000);if(m<1)return T('방금');if(m<60)return unit(m,'분')+T(' 전');const h=Math.floor(m/60);if(h<24)return unit(h,'시간')+T(' 전');const d=Math.floor(h/24);return d===1?T('어제'):unit(d,'일')+T(' 전')}
 function openTaps(){
  const esc=x=>String(x||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  const rows=Object.entries(taps).sort((a,b)=>tapSort==='n'?(b[1].n-a[1].n||b[1].t-a[1].t):b[1].t-a[1].t);
  $('tapCount').textContent=rows.length?unit(rows.length,'개'):'';
- $('tapList').innerHTML=rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
+ $('tapList').innerHTML=rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}${r.r?`<small class="rd">${esc(r.r)}</small>`:''}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
   :'<p class="tl-empty">'+T('아직 찾아본 말이 없어요.')+'</p>';
  if(!$('tapCopy')){const b=document.createElement('button');b.className='btn';b.id='tapCopy';b.textContent=T('복사');b.style.marginLeft='auto';b.addEventListener('click',copyTaps);$('tapSortN').after(b)}
  $('tapCopy').hidden=!rows.length;if($('tapText'))$('tapText').hidden=true;

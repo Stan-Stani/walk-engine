@@ -1021,7 +1021,7 @@ function logTalk(who,text,enKey){
 }
 function openTalk(){
  const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- $('talkList').innerHTML=talk.length?talk.map(([w,t,k])=>{const en=lineEn(k||t);return `<div class="tl"><span class="tw">${esc(w)}</span><span class="tt txt">${glossHTML(t)}${en?`<button class="tq" type="button" aria-label="영어로 보기">?</button><span class="ten" hidden>${esc(en)}</span>`:''}</span></div>`}).join('')
+ $('talkList').innerHTML=talk.length?talk.map(([w,t,k])=>{const en=lineEn(k||t);return `<div class="tl"><span class="tw">${esc(T(w))}</span><span class="tt txt">${glossHTML(t)}${en?`<button class="tq" type="button" aria-label="영어로 보기">?</button><span class="ten" hidden>${esc(en)}</span>`:''}</span></div>`}).join('')
   :'<p class="tl-empty">'+T('아직 대화가 없어요.')+'</p>';
  $('talkList').onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();q.nextElementSibling.hidden=!q.nextElementSibling.hidden}};if(window.LINES_EN)enUI();  // enUI: the ?'s style
  $('talkPanel').hidden=false;document.body.classList.add('talkopen');
@@ -1485,19 +1485,19 @@ function pips(w){const L=lv(w);return `<span class="pips${isDue(w)?' due':''}">$
 function openPanel(){
  renderNotes();if($('itemCard'))$('itemCard').hidden=true;
  const got=C.WORDS.filter(has);
- $('logCount').textContent=`${got.length}/${C.WORDS.length} · 복습 ${dueWords().length}`;
+ $('logCount').textContent=`${got.length}/${C.WORDS.length} · ${T('복습')} ${dueWords().length}`;
  if(!logSel||!has(logSel))logSel=got[got.length-1]||null;
  $('wlist').innerHTML=C.WORDS.map(w=>has(w)?`<button class="wd${w===logSel?' sel':''}" data-w="${w}"><span class="w">${w}</span>${pips(w)}</button>`:`<div class="wd off"><span class="w">？</span></div>`).join('');
  $('wlist').querySelectorAll('button.wd').forEach(b=>b.addEventListener('click',()=>{logSel=b.dataset.w;showEn=false;openPanel();speak(logSel)}));
  if(logSel){const d=C.DICT[logSel],L=lv(logSel);
   $('card').innerHTML=`<div class="top"><span class="big">${logSel}</span><button class="spk${canSpeak()?'':' '}" id="cardSpk" aria-label="듣기" ${canSpeak()?'':'hidden'}>${$('spk').innerHTML}</button></div>
-   <span class="def">${d.k}</span><span class="ex">예: ${d.ex}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
+   <span class="def">${d.k}</span><span class="ex">${T('예')}: ${d.ex}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
    <span class="hj">${T('기억 레벨')} ${L.b}/5 · ${isDue(logSel)?T('지금 복습할 수 있어요'):T('다음 복습: ')+fmtWait(L.due-now())+T(' 후')}</span>
    ${showEn?`<span class="en">${d.e}</span>`:'<button class="enb" id="cardEn" aria-label="영어로 보기">?</button>'}`;
   $('cardSpk')?.addEventListener('click',()=>speak(logSel+'. '+d.ex));
   $('cardEn')?.addEventListener('click',()=>{showEn=true;openPanel()});  // its own id: it once shared the dialogue's #enBtn, so this handler went onto the line's ? (re-rendering the 일지 on every tap)
  }else $('card').innerHTML='<span class="def">'+T('아직 단어가 없어요.')+'</span><span class="ex">'+T('사람들한테 말을 걸면 일지에 단어가 생겨요.')+'</span>';
- $('items').innerHTML=state.items.length?state.items.map((i,k)=>`<li data-k="${k}" title="${String(C.ITEMS[i]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(i).replace(/</g,'&lt;')}</li>`).join(''):'<li class="none">비어 있어요.</li>';
+ $('items').innerHTML=state.items.length?state.items.map((i,k)=>`<li data-k="${k}" title="${String(C.ITEMS[i]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(i).replace(/</g,'&lt;')}</li>`).join(''):'<li class="none">'+T('비어 있어요.')+'</li>';
  /* tap an item to read it again (the 복숭아 쪽지 that starts it all): its description in the card; an item with a photo (C.PHOTOS) opens it */
  $('items').querySelectorAll('li[data-k]').forEach(li=>li.addEventListener('click',()=>{const name=state.items[+li.dataset.k],ph=(C.PHOTOS||{})[name];
   if(ph){$('panel').hidden=true;openPhone(ph);return}

@@ -85,12 +85,15 @@ function wrapUp(){
  return qs.length?[{who:'…',say:TERM.wrap,black:1,wrapStart:1},...qs]:[];  // over a black screen: these are memories of people who aren't here
 }
 function nextDue(){const t=C.WORDS.filter(has).map(w=>lv(w).due).filter(d=>d>now());return t.length?Math.min(...t):null}
-function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?`${m}분`:m<1440?`${Math.round(m/60)}시간`:`${Math.round(m/1440)}일`}
+function fmtWait(ms){const m=Math.ceil(ms/60e3);return m<60?`${m}${T('분')}`:m<1440?`${Math.round(m/60)}${T('시간')}`:`${Math.round(m/1440)}${T('일')}`}
 
 /* ---------- settings ---------- */
 /* Per-game settings come from src/game.js (`var GAME={…}`), so one engine serves 성실호, 형제 and 점심 방송. */
 const G=typeof GAME!=='undefined'?GAME:{};
 const KEY=k=>(G.prefix||'walk')+'-'+k;
+/* GAME.ui: a game in another language (ことばのむら) gives the engine's own Korean text in its language, keyed by the Korean;
+   GAME.lang/voice: the speech language and the voice to prefer */
+const T=k=>(G.ui&&k in G.ui)?G.ui[k]:k;
 const TERM_BASE=Object.assign({allWords:n=>[`단어 ${n}개를 다 모았어요!`,`이제 ${TERM.name}에서 복습하면 ★가 생겨요.`],name:'복습 노트',empty:'아직 노트가 비어 있어요.',idle:'지금은 복습할 단어가 없어요.',next:'다음 복습',due:(n,k)=>`복습할 단어가 ${n}개 있어요.`+(k<n?` 이번에는 ${k}개만 해요.`:''),end:'복습 끝! 다음에 또 봐요.',carry:'지난번에 배운 말도 다시 나와요.',wrap:'오늘 배운 말, 한 번 더 떠올려요.'},G.term||{});
 const TERM=new Proxy(TERM_BASE,{get:(o,k)=>(typeof C!=='undefined'&&C&&C.term&&k in C.term)?C.term[k]:o[k]});  // a chapter's term:{name,…} overrides the game's (one 교시 reviews on paper, the next on a laptop)
 const LOGNAME=G.log||LOGNAME;
@@ -98,7 +101,7 @@ const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s
 let soundOn=store.get(KEY('sound'))!=='0';
 /* 듣기 문제 (START menu): review may ask a word by sound alone. On by default; ?listen=0 in the URL turns it off and saves that
    (the playtest tools do, since testers can't hear) */
-let writeOn=store.get(KEY('write'))==='1'||store.get(KEY('write'))==='step',writeStep=store.get(KEY('write'))==='step';
+let writeOn=!G.noWrite&&(store.get(KEY('write'))==='1'||store.get(KEY('write'))==='step'),writeStep=store.get(KEY('write'))==='step';
 {const q=new URLSearchParams(location.search).get('write');if(q==='0'||q==='1'||q==='step'){writeOn=q!=='0';writeStep=q==='step';store.set(KEY('write'),q)}}  // 쓰기 문제 (START): off until the player turns it on; ?write=0/1; ?write=step (prototype): the 쓰기 ladder
 let listenOn=store.get(KEY('listen'))!=='0';{const q=new URLSearchParams(location.search).get('listen');if(q==='0'||q==='1'){listenOn=q==='1';store.set(KEY('listen'),q)}}
 /* ?en=1: a link for testers without Korean: each line's English shows under it, as if its ? were already open (questions still
@@ -123,12 +126,12 @@ function sfx(k){
 /* ---------- speech (Korean voice, if this device has one) ---------- */
 const TTS='speechSynthesis' in window;
 let koVoice=null;
-function pickVoice(){if(!TTS)return;const vs=speechSynthesis.getVoices();koVoice=vs.find(v=>/^ko/i.test(v.lang)&&/google|yuna|sora|heami|neural/i.test(v.name))||vs.find(v=>/^ko/i.test(v.lang))||null;updateRead()}
+function pickVoice(){if(!TTS)return;const vs=speechSynthesis.getVoices();koVoice=vs.find(v=>new RegExp('^'+(G.lang||'ko').slice(0,2),'i').test(v.lang)&&(G.voice||/google|yuna|sora|heami|neural/i).test(v.name))||vs.find(v=>new RegExp('^'+(G.lang||'ko').slice(0,2),'i').test(v.lang))||null;updateRead()}
 const canSpeak=()=>!!koVoice;
 const plain=t=>t.replace(/\{([^|}]+)\|[^}]+\}/g,'$1');
 function speak(t){
  if(!canSpeak())return;
- try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(plain(t).replace(/___/g,'뭐'));u.lang='ko-KR';u.voice=koVoice;u.rate=.92;speechSynthesis.speak(u)}catch(e){}
+ try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(plain(t).replace(/___/g,T('뭐')));u.lang=G.lang||'ko-KR';u.voice=koVoice;u.rate=.92;speechSynthesis.speak(u)}catch(e){}
 }
 
 /* ---------- canvas + tiles ---------- */
@@ -788,7 +791,7 @@ function unlockNote(K,k){const N=NOTE_KINDS[K];
 const unlockCulture=k=>unlockNote('culture',k),unlockGrammar=k=>unlockNote('grammar',k);
 function renderNotes(){
  for(const N of Object.values(NOTE_KINDS)){if(!$(N.list))continue;const ks=N.seen.filter(k=>N.data[k]);
-  $(N.list).innerHTML=ks.length?ks.map(k=>`<button class="nb" data-k="${k}">${N.data[k].t}</button>`).join(''):'<p class="none">아직 없어요.</p>';
+  $(N.list).innerHTML=ks.length?ks.map(k=>`<button class="nb" data-k="${k}">${N.data[k].t}</button>`).join(''):'<p class="none">'+T('아직 없어요.')+'</p>';
   $(N.card).hidden=true}
 }
 /* a note in its card: the title and ? (English for every line), its lines (each with its source numbers), then a 문법 노트's examples
@@ -807,7 +810,7 @@ function showNote(K,k){
 if(Object.values(NOTE_KINDS).some(N=>$(N.list))){
  for(const [K,N] of Object.entries(NOTE_KINDS))if($(N.list)){
   $(N.list).addEventListener('click',e=>{const b=e.target.closest('.nb');if(b)showNote(K,b.dataset.k)});
-  $(N.card).addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();document.body.classList.add('talkopen');showWord(w.textContent)}})}  // word help above the journal
+  $(N.card).addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();document.body.classList.add('talkopen');showWord(w.dataset.w||w.textContent)}})}  // word help above the journal
  {const b=document.createElement('button');b.id='noteChip';b.className='notechip';b.type='button';b.hidden=true;$('toast').after(b);
   b.addEventListener('click',e=>{e.stopPropagation();openPanel();showNote(b.dataset.kind,b.dataset.k)});noteChip()}
  for(const id of ['closePanel','panel'])$(id).addEventListener('click',e=>{if(id==='closePanel'||e.target.id==='panel')document.body.classList.remove('talkopen')});
@@ -862,11 +865,11 @@ function show(s){
  if('cam' in s){camT=s.cam||null;if(camT){const cyc=Math.max(0,Math.min(camT[1]*TS+8-VH*TS/2,MH*TS-VH*TS));placeBox([camT[1]],cyc)}else placeBox(talkRows())}
  if(s.go){const [z,x,y,d]=s.go;loadZone(z,x,y,d||'down');talkCy=null;talkExtra=0;save();placeBox(talkRows())}  // a scene that moves you ("다음 날 아침, 학교")
  if(s.sfx||/딩동댕동/.test(s.say||''))sfx(s.sfx||'bell');  /* a step can play a sound; the school bell rings on its own */
- if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast('받았어요: '+s.give),200)}
+ if(s.give){state.items.push(s.give);save();sfx('item');setTimeout(()=>toast(T('받았어요: ')+s.give),200)}
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
  if(s.award)award(s.award);
  if(s.listen)s=prepListen(s);
- $('who').textContent=s.who||dlg.name;
+ $('who').textContent=T(s.who||dlg.name);  // '나' is the player in every game; GAME.ui names them in its language
  setEn(s.ask||s.build||s.listen?null:lineEn(s.enKey||s.say||''));  // an open question has no English (it would give the answer away); answered, its whole line has
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;writeKbOff();
  const text=s.say||s.ask||'';  // a word-order question needs no instruction: the tiles explain themselves
@@ -883,14 +886,14 @@ function prepListen(s){
  while(pool.length<2){const o=C.WORDS[Math.random()*C.WORDS.length|0];if(o!==w&&!pool.includes(o))pool.push(o)}
  const again=dlg.npc&&dlg.npc.banmal?`다시 들어 봐. "${w}".`:`다시 들어 보세요. "${w}".`;
  const out=s.listenLine?{...s,ask:s.ask.replace('___','🔊'),done:s.listenLine,own:1,w,opts:[[w,1],...pool.map(p=>[p,0,again])],listenOnly:1}  // someone's review line said aloud: the word is a sound in the text, and the whole line is the answer
-  :{...s,ask:'잘 들어 보세요. 무슨 단어예요?',w,opts:[[w,1],...pool.map(p=>[p,0,`"${w}"였어요. 다시 들어 보세요.`])],listenOnly:1};
+  :{...s,ask:T('잘 들어 보세요. 무슨 단어예요?'),w,opts:[[w,1],...pool.map(p=>[p,0,`"${w}"였어요. 다시 들어 보세요.`])],listenOnly:1};
  dlg.cur=out;return out;
 }
 /* Every Korean word in a line is tappable: marked glosses ({shown|key}) open the chapter DICT entry,
    all other words open the game's dictionary (LEX, built from the dialogue by lexicon/extract.py). */
 function glossHTML(t){
  const esc=x=>x.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- const words=x=>esc(x).replace(/[가-힣]+/g,w=>`<span class="w">${w}</span>`);
+ const words=x=>G.wordsHTML?G.wordsHTML(x,esc):esc(x).replace(/[가-힣]+/g,w=>`<span class="w">${w}</span>`);  // GAME.wordsHTML: the game's own word spans (data-w: the word to look up)
  let out='',last=0;const re=/\{([^|}]+)\|([^}]+)\}/g;let m;
  while((m=re.exec(t))){out+=words(t.slice(last,m.index))+`<span class="gl" data-k="${esc(m[2])}">${esc(m[1])}</span>`;last=re.lastIndex}
  return out+words(t.slice(last));
@@ -904,9 +907,9 @@ function lexLookup(w){ // word as written → [[lemma,{k,e}],…]; falls back to
  return (ls||[]).map(hit).filter(Boolean);
 }
 function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; English only behind the ? button. Stays until ×, A, B or the next line
- if(!rows.length){hideGloss();toast('사전에 없는 말이에요.');return}
+ if(!rows.length){hideGloss();toast(T('사전에 없는 말이에요.'));return}
  const el=$('gloss');
- el.innerHTML=rows.map(([h,d])=>`<div class="gr"><b>${h}</b>${d.k}<span class="en" hidden>${d.e||''}</span></div>`).join('')+'<button class="q" type="button" aria-label="영어로 보기">?</button><button class="gx" type="button" aria-label="닫기">×</button>';
+ el.innerHTML=rows.map(([h,d])=>`<div class="gr"><b>${h}${d.r&&d.r!==h?`<small class="rd">${d.r}</small>`:''}</b>${d.k}<span class="en" hidden>${d.e||''}</span></div>`).join('')+'<button class="q" type="button" aria-label="영어로 보기">?</button><button class="gx" type="button" aria-label="닫기">×</button>';
  el.hidden=false;const q=el.querySelector('.q');if(hints.glossQ!==1){q.classList.add('hintq');hintSeen('glossQ',3)}
  q.addEventListener('click',e=>{e.stopPropagation();hintDone('glossQ');q.classList.remove('hintq');el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden)});
 }
@@ -915,7 +918,7 @@ function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; Engli
    under the Korean until the next line. Lines made at run time (names, counts) have none. */
 const lineEn=t=>{const L=window.LINES_EN;return L&&t?L[plain(t)]||null:null};
 function enUI(){let b=$('enBtn');if(b)return b;
- b=document.createElement('button');b.id='enBtn';b.className='spk enq';b.type='button';b.textContent='?';b.setAttribute('aria-label','영어로 보기');$('spk').before(b);
+ b=document.createElement('button');b.id='enBtn';b.className='spk enq';b.type='button';b.textContent='?';b.setAttribute('aria-label',T('영어로 보기'));$('spk').before(b);
  const d=document.createElement('div');d.id='txtEn';d.className='txt-en';d.hidden=true;$('txt').after(d);
  b.addEventListener('click',e=>{e.stopPropagation();hintDone('lineQ');b.classList.remove('hintq');d.hidden=!d.hidden;b.classList.toggle('on',!d.hidden);b.blur()});  // blur: A/Enter go on talking, not toggle it again
  const st=document.createElement('style');st.textContent='.spk.enq{margin-left:auto;font:700 .9rem/1 var(--body,sans-serif)}.spk.enq+.spk{margin-left:0}'
@@ -979,14 +982,14 @@ function hintWord(){  // a line has been on the screen 4 s and no word has ever 
   const ws=[...$('txt').querySelectorAll('.w')],w=ws.filter(e=>e.textContent.length>=2).sort((a,b)=>b.textContent.length-a.textContent.length)[0]||ws[0];
   if(w){w.classList.add('hintw');hintSeen('word',6)}},4000)}
 function noteTap(rows){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;store.set(TAPS_KEY,JSON.stringify(taps))}
-function ago(t){const m=Math.floor((Date.now()-t)/60000);if(m<1)return '방금';if(m<60)return m+'분 전';const h=Math.floor(m/60);if(h<24)return h+'시간 전';const d=Math.floor(h/24);return d===1?'어제':d+'일 전'}
+function ago(t){const m=Math.floor((Date.now()-t)/60000);if(m<1)return T('방금');if(m<60)return m+T('분 전');const h=Math.floor(m/60);if(h<24)return h+T('시간 전');const d=Math.floor(h/24);return d===1?T('어제'):d+T('일 전')}
 function openTaps(){
  const esc=x=>String(x||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  const rows=Object.entries(taps).sort((a,b)=>tapSort==='n'?(b[1].n-a[1].n||b[1].t-a[1].t):b[1].t-a[1].t);
  $('tapCount').textContent=rows.length?rows.length+'개':'';
  $('tapList').innerHTML=rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}</b><span class="tpm">${r.n}번 · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
-  :'<p class="tl-empty">아직 찾아본 말이 없어요.</p>';
- if(!$('tapCopy')){const b=document.createElement('button');b.className='btn';b.id='tapCopy';b.textContent='복사';b.style.marginLeft='auto';b.addEventListener('click',copyTaps);$('tapSortN').after(b)}
+  :'<p class="tl-empty">'+T('아직 찾아본 말이 없어요.')+'</p>';
+ if(!$('tapCopy')){const b=document.createElement('button');b.className='btn';b.id='tapCopy';b.textContent=T('복사');b.style.marginLeft='auto';b.addEventListener('click',copyTaps);$('tapSortN').after(b)}
  $('tapCopy').hidden=!rows.length;if($('tapText'))$('tapText').hidden=true;
  $('tapSortT').classList.toggle('on',tapSort==='t');$('tapSortN').classList.toggle('on',tapSort==='n');
  $('tapPanel').hidden=false;document.body.classList.add('talkopen');$('tapList').scrollTop=0;
@@ -1003,8 +1006,8 @@ function copyTaps(){
  const txt=tapsText();
  const show=()=>{  // no clipboard (some embeds block it): show the text selected, ready for the phone's own copy
   let ta=$('tapText');if(!ta){ta=document.createElement('textarea');ta.id='tapText';ta.readOnly=true;ta.style.cssText='width:100%;height:9em;font-size:.8rem;margin:6px 0;box-sizing:border-box';$('tapList').before(ta)}
-  ta.hidden=false;ta.value=txt;ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}if(ok)toast('복사했어요!')};
- if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>toast('복사했어요!'),show);else show();
+  ta.hidden=false;ta.value=txt;ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}if(ok)toast(T('복사했어요!'))};
+ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>toast(T('복사했어요!')),show);else show();
 }
 function hideGloss(){$('gloss').hidden=true}
 /* ---------- conversation log: every line shown, scrollable, words tappable like in the dialogue box ---------- */
@@ -1019,7 +1022,7 @@ function logTalk(who,text,enKey){
 function openTalk(){
  const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  $('talkList').innerHTML=talk.length?talk.map(([w,t,k])=>{const en=lineEn(k||t);return `<div class="tl"><span class="tw">${esc(w)}</span><span class="tt txt">${glossHTML(t)}${en?`<button class="tq" type="button" aria-label="영어로 보기">?</button><span class="ten" hidden>${esc(en)}</span>`:''}</span></div>`}).join('')
-  :'<p class="tl-empty">아직 대화가 없어요.</p>';
+  :'<p class="tl-empty">'+T('아직 대화가 없어요.')+'</p>';
  $('talkList').onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();q.nextElementSibling.hidden=!q.nextElementSibling.hidden}};if(window.LINES_EN)enUI();  // enUI: the ?'s style
  $('talkPanel').hidden=false;document.body.classList.add('talkopen');
  const L=$('talkList');L.scrollTop=L.scrollHeight;
@@ -1037,10 +1040,10 @@ function renderChoices(s){
  writeKbOff();  // 보기 after a 쓰기 문제: the controls come back
  const box=$('choices');box.hidden=false;
  const order=shuffle(s.opts.map((_,i)=>i));
- box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${plain(String(s.opts[i][0])).replace(/[가-힣]+/g,w=>`<span class="cw">${w}</span>`)}</button>`).join('');
+ box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${G.choiceHTML?G.choiceHTML(plain(String(s.opts[i][0]))):plain(String(s.opts[i][0])).replace(/[가-힣]+/g,w=>`<span class="cw">${w}</span>`)}</button>`).join('');
  let pressT=null,defined=false;  // long-press a word on a choice = its definition (doesn't answer)
  box.querySelectorAll('.choice').forEach(b=>{
-  b.addEventListener('pointerdown',e=>{const w=e.target.closest('.cw');defined=false;clearTimeout(pressT);if(w)pressT=setTimeout(()=>{defined=true;showWord(w.textContent)},450)});
+  b.addEventListener('pointerdown',e=>{const w=e.target.closest('.cw');defined=false;clearTimeout(pressT);if(w)pressT=setTimeout(()=>{defined=true;showWord(w.dataset.w||w.textContent)},450)});
   for(const t of ['pointerup','pointerleave','pointercancel'])b.addEventListener(t,()=>clearTimeout(pressT));
   b.addEventListener('click',e=>{e.stopPropagation();if(defined){defined=false;return}choose(s,+b.dataset.i)})});
  sel=-1;choicesAt=performance.now();markSel();  // nothing selected: A can't answer by accident
@@ -1191,7 +1194,7 @@ function renderWrite(s){
  const submit=()=>{const v=writeNorm(inp.value);if(!v)return;inp.blur();
   const i=s.opts.findIndex(o=>writeNorm(o[0])===v);if(i>=0){if(s.opts[i][1])rampNote(s,s.hint1?null:true);choose(s,i);return}  // right, or a wrong option you wrote (its explanation)
   sfx('no');if(writeStep)writeGiveUp(s);else{s.missed=true;if(s.w){dlg.missed.add(s.w);askedIn[s.w]=talkN}}
-  dlg.next=s;show({who:s.who==='나'?'…':s.who,say:'아니에요. 보기에서 골라 봐요.',fb:1})};
+  dlg.next=s;show({who:s.who==='나'?'…':s.who,say:T('아니에요. 보기에서 골라 봐요.'),fb:1})};
  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();submit()}});
  box.querySelector('.wqok')?.addEventListener('click',e=>{e.stopPropagation();submit()});
  box.querySelector('.wqhb').addEventListener('click',e=>{e.stopPropagation();s.hinted=1;
@@ -1212,7 +1215,7 @@ function renderPick(s){
 function nextChapterAsk(line){
  const i=CHAPTERS.findIndex(c=>c.id===CH.id),nx=CHAPTERS[i+1];if(!nx)return line;
  const ro=(w=>{const c=w.charCodeAt(w.length-1)-0xAC00,b=c>=0&&c<11172?c%28:0;return b===0||b===8?'로':'으로'})(nx.n);  // 2교시로, 2장으로
- return {steps:[{say:(line?line+' ':'')+nx.n+ro+' 갈까요?',choose:[[nx.n+ro+' 가요',()=>{boot(nx.id);sfx('door')}],['아직이요',null]]}]};
+ return {steps:[{say:(line?line+' ':'')+nx.n+ro+' 갈까요?',choose:[[nx.n+ro+' 가요',()=>{boot(nx.id);sfx('door')}],[T('아직이요'),null]]}]};
 }
 function markSel(){const bs=choosing()?choiceBtns():tileBtns();bs.forEach((b,i)=>b.classList.toggle('sel',i===sel));bs[sel]?.focus({preventScroll:true});bs[sel]?.scrollIntoView({block:'nearest'})}
 function moveSel(d){if(performance.now()-choicesAt<450)return;  // keys still held from walking don't move a fresh question's selection
@@ -1262,12 +1265,12 @@ function gradeStep(s){
  if(!s.w)return;
  const before=lv(s.w).b,b=grade(s.w,!s.missed,!!s.hinted);
  updateHud();
- if(s.missed)setTimeout(()=>toast(`"${s.w}" 다시 연습해요`),250);
- if(!s.missed&&b>=3&&before<3){setTimeout(()=>{toast('★ '+s.w+' 기억했어요!');sfx('star')},250)}
- if(s.missed?firstTime('reviewMiss'):firstTime('reviewLevel'))dlg.steps.splice(dlg.i+1,0,{who:LOGNAME,say:s.missed?`"${s.w}" 다시 연습해요. 곧 또 나와요.`:`"${s.w}" 기억 레벨 ${b}/5.`+(b>=3?' ★':'')});
+ if(s.missed)setTimeout(()=>toast(`"${s.w}" ${T('다시 연습해요')}`),250);
+ if(!s.missed&&b>=3&&before<3){setTimeout(()=>{toast('★ '+s.w+T(' 기억했어요!'));sfx('star')},250)}
+ if(s.missed?firstTime('reviewMiss'):firstTime('reviewLevel'))dlg.steps.splice(dlg.i+1,0,{who:LOGNAME,say:s.missed?`"${s.w}" ${T('다시 연습해요. 곧 또 나와요.')}`:`"${s.w}" ${T('기억 레벨')} ${b}/5.`+(b>=3?' ★':'')});
 }
 /* praise after a right answer: a step's own `ok`, else 맞아! from a friend who speaks 반말 (NPC banmal:1), else 맞아요! */
-const okWord=s=>s.ok||(dlg.npc&&dlg.npc.banmal?'맞아!':'맞아요!');
+const okWord=s=>s.ok||(dlg.npc&&dlg.npc.banmal?T('맞아!'):T('맞아요!'));
 /* the asked line with its blank filled, minus a question after it that the answer has just settled ("…" 맞춤법에 맞는 건?) */
 function answered(ask,a){const f=ask.replace('___',a),i=ask.indexOf('___')+a.length;
  const m=f.slice(i).match(/^([^"”]*["”][.!?]?)\s+([^"”]*\?)$/);return m?f.slice(0,i)+m[1]:f}  // only a quoted example's question
@@ -1287,7 +1290,7 @@ function choose(s,i){
    if(react)dlg.next={who:s.reactWho||dlg.name,say:react,fb:1}}else show({who:s.who==='나'?dlg.name:s.who,say:okWord(s)+' '+(s.listenOnly?`"${o[0]}"`:line),fb:1,enKey:s.listenOnly?undefined:enKey,hl});
  }else{
   sfx('no');s.missed=true;if(s.w)dlg.missed.add(s.w);
-  dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||'다시 해 봐요.',fb:1});  // after your own line, the hint is narration
+  dlg.next=s;show({who:s.who==='나'?'…':s.who,say:o[2]||T('다시 해 봐요.'),fb:1});  // after your own line, the hint is narration
  }
 }
 function advance(){
@@ -1377,7 +1380,7 @@ function reviewFor(words){ // pick a question for the weakest of these words
  if(C.REVIEW){const g=(C.BANK||[]).filter(q=>q.w===w&&!q.scene);if(g.length)pool=g}  // with in-character review, the notebook asks the generic example sentences, not lines from someone's scene
  const gen=pool.filter(q=>!q.scene),all=gen.length?gen:pool;  // scene:1 quotes its own scene: never asked in review (it would play the scene before it happens)
  const own=all.filter(q=>!q.gram),qs=own.length?own:all;  // gram:1 tests a pattern, not the word: no star for the word from it
- const narr={review:true,who:'…',ok:'맞아요!'};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
+ const narr={review:true,who:'…',ok:T('맞아요!')};  /* asked by the narrator: the sentences are generic examples, not in the NPC's voice */
  if(canSpeak()&&soundOn&&listenOn&&Math.random()<.35)return {listen:w,...narr};  // a muted phone (or 듣기 문제 off) can't answer a listening question
  return {...freshQ(w,qs),...narr};
 }
@@ -1454,10 +1457,10 @@ function award(words){
  const L0=SRS().start??2;  // srs.start: the level of a word answered right every time it was taught (★ is level 3)
  nw.forEach(w=>{state.lv[w]=perfect.includes(w)?spaced(L0):{b:0,due:now()}});
  save();updateHud();sfx('badge');
- toast((G.gotToast||'일지에 추가')+': '+nw.join(', '));  // GAME.gotToast: the game's word for it (단어 마을: 배지 획득)
+ toast((G.gotToast||T('일지에 추가'))+': '+nw.join(', '));  // GAME.gotToast: the game's word for it (단어 마을: 배지 획득)
  const note=perfect.length===nw.length
-  ?{who:LOGNAME,say:`한 번도 안 틀렸어요! "${nw.join('", "')}" 기억 레벨 ${L0}/5.`}
-  :{who:LOGNAME,say:`일지에 적었어요. 틀린 단어는 곧 다시 나와요. 머리 위의 ?를 찾아요.`};
+  ?{who:LOGNAME,say:G.ui&&G.ui.awardPerfect?G.ui.awardPerfect(nw,L0):`한 번도 안 틀렸어요! "${nw.join('", "')}" 기억 레벨 ${L0}/5.`}
+  :{who:LOGNAME,say:G.ui&&G.ui.awardMissed?G.ui.awardMissed(nw):`일지에 적었어요. 틀린 단어는 곧 다시 나와요. 머리 위의 ?를 찾아요.`};
  if(firstTime(perfect.length===nw.length?'awardPerfect':'awardMissed'))dlg.steps.splice(dlg.i+1,0,note);
  if(state.badges.length>=C.WORDS.length&&!state.f.allWords){state.f.allWords=1;save();const all=TERM.allWords(C.WORDS.length);if(all&&all.length)pending=says(all)}  // term.allWords(n): the note when the last word is in ([] = none)
 }
@@ -1489,11 +1492,11 @@ function openPanel(){
  if(logSel){const d=C.DICT[logSel],L=lv(logSel);
   $('card').innerHTML=`<div class="top"><span class="big">${logSel}</span><button class="spk${canSpeak()?'':' '}" id="cardSpk" aria-label="듣기" ${canSpeak()?'':'hidden'}>${$('spk').innerHTML}</button></div>
    <span class="def">${d.k}</span><span class="ex">예: ${d.ex}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
-   <span class="hj">기억 레벨 ${L.b}/5 · ${isDue(logSel)?'지금 복습할 수 있어요':'다음 복습: '+fmtWait(L.due-now())+' 후'}</span>
+   <span class="hj">${T('기억 레벨')} ${L.b}/5 · ${isDue(logSel)?T('지금 복습할 수 있어요'):T('다음 복습: ')+fmtWait(L.due-now())+T(' 후')}</span>
    ${showEn?`<span class="en">${d.e}</span>`:'<button class="enb" id="cardEn" aria-label="영어로 보기">?</button>'}`;
   $('cardSpk')?.addEventListener('click',()=>speak(logSel+'. '+d.ex));
   $('cardEn')?.addEventListener('click',()=>{showEn=true;openPanel()});  // its own id: it once shared the dialogue's #enBtn, so this handler went onto the line's ? (re-rendering the 일지 on every tap)
- }else $('card').innerHTML='<span class="def">아직 단어가 없어요.</span><span class="ex">사람들한테 말을 걸면 일지에 단어가 생겨요.</span>';
+ }else $('card').innerHTML='<span class="def">'+T('아직 단어가 없어요.')+'</span><span class="ex">'+T('사람들한테 말을 걸면 일지에 단어가 생겨요.')+'</span>';
  $('items').innerHTML=state.items.length?state.items.map((i,k)=>`<li data-k="${k}" title="${String(C.ITEMS[i]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(i).replace(/</g,'&lt;')}</li>`).join(''):'<li class="none">비어 있어요.</li>';
  /* tap an item to read it again (the 복숭아 쪽지 that starts it all): its description in the card; an item with a photo (C.PHOTOS) opens it */
  $('items').querySelectorAll('li[data-k]').forEach(li=>li.addEventListener('click',()=>{const name=state.items[+li.dataset.k],ph=(C.PHOTOS||{})[name];
@@ -1536,14 +1539,14 @@ function dirPress(d){
  for(const t of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(t,off);}
 $('btnA').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
 $('btnB').addEventListener('pointerdown',e=>{e.preventDefault();cancel()});
-$('dlg').addEventListener('click',e=>{const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.textContent);return}if(e.target.closest('#spk'))return;advance()});
+$('dlg').addEventListener('click',e=>{const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.dataset.w||w.textContent);return}if(e.target.closest('#spk'))return;advance()});
 $('spk').addEventListener('click',e=>{e.stopPropagation();if(dlg)speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.say||dlg.cur.ask||'')});
 $('gloss').addEventListener('click',e=>{if(e.target.closest('.gx'))hideGloss()});  // × closes; A and B close too
 $('choices').addEventListener('pointerdown',e=>{const b=e.target.closest('.choice');if(b){sel=choiceBtns().indexOf(b);markSel()}});
 $('logBtn').addEventListener('click',()=>{showEn=false;openPanel()});
 $('talkBtn').addEventListener('click',openTalk);
 /* 나 꾸미기 panel: pick a look; the walk sprite and talk portrait preview live */
-const ME_OPTS={style:[['short','짧은 머리'],['long','긴 머리'],['bob','단발'],['bun','올림머리'],['spiky','삐죽 머리'],['bald','민머리']],
+const ME_OPTS={style:[['short',T('짧은 머리')],['long',T('긴 머리')],['bob',T('단발')],['bun',T('올림머리')],['spiky',T('삐죽 머리')],['bald',T('민머리')]],
  hair:['#1E1B22','#4A3426','#7A4B2A','#C9A15A','#B23A3A','#5A6FA8','#D8D2C4'],skin:['#F6D7BD','#F1C9A5','#E2AE86','#C68A5E','#8E5A3C']};
 let meDraft=null,meDone=null;
 function drawMePreview(){
@@ -1563,7 +1566,7 @@ function openMe(done){
 }
 function closeMe(keep){
  if(keep){me={...meDraft};if(me.lashes==='0'||!+me.lashes)delete me.lashes;else me.lashes=1;if(!me.lips||me.lips==='0')delete me.lips;
-  store.set(ME_KEY,JSON.stringify(me));if(typeof C.PLAYER!=='function')player.look=myLook(C.PLAYER||CREW_LOOK);toast('반가워요! 👋')}
+  store.set(ME_KEY,JSON.stringify(me));if(typeof C.PLAYER!=='function')player.look=myLook(C.PLAYER||CREW_LOOK);toast(T('반가워요! 👋'))}
  $('mePanel').hidden=true;const d=meDone;meDone=null;if(d)d();
 }
 if(CREATOR)$('meOpts').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;const k=b.dataset.k,on=meDraft[k]&&meDraft[k]!=='0';
@@ -1644,7 +1647,7 @@ function openReport(){
   $('repGame').addEventListener('click',()=>setRepKind('game'));$('repKo').addEventListener('click',()=>setRepKind('korean'));
   $('repNote').addEventListener('input',syncSend);
   $('repSend').addEventListener('click',e=>{if(!$('repNote').value.trim()){e.preventDefault();$('repNote').focus();return}
-   $('repSend').href=reportHref();setTimeout(()=>{closeReport();$('repNote').value='';syncSend();toast('고마워요!')},300)});
+   $('repSend').href=reportHref();setTimeout(()=>{closeReport();$('repNote').value='';syncSend();toast(T('고마워요!'))},300)});
  }
  const c=reportCtx();$('repCtx').textContent=[c.chapter+' · '+c.place,c.line||lastLines[lastLines.length-1]||'',c.word?'단어: '+c.word:''].filter(Boolean).join('\n');
  setRepKind(repKind);$('repPanel').hidden=false;document.body.classList.add('talkopen');hideGloss();
@@ -1660,18 +1663,18 @@ function menuAdd(b){const g=$('startPanel').querySelector('.mgrid');if(!g)return
   if(c.classList.contains('wide')){if(col===1){g.insertBefore(b,c);return}col=0}else col^=1}
  if(col===0)b.classList.add('wide');g.append(b)}
 /* 영어 자막: the on/off for ?en=1's English under every line, only for someone who has opened that link (others never see it) */
-if(window.LINES_EN&&store.get(KEY('enAll'))!==null){const b=document.createElement('button');b.className='mi toggle';b.id='enAllBtn';b.textContent='영어 자막';
+if(window.LINES_EN&&store.get(KEY('enAll'))!==null){const b=document.createElement('button');b.className='mi toggle';b.id='enAllBtn';b.textContent=T('영어 자막');
  const upd=()=>b.setAttribute('aria-pressed',String(enAll));upd();menuAdd(b);
  b.addEventListener('click',()=>{enAll=!enAll;store.set(KEY('enAll'),enAll?'1':'0');upd();sfx('ok');
-  const d=$('txtEn');if(d&&d.textContent){d.hidden=!enAll;$('enBtn').classList.toggle('on',enAll)}toast(enAll?'영어 자막을 켰어요.':'영어 자막을 껐어요.')})}
-{const b=document.createElement('button');b.className='mi';b.id='repBtn';b.textContent='문제 알리기';b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});menuAdd(b)}
+  const d=$('txtEn');if(d&&d.textContent){d.hidden=!enAll;$('enBtn').classList.toggle('on',enAll)}toast(enAll?T('영어 자막을 켰어요.'):T('영어 자막을 껐어요.'))})}
+{const b=document.createElement('button');b.className='mi';b.id='repBtn';b.textContent=T('문제 알리기');b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});menuAdd(b)}
 $('startBtn').addEventListener('click',toggleStart);$('startClose').addEventListener('click',()=>$('startPanel').hidden=true);
 $('startPanel').addEventListener('click',e=>{if(e.target.id==='startPanel'){$('startPanel').hidden=true;return}
  const mi=e.target.closest('.mi');if(mi&&!mi.classList.contains('toggle')){fromMenu=!$('startPanel').hidden&&['talkBtn','tapBtn'].includes(mi.id);$('startPanel').hidden=true}},true);  // capture: close the menu before the item opens its panel (the talk log and dictionary go back to it on 닫기)
 $('tapBtn').addEventListener('click',openTaps);$('tapClose').addEventListener('click',closeTaps);
 $('tapSortT').addEventListener('click',()=>{tapSort='t';openTaps()});$('tapSortN').addEventListener('click',()=>{tapSort='n';openTaps()});
 $('tapPanel').addEventListener('click',e=>{if(e.target.id==='tapPanel'){closeTaps();return}const p=e.target.closest('.tp');if(p){const en=p.querySelector('.tpe');en.hidden=!en.hidden}});$('talkClose').addEventListener('click',closeTalk);
-$('talkPanel').addEventListener('click',e=>{if(e.target.id==='talkPanel'){closeTalk();return}const gl=e.target.closest('.gl');if(gl){showGloss(gl.dataset.k);return}const w=e.target.closest('.w');if(w)showWord(w.textContent)});
+$('talkPanel').addEventListener('click',e=>{if(e.target.id==='talkPanel'){closeTalk();return}const gl=e.target.closest('.gl');if(gl){showGloss(gl.dataset.k);return}const w=e.target.closest('.w');if(w)showWord(w.dataset.w||w.textContent)});
 /* debug (START → 디버그, saved per game): a 건너뛰기 button on every conversation runs it to the end — right answers, finished word
    orders, every flag / item / word it sets, quietly — and stops at a real decision (a plain choice like "2교시로 갈까요?"). For testing. */
 /* only for development: shown off the published site (file://, localhost: the playtests) and in a browser that opened ?debug=1 once
@@ -1702,7 +1705,7 @@ function skipTalk(){
  soundOn=snd;if(TTS)try{speechSynthesis.cancel()}catch(e){}
 }
 (()=>{const grid=document.querySelector('#startPanel .mgrid');if(!grid)return;
- if(debugOK){const b=document.createElement('button');b.className='mi toggle';b.id='dbgBtn';b.setAttribute('aria-pressed','false');b.textContent='디버그';menuAdd(b)}
+ if(debugOK){const b=document.createElement('button');b.className='mi toggle';b.id='dbgBtn';b.setAttribute('aria-pressed','false');b.textContent=T('디버그');menuAdd(b)}
  $('spk').insertAdjacentHTML('beforebegin','<button class="spk" id="skipBtn" type="button" hidden style="width:auto;padding:0 8px;margin-left:auto;margin-right:6px;font-size:.8rem;font-weight:700">건너뛰기</button>');
  $('resetBtn').insertAdjacentHTML('beforebegin','<button class="btn" id="backBtn" type="button" hidden>한 단계 뒤로</button>');
  const upd=()=>{$('dbgBtn')?.setAttribute('aria-pressed',debugOn?'true':'false');$('skipBtn').hidden=!debugOn;updBack()};upd();
@@ -1731,7 +1734,7 @@ function updateMusic(){
  if(!m)return;bgm=new Audio(m);bgm.loop=true;bgm.volume=musicVol/100;bgm.play().catch(()=>{});
 }
 if(G.music){
- const b=document.createElement('button');b.className='mi toggle';b.id='musicBtn';b.textContent='음악';
+ const b=document.createElement('button');b.className='mi toggle';b.id='musicBtn';b.textContent=T('음악');
  const upd=()=>b.setAttribute('aria-pressed',String(musicOn));upd();
  b.addEventListener('click',()=>{musicOn=!musicOn;store.set(KEY('music'),musicOn?'1':'0');upd();sfx('ok');updateMusic()});
  const v=document.createElement('div');v.className='vol';v.innerHTML='<input type="range" min="0" max="100" step="5" aria-label="음악 크기">';v.prepend(b);  // the 음악 on/off sits beside its volume, under the menu buttons  // the volume (Android and desktop: iPhones ignore it, use the side buttons)
@@ -1743,24 +1746,24 @@ if(G.music){
  addEventListener('pointerdown',wake,true);addEventListener('keydown',wake,true);
  document.addEventListener('visibilitychange',()=>{if(!bgm)return;if(document.hidden)bgm.pause();else wake()});
 }
-{const b=document.createElement('button');b.className='mi toggle';b.id='writeBtn';b.textContent=writeStep?'쓰기 문제 · 단계별':'쓰기 문제';  // 쓰기 문제 on/off (every game); 단계별 = the ladder (?write=step)
+if(!G.noWrite){const b=document.createElement('button');b.className='mi toggle';b.id='writeBtn';b.textContent=writeStep?'쓰기 문제 · 단계별':'쓰기 문제';  // 쓰기 문제 on/off (every game); 단계별 = the ladder (?write=step)
  const upd=()=>b.setAttribute('aria-pressed',String(writeOn));upd();menuAdd(b);
  b.addEventListener('click',()=>{writeOn=!writeOn;store.set(KEY('write'),writeOn?(writeStep?'step':'1'):'0');upd();sfx('ok');toast(writeOn?'★ 단어는 직접 써요.':'쓰기 문제를 껐어요. 보기에서 골라요.')})}
 if($('listenBtn')){const upd=()=>$('listenBtn').setAttribute('aria-pressed',String(listenOn));upd();  // a game's shell may offer the 듣기 문제 toggle
- $('listenBtn').addEventListener('click',()=>{listenOn=!listenOn;store.set(KEY('listen'),listenOn?'1':'0');upd();sfx('ok');toast(listenOn?'복습에 듣기 문제가 나와요.':'듣기 문제를 껐어요.')})}
+ $('listenBtn').addEventListener('click',()=>{listenOn=!listenOn;store.set(KEY('listen'),listenOn?'1':'0');upd();sfx('ok');toast(listenOn?T('복습에 듣기 문제가 나와요.'):'듣기 문제를 껐어요.')})}
 $('readBtn').addEventListener('click',()=>{
- if(!canSpeak()){toast('이 기기에는 한국어 음성이 없어요.');return}
- readOn=!readOn;store.set(KEY('read'),readOn?'1':'0');updateRead();toast(readOn?'대사를 소리 내서 읽어요.':'읽기를 껐어요.');if(readOn&&dlg)speak(dlg.cur.say||dlg.cur.ask||'');
+ if(!canSpeak()){toast(T('이 기기에는 한국어 음성이 없어요.'));return}
+ readOn=!readOn;store.set(KEY('read'),readOn?'1':'0');updateRead();toast(readOn?T('대사를 소리 내서 읽어요.'):T('읽기를 껐어요.'));if(readOn&&dlg)speak(dlg.cur.say||dlg.cur.ask||'');
 });
 $('closePanel').addEventListener('click',()=>$('panel').hidden=true);
 $('panel').addEventListener('click',e=>{if(e.target.id==='panel')$('panel').hidden=true});
 let armT;
 $('resetBtn').addEventListener('click',()=>{
  const b=$('resetBtn');
- if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='한 번 더 누르면 지워져요';clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent='처음부터'},3000);return}
- b.classList.remove('armed');b.textContent='처음부터';
+ if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent=T('한 번 더 누르면 지워져요');clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent=T('처음부터')},3000);return}
+ b.classList.remove('armed');b.textContent=T('처음부터');
  dropTalk();state=fresh();state.seenIntro=true;save();forgetNotes();store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
- setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);  // starting over replays the intro, like a first start
+ setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);  // starting over replays the intro, like a first start
 });
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.querySelector('.pad').addEventListener('touchstart',e=>{if(e.cancelable)e.preventDefault()},{passive:false});
@@ -1790,7 +1793,7 @@ function boot(id){
  $('chName').textContent=CH.n;
  updateHud();updateQuest();updBack();
  if(G.onBoot)G.onBoot(CH,C);  // the game's own page parts for this chapter (단어 마을: tips, news sources)
- if(!state.seenIntro){state.seenIntro=true;state.steps=[];save();countPlay('start');countStep();const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||'이야기',C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
+ if(!state.seenIntro){state.seenIntro=true;state.steps=[];save();countPlay('start');countStep();const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
  else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over
 }
 function chapterProgress(c){try{const s=JSON.parse(store.get(c.save)||'null');return s?{got:(s.badges||[]).length,done:!!(s.f&&s.f.done)}:{got:0,done:false}}catch(e){return {got:0,done:false}}}

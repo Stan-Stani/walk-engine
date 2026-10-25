@@ -504,7 +504,7 @@ function marker(X,Y,t,st){
  const bob=Math.round(Math.sin(t/220)*1.5);
  if(st==='todo'){r(X+6,Y-9+bob,4,8,'#1B1E2B');r(X+7,Y-8+bob,2,4,'#E8962A');r(X+7,Y-3+bob,2,1,'#E8962A')}
  else if(st==='review'){const y=Y-10+bob;r(X+5,y,6,9,'#1B1E2B');r(X+6,y+1,4,7,'#69CFD8');r(X+7,y+2,2,1,'#0F141A');r(X+8,y+3,1,1,'#0F141A');r(X+7,y+4,1,1,'#0F141A');r(X+7,y+6,1,1,'#0F141A')}
- else if(st==='side'){const y=Y-12,k='#1B1E2B',w='#C9D1CD';r(X+4,y,8,1,k);r(X+3,y+1,1,4,k);r(X+12,y+1,1,4,k);r(X+4,y+5,8,1,k);r(X+4,y+1,8,4,w);r(X+5,y+2,6,1,'#93A09A');r(X+5,y+3,4,1,'#93A09A');r(X+6,y+5,2,1,w);r(X+6,y+6,1,1,w);r(X+5,y+6,1,1,k);r(X+7,y+6,1,1,k);r(X+6,y+7,1,1,k)}  // someone with something new to say, off the story path: a still grey speech bubble, quieter than ! and ?
+ else if(st==='side'){const y=Y-9,k='#1B1E2B',w='#C9D1CD';r(X+4,y,8,1,k);r(X+3,y+1,1,4,k);r(X+12,y+1,1,4,k);r(X+4,y+5,8,1,k);r(X+4,y+1,8,4,w);r(X+5,y+2,6,1,'#93A09A');r(X+5,y+3,4,1,'#93A09A');r(X+6,y+5,2,1,w);r(X+6,y+6,1,1,w);r(X+5,y+6,1,1,k);r(X+7,y+6,1,1,k);r(X+6,y+7,1,1,k)}  // someone with something new to say, off the story path: a still grey speech bubble, quieter than ! and ?
  else if(st==='wait'){const y=Y-5+bob;[5,7,9].forEach((dx,i)=>r(X+dx,y,1,1,Math.floor(t/300)%3===i?'#FFFFFF':'#93A09A'))}
  else{const y=Y-9+bob;r(X+7,y,2,2,'#E8962A');r(X+4,y+2,8,2,'#E8962A');r(X+5,y+4,6,1,'#E8962A');r(X+5,y+5,2,2,'#E8962A');r(X+9,y+5,2,2,'#E8962A');r(X+7,y+2,2,2,'#F6D9A6')}
 }

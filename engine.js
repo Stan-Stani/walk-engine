@@ -1334,6 +1334,7 @@ function cancel(){
   $('panel').hidden=true;$('chPanel').hidden=true;document.body.classList.remove('talkopen');return}
  if(!$('gloss').hidden){hideGloss();return}
  if(choosing()||building()){speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.ask||'');return} // B never throws away a question; it replays it
+ if(dlg&&dlg.cur&&dlg.cur.fb&&dlg.next&&(dlg.next.ask||dlg.next.build||dlg.next.listen)){if(typing&&!typing.finished)typing.fin();advance();return}  // B on a wrong-answer hint dismisses the hint: back to the question, not out of the talk
  if(dlg)closeDialog();
 }
 const says=a=>(Array.isArray(a)?a:[a]).filter(t=>t!=null&&t!=='').map(t=>typeof t==='string'?{say:t}:t);  // a missing line (an NPC with no after:) is no step, not a crash  // a line, or a full step (set:, sfx:, …)

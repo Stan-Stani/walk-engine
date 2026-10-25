@@ -133,7 +133,7 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   then the answerer's (each with its own portrait via a step's `look`), and the pair keeps facing each other.
 - A game's own art (단어 마을 keeps its older drawing style): a look's `draw(look, X, Y, dir, step)` draws that character instead of
   the engine's sprites (player, NPCs, followers); `GAME.marker(X, Y, t, status)` draws the ! ? ★ markers ('todo', 'review',
-  'wait', 'star'); `GAME.hud` names the HUD counter (default 일지) and `GAME.gotToast` the new-word toast (default 일지에 추가). A `term.allWords(n)` gives the note when the last word is in
+  'wait', 'star', and 'side': a still grey bubble over someone with an optional new talk); `GAME.hud` names the HUD counter (default 일지) and `GAME.gotToast` the new-word toast (default 일지에 추가). A `term.allWords(n)` gives the note when the last word is in
   (default: "단어 n개를 다 모았어요!" + review hint; `[]` for none, when the chapter's own ending says it).
 - Step `black:1`: the line (and the ones after it) plays over a black screen, a time cut ("겨울." in an epilogue); `black:0` or the end
   of the conversation brings the room back.

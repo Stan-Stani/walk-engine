@@ -547,11 +547,12 @@ const blocked=(x,y)=>!walkable(x,y)||!!npcAt(x,y);
 const CREATOR=!!document.getElementById('mePanel');  // 나 꾸미기 only where the page has the panel
 const panelOpen=()=>(CREATOR&&!$('mePanel').hidden)||!$('startPanel').hidden||!$('panel').hidden||!$('chPanel').hidden||!$('talkPanel').hidden||!$('tapPanel').hidden||(!!$('repPanel')&&!$('repPanel').hidden);
 
+const boxedIn=(px,py)=>Object.values(D).every(([dx,dy])=>{const x=player.x+dx,y=player.y+dy;return x===px&&y===py||blocked(x,y)});  // every other way is shut: a press toward the follower swaps at once (else the turn-first rule reads as a wall)
 function tryMove(){
  if(player.moving||!held||dlg||panelOpen()||warping)return;
  player.sit=null;
  const was=player.dir;player.dir=held;const [dx,dy]=D[held];const nx=player.x+dx,ny=player.y+dy;
- if(petOn()&&pet.x===nx&&pet.y===ny){if(was!==held){petTurn=pressN;return}if(petTurn===pressN)return}  // the follower right there: a press turns you to face them (A talks); a NEW press swaps places — holding that first press never swaps by itself (a normal tap lasts a few frames)
+ if(petOn()&&pet.x===nx&&pet.y===ny&&!boxedIn(nx,ny)){if(was!==held){petTurn=pressN;return}if(petTurn===pressN)return}  // the follower right there: a press turns you to face them (A talks); a NEW press swaps places — holding that first press never swaps by itself (a normal tap lasts a few frames)
  const w=warpAt(nx,ny);const lock=w&&w.lock&&w.lock();
  if(lock){if(performance.now()-lockMsgAt>1500){lockMsgAt=performance.now();sfx('lock');toast(lock)}return}
  if(blocked(nx,ny))return;

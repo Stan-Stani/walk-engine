@@ -766,7 +766,8 @@ function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidde
 if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten')||(q.nextElementSibling&&q.nextElementSibling.classList.contains('ten')?q.nextElementSibling:null);if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();return}const g=e.target.closest('.gl');if(g){e.stopPropagation();showGloss(g.dataset.k);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
 /* ---------- phone chat (opt-in; 소리 엽서). A dialogue step chat:{id, room, msgs, reply?, after?, set?, award?} is one exchange in a
    messenger room, shown on the phone (#phonePanel) with the dialogue box out of the way:
-   - msgs/after: [{id, from, text, time, pic?, caption?}] — from is a cast id (C.CAST / GAME.cast: {id:{name, look}}) or 'me' (the player:
+   - msgs/after: [{id, from, text, time, now?, pic?, caption?}] (time: when it was sent; now: what the phone's clock shows as it
+     arrives, default its time; the chat's own now: the clock when a finished exchange is reopened later) — from is a cast id (C.CAST / GAME.cast: {id:{name, look}}) or 'me' (the player:
      right-hand bubbles, no portrait). Each message is one press of A. pic: a picture card (C.PICS[pic](canvas) draws it) with a caption.
    - reply: {id, ask, opts, w, reg?} — a question whose options are whole messages, answered in the reply strip under the thread (the
      dialogue's own #choices, moved there): a wrong one shows its hint over the thread and never becomes a bubble; the right one is sent.
@@ -798,13 +799,14 @@ function chatSteps(c){  // a chat step → its dialogue steps
 function openChat(c,all){
  if(!$('phonePanel'))return;curChat={c,msgs:[],sent:null,later:[]};curPhone={chat:1};
  const R=chatRoom(c.room),bat=c.battery??72,bars='<i class="sig"><b></b><b></b><b></b><b class="off"></b></i>';
- $('pscr').innerHTML=`<div class="pstat"><span>${c.time||(c.msgs&&c.msgs[0]&&c.msgs[0].time)||''}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
+ $('pscr').innerHTML=`<div class="pstat"><span class="pnow">${c.time||(c.msgs&&c.msgs[0]&&(c.msgs[0].now||c.msgs[0].time))||''}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
   +`<div class="pbar chatbar"><span class="txt">${glossHTML(R.t||c.room)}${R.members?` <small>${R.members.length}</small>`:''}</span><span>☰</span></div>`
   +`<div class="clist" id="clist"></div><div class="cfb" id="cfb" hidden></div><div class="creply" id="creply"><div class="cask txt" id="cask" hidden></div></div>`;
  const ch=$('choices');curChat.home=[ch.parentNode,ch.nextSibling];$('creply').appendChild(ch);  // the dialogue's choices become the reply strip
  $('phonePanel').hidden=false;phoneOpen=true;document.body.classList.add('chatting');
- if(all)all.forEach(m=>chatPush(m,true));
+ if(all){all.forEach(m=>chatPush(m,true));setNow(c.now||'')}  // reopened later: the transcript keeps its send times, the clock shows c.now (now) if given
 }
+const setNow=t=>{const el=$('pscr')&&$('pscr').querySelector('.pnow');if(el&&t)el.textContent=t};
 function closeChat(){
  if(!curChat)return;const ch=$('choices');ch.hidden=true;ch.innerHTML='';
  const [par,nx]=curChat.home;if(par)par.insertBefore(ch,nx&&nx.parentNode===par?nx:null);
@@ -825,6 +827,7 @@ function chatPush(m,quiet){
  L.appendChild(row);
  if(!mine&&who.look){try{drawPortrait(row.querySelector('.cface'),who.look,m.face||'happy',false)}catch(e){}}
  if(m.pic){const P=(C.PICS||G.pics||{})[m.pic];if(P)try{P(row.querySelector('.cpic'))}catch(e){}}
+ if(!quiet)setNow(m.now||m.time);  // the phone's clock: the story's time now (m.now), else the message's send time
  curChat.msgs.push({from:m.from,text:m.text||m.caption||'',time:m.time,id:m.id,pic:m.pic});
  if(!quiet)logTalk(chatRoom(curChat.c.room).t+' · '+(mine?T('나'):who.name),m.text||m.caption||'',key&&lineEn(key)?key:undefined);
  if(near||mine||curChat.msgs.length<=1)L.scrollTop=L.scrollHeight;  // new messages don't pull you back down if you scrolled up to read
@@ -854,7 +857,7 @@ const PC=()=>G.postcard||globalThis.POSTCARD||[];  // GAME.postcard, or a POSTCA
 const pcIdx=id=>CHAPTERS.findIndex(c=>c.id===id);
 function pcCards(){  // the cards up to this chapter: [{e, v (the version shown), made}]
  const cur=pcIdx(CH.id),got=shared.postcard||{};
- return PC().filter(e=>pcIdx(e.ch)<=cur).map(e=>{const m=got[e.id];return {e,k:m?m.v:e.def,made:!!m}}).filter(x=>x.e.v[x.k]);
+ return PC().filter(e=>{const i=pcIdx(e.ch);return i>=0&&i<=cur}).map(e=>{const m=got[e.id];return {e,k:m?m.v:e.def,made:!!m}}).filter(x=>x.e.v[x.k]);
 }
 function putCard(c){const e=PC().find(x=>x.id===c.id);if(!e||!e.v[c.v])return;(shared.postcard||(shared.postcard={}))[c.id]={v:c.v,ch:CH.id,t:Date.now()};saveShared();
  sfx('item');setTimeout(()=>toast(T('엽서에 추가')+': '+plain(e.v[c.v].caption||e.place||'')),200)}

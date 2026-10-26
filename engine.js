@@ -120,6 +120,7 @@ const SFX={move:[[1040,.04,0]],ok:[[880,.07,0],[1320,.12,.07]],no:[[240,.12,0],[
 const SFXON={};
 function sfx(k){
  if(!soundOn)return;
+ if(k==='bell')duckMusic(5200);  // the bell rings over the music: it dips almost to nothing while the chime plays (user, 2026-10-25)
  try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const t0=AC.currentTime;
   (SFXON[k]||[]).forEach(g=>{g.gain.cancelScheduledValues(t0);g.gain.setTargetAtTime(.0001,t0,.05)});  /* a sound started again cuts the last one short */
   SFXON[k]=SFX[k].map(([fq,d,st,type,vol])=>{const o=AC.createOscillator(),gn=AC.createGain();o.type=type||'square';o.frequency.value=fq;gn.gain.setValueAtTime(0,t0);gn.gain.setValueAtTime(vol||.035,t0+st);gn.gain.exponentialRampToValueAtTime(.0001,t0+st+d);o.connect(gn).connect(AC.destination);o.start(t0+st);o.stop(t0+st+d+.02);return gn})}catch(e){}
@@ -1334,6 +1335,7 @@ function cancel(){
   $('panel').hidden=true;$('chPanel').hidden=true;document.body.classList.remove('talkopen');return}
  if(!$('gloss').hidden){hideGloss();return}
  if(choosing()||building()){speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.ask||'');return} // B never throws away a question; it replays it
+ if(dlg&&dlg.black){if(typing&&!typing.finished)typing.fin();else advance();return}  // over a black time cut B goes on like A: closing there skipped the cut's end (the bell, the move, the day's flag) and once locked a 교시
  if(dlg&&dlg.cur&&dlg.cur.fb&&dlg.next&&(dlg.next.ask||dlg.next.build||dlg.next.listen)){if(typing&&!typing.finished)typing.fin();advance();return}  // B on a wrong-answer hint dismisses the hint: back to the question, not out of the talk
  if(dlg)closeDialog();
 }
@@ -1482,6 +1484,12 @@ function updateHud(){const n=state.badges.length,st=C.WORDS.filter(w=>has(w)&&lv
 function fitReg(){const e=$('reg');if(!e)return;e.style.letterSpacing=e.style.fontSize='';const f0=parseFloat(getComputedStyle(e).fontSize);
  for(const [ls,k] of [['.08em',1],['.03em',1],['.02em',.92],['0',.86]]){if(e.scrollWidth<=e.clientWidth)return;e.style.letterSpacing=ls;e.style.fontSize=k<1?f0*k+'px':''}}
 addEventListener('resize',()=>fitReg());
+/* phones: the first tap goes fullscreen (browsers allow it only from a tap, and only on release for touch), hiding the status and
+   address bars: in landscape they took a third of the height and shrank the game. Tried once per visit: a player who leaves
+   fullscreen stays out until the next load. (iPhone Safari has no fullscreen for pages; nothing happens there.) */
+{let fsTried=false;const fs=()=>{if(fsTried||document.fullscreenElement||!matchMedia('(pointer:coarse)').matches||!document.documentElement.requestFullscreen)return;
+ fsTried=true;document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(()=>{})};
+ addEventListener('pointerup',fs,true);addEventListener('touchend',fs,true)}
 function updateQuest(){$('questTxt').textContent=C.questText();countStep();$('quest').classList.toggle('late',!!(C.questLate&&C.questLate()))}  // questLate: the goal is overdue (shell CSS .quest.late)
 function updateRead(){$('readBtn').setAttribute('aria-pressed',readOn&&canSpeak()?'true':'false');$('spk').hidden=!canSpeak()}
 function updateSound(){$('sndBtn').setAttribute('aria-pressed',soundOn?'true':'false')}
@@ -1731,12 +1739,17 @@ function creditUI(){const c=$('credit');if(!c)return;const M=typeof G.music==='s
  const t=bgmSrc.split('/').pop().replace(/\.\w+$/,'').split(/[-_]/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');  // '' while quiet: no track name
  c.textContent='음악 · '+(t?t+' — ':'');const a=document.createElement(M.url?'a':'span');a.textContent=M.by;
  if(M.url){a.href=M.url;a.target='_blank';a.rel='noopener'}c.append(a)}
+let duck=1,duckEnd=0,duckT=null;  // 1 = full music volume; the bell takes it down to .05 and back
+const musicLevel=()=>musicVol/100*duck;
+function duckMusic(ms){duckEnd=Math.max(duckEnd,performance.now()+ms);if(duckT)return;
+ duckT=setInterval(()=>{const down=performance.now()<duckEnd;duck=down?Math.max(.05,duck-.15):Math.min(1,duck+.04);  // ~0.3 s down, ~1.2 s back up
+  if(bgm)bgm.volume=musicLevel();if(!down&&duck>=1){clearInterval(duckT);duckT=null}},50)}
 function updateMusic(){
  if(!G.music)return;
  let m=Z?('music' in Z?Z.music:C.MUSIC):null;if(typeof m==='function')m=m();m=(soundOn&&musicOn&&m)||'';
  if(m===bgmSrc)return;bgmSrc=m;creditUI();
  if(bgm){bgm.pause();bgm=null}
- if(!m)return;bgm=new Audio(m);bgm.loop=true;bgm.volume=musicVol/100;bgm.play().catch(()=>{});
+ if(!m)return;bgm=new Audio(m);bgm.loop=true;bgm.volume=musicLevel();bgm.play().catch(()=>{});
 }
 if(G.music){
  const b=document.createElement('button');b.className='mi toggle';b.id='musicBtn';b.textContent=T('음악');
@@ -1744,7 +1757,7 @@ if(G.music){
  b.addEventListener('click',()=>{musicOn=!musicOn;store.set(KEY('music'),musicOn?'1':'0');upd();sfx('ok');updateMusic()});
  const v=document.createElement('div');v.className='vol';v.innerHTML='<input type="range" min="0" max="100" step="5" aria-label="음악 크기">';v.prepend(b);  // the 음악 on/off sits beside its volume, under the menu buttons  // the volume (Android and desktop: iPhones ignore it, use the side buttons)
  const r=v.querySelector('input');r.value=musicVol;$('startPanel').querySelector('.mgrid').after(v);
- r.addEventListener('input',()=>{musicVol=+r.value;store.set(KEY('musicVol'),String(musicVol));if(bgm)bgm.volume=musicVol/100;
+ r.addEventListener('input',()=>{musicVol=+r.value;store.set(KEY('musicVol'),String(musicVol));if(bgm)bgm.volume=musicLevel();
   if(!musicOn&&musicVol>0){musicOn=true;store.set(KEY('music'),'1');upd();updateMusic()}});  // moving the slider while 음악 is off turns it back on
  const g=document.querySelector('.startsheet .games');if(g){const c=document.createElement('div');c.className='credit';c.id='credit';g.after(c);creditUI()}
  const wake=()=>{if(bgm&&bgm.paused&&!document.hidden)bgm.play().catch(()=>{})};

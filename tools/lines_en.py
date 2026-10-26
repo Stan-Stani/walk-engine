@@ -11,11 +11,11 @@ Editing a line's Korean (even a particle) drops its English: run this after ever
 close to an English entry no longer in the game gets that entry as "was"/"was_en" in lines-todo.json, so it can be redone."""
 import json,re,sys,pathlib,difflib
 repo=pathlib.Path(sys.argv[1] if len(sys.argv)>1 else '.')
-SKIP={'k','e','ex','hj','name','who','title','place','reg','n','introWho','label','w','look','tile','zone','by','id','t','src','reactWho'}
+SKIP={'k','e','ex','hj','name','who','title','place','n','introWho','label','w','look','tile','zone','by','id','t','src','reactWho'}
 STR=re.compile(r"'((?:[^'\\\n]|\\.)*)'|`([^`]*)`|\"((?:[^\"\\\n]|\\.)*)\"")
 ANSWER=re.compile(r"\[(['\"])((?:[^'\"\\]|\\.)*)\1,1[,\]]")
 plain=lambda t:re.sub(r'\{([^|}]+)\|[^}]+\}',r'\1',t)
-files=sorted((repo/'src/chapters').glob('ch*.js'),key=lambda p:int(re.search(r'\d+',p.stem).group()))+[q for q in [repo/'src/school.js'] if q.exists()]
+files=sorted((repo/'src/chapters').glob('ch*.js'),key=lambda p:int(re.search(r'\d+',p.stem).group()))+[q for q in [repo/'src/school.js',repo/'src/shared.js',repo/'src/chapters/proto.js'] if q.exists()]
 def uncomment(src):
     """Blank out /* */ and // comments (not inside strings), keeping line breaks: an apostrophe in a comment ("다온's …")
     would otherwise open a fake string."""
@@ -58,10 +58,34 @@ for p in files:
                 a=ANSWER.search(after+' '+' '.join(rows[i+1:i+3]))  # the choices can start on the next line
                 if a: e['answer']=a.group(2)
             lines[t]=e
+# phone chats (chat:{id, msgs, reply, after}): every message, reply option and picture caption needs English. A line that is
+# collected above is keyed by its text; a short or jamo-only one ('ㅇㅇ', '사진 보내 봐' is fine, 'ㅋㅋ' isn't) by its place in the
+# chat, 'chat:<exchange>:<message id>' (a reply option: 'chat:<exchange>:<reply id>:<option index>'), as the engine looks it up.
+alias={}  # a chat key whose message is also a line by its text: English under either is fine (the engine tries the key first)
+STRQ=r"'((?:[^'\\\n]|\\.)*)'"
+for p in files:
+    src=uncomment(p.read_text(encoding='utf-8'))
+    for cm in re.finditer(r"chat:\{id:'([^']+)'",src):
+        ex=cm.group(1);end=src.find('chat:{id:',cm.end());body=src[cm.end():end if end>0 else len(src)]
+        for mm in re.finditer(r"\{id:'([^']+)',from:'\w+'[^{}]*?(?:text|caption):"+STRQ,body):
+            t=plain(mm.group(2).replace("\\'","'"))
+            k='chat:'+ex+':'+mm.group(1)
+            if t in lines: alias[k]=t
+            else: lines[k]={'file':str(p.relative_to(repo)),'text':t}
+        rm=re.search(r"reply:\{id:'([^']+)'",body)
+        if rm:
+            om=re.search(r"opts:\[(.*?)\]\]\}",body[rm.end():],re.S)
+            if om:
+                for i,o in enumerate(re.findall(r"\[("+STRQ+")",om.group(1)+']')):
+                    t=plain(o[1].replace("\\'","'"))
+                    k='chat:'+ex+':'+rm.group(1)+':'+str(i)
+                    if t in lines: alias[k]=t
+                    else: lines[k]={'file':str(p.relative_to(repo)),'text':t}
 en_p=repo/'src/lines-en.json'
 en=json.loads(en_p.read_text(encoding='utf-8')) if en_p.exists() else {}
-todo=[{'ko':k,**v} for k,v in lines.items() if not (en.get(k) or '').strip()]
-stale=[k for k in en if k not in lines and (en[k] or '').strip()]
+has_en=lambda k:(en.get(k) or '').strip() or any((en.get(a) or '').strip() for a,t in alias.items() if t==k)
+todo=[{'ko':k,**v} for k,v in lines.items() if not has_en(k)]
+stale=[k for k in en if k not in lines and k not in alias and (en[k] or '').strip()]
 # an edited line loses its English silently (the key is the Korean): give its todo entry the old line and English to redo
 edited=0
 for k in stale:  # each old entry goes to the one line most like it (feedback lines look alike: no fan-out)

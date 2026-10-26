@@ -114,13 +114,14 @@ let readOn=store.get(KEY('read'))==='1';
 
 /* ---------- sound ---------- */
 let AC=null;
-const SFX={move:[[1040,.04,0]],ok:[[880,.07,0],[1320,.12,.07]],no:[[240,.12,0],[180,.18,.1]],badge:[[660,.09,0],[880,.09,.09],[1100,.09,.18],[1320,.25,.27]],star:[[1320,.07,0],[1760,.07,.07],[2200,.2,.14]],door:[[300,.1,0],[220,.16,.08]],item:[[990,.06,0],[1480,.14,.06]],lock:[[160,.08,0],[160,.08,.12]],
+const SFX={move:[[1040,.04,0]],ok:[[880,.07,0],[1320,.12,.07]],no:[[240,.12,0],[180,.18,.1]],badge:[[660,.09,0],[880,.09,.09],[1100,.09,.18],[1320,.25,.27]],star:[[1320,.07,0],[1760,.07,.07],[2200,.2,.14]],door:[[300,.1,0,'square',.07],[220,.16,.08,'square',.07]],item:[[990,.06,0],[1480,.14,.06]],lock:[[160,.08,0],[160,.08,.12]],
  /* the school bell: the Westminster chime Korean schools ring (딩동댕동), soft sine tones that ring on */
  bell:[659.3,523.3,587.3,392,392,587.3,659.3,523.3].flatMap((fq,i)=>[[fq,1.5,i*.5,'sine',.07],[fq*2,.4,i*.5,'sine',.012]])};
 const SFXON={};
 function sfx(k){
  if(!soundOn)return;
- if(k==='bell')duckMusic(5200);  // the bell rings over the music: it dips almost to nothing while the chime plays (user, 2026-10-25)
+ if(k==='bell')duckMusic(5200,.05);  // the bell rings over the music: it dips almost to nothing while the chime plays (user, 2026-10-25)
+ if(k==='door')duckMusic(350,.5);  // a door: the music dips by half for a moment, so the low knock is heard over it
  try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const t0=AC.currentTime;
   (SFXON[k]||[]).forEach(g=>{g.gain.cancelScheduledValues(t0);g.gain.setTargetAtTime(.0001,t0,.05)});  /* a sound started again cuts the last one short */
   SFXON[k]=SFX[k].map(([fq,d,st,type,vol])=>{const o=AC.createOscillator(),gn=AC.createGain();o.type=type||'square';o.frequency.value=fq;gn.gain.setValueAtTime(0,t0);gn.gain.setValueAtTime(vol||.035,t0+st);gn.gain.exponentialRampToValueAtTime(.0001,t0+st+d);o.connect(gn).connect(AC.destination);o.start(t0+st);o.stop(t0+st+d+.02);return gn})}catch(e){}
@@ -1427,18 +1428,18 @@ function talkWith(n){
  if(n.proxy){const p=n.proxy();if(p)n=p}
  const pair=chatPair(n);  // two people talking to each other: they keep facing each other, and the one who started speaks first
  if(!pair&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // fixed: furniture (a chair) never turns to face you
- let steps=n.script?n.script():null,isReview=false;
+ let steps=n.script?n.script():null,isReview=false,extra=null;
  if(!steps&&C.REVIEW){const own=usual(n),rv=own&&!own.some(moves)?reviewPick(n):null;  // a talk that moves the story goes first; the review waits for the next talk
   if(rv){const q=rv[rv.length-1],stems=[q.w.replace(/다$/,''),q.w.replace(/하다$/,'')].filter(x=>x),gives=t=>stems.some(x=>(t.say||'').includes(x));  // their usual line goes first, unless it says the very word they're about to ask (흥정해 → 흥정하다)
    steps=[...(n.badge?own.filter(t=>!gives(t)):[]),...rv];isReview=true}
-  else{const sl=own&&!own.some(moves)?sayLine(n):null;steps=sl?[...(n.badge?own:[]),...sl]:own||n.talk()}}
+  else{const sl=own&&!own.some(moves)?sayLine(n):null;if(sl&&pair){extra=sl;steps=own||n.talk()}else steps=sl?[...(n.badge?own:[]),...sl]:own||n.talk()}}  // in a pair the extra line comes after their exchange: in place of the opener, the friend answered a line nobody said
  if(!steps){
   if(n.badge&&n.badge.every(has)){const due=n.badge.some(isDue);steps=due?[...says(n.after),reviewFor(n.badge)]:says(n.after);isReview=due}  // a review question only when one of their words is due
   else steps=n.talk();
  }
  {const id=npcId(n);if(id&&!metIds().includes(id)){metIds().push(id);save()}if(id&&status(n)==='star')starAcc[id]=Math.max(starAcc[id]||0,STAR_MS)}  // met: from now on they can review and chat; a ★ over them starts to fade once you've talked
  if(pair&&isReview&&!n.pos&&!sitting(n)&&!n.fixed){n.dir=OPP[player.dir];n.turnAt=performance.now()+6000}  // a review question is for you: the one asking turns to you (and back to their friend after, as after any talk)
- if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1])];
+ if(pair&&!isReview){const said=m=>(m===n?steps:(m.script&&m.script())||m.talk()).map(s=>s.who?s:{...s,who:m.name,look:m.look});steps=[...said(pair[0]),...said(pair[1]),...(extra||[]).map(s=>s.who?s:{...s,who:n.name,look:n.look})];
   for(const m of pair){const id=npcId(m);if(id&&!metIds().includes(id)){metIds().push(id);save()}}}  // both of them spoke: both count as met, so either can ask a review next time (not only the one you faced)
  openDialog(n.name,steps,{npc:n,review:isReview,snap});
 }
@@ -1739,10 +1740,10 @@ function creditUI(){const c=$('credit');if(!c)return;const M=typeof G.music==='s
  const t=bgmSrc.split('/').pop().replace(/\.\w+$/,'').split(/[-_]/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');  // '' while quiet: no track name
  c.textContent='음악 · '+(t?t+' — ':'');const a=document.createElement(M.url?'a':'span');a.textContent=M.by;
  if(M.url){a.href=M.url;a.target='_blank';a.rel='noopener'}c.append(a)}
-let duck=1,duckEnd=0,duckT=null;  // 1 = full music volume; the bell takes it down to .05 and back
+let duck=1,duckEnd=0,duckT=null,duckTo=1;  // 1 = full music volume; the bell takes it down to .05 (a door to .5) and back
 const musicLevel=()=>musicVol/100*duck;
-function duckMusic(ms){duckEnd=Math.max(duckEnd,performance.now()+ms);if(duckT)return;
- duckT=setInterval(()=>{const down=performance.now()<duckEnd;duck=down?Math.max(.05,duck-.15):Math.min(1,duck+.04);  // ~0.3 s down, ~1.2 s back up
+function duckMusic(ms,to){const now=performance.now();duckTo=now<duckEnd?Math.min(duckTo,to):to;duckEnd=Math.max(duckEnd,now+ms);if(duckT)return;
+ duckT=setInterval(()=>{const down=performance.now()<duckEnd;duck=down?Math.max(duckTo,duck-.15):Math.min(1,duck+.04);  // ~0.3 s down, ~1.2 s back up
   if(bgm)bgm.volume=musicLevel();if(!down&&duck>=1){clearInterval(duckT);duckT=null}},50)}
 function updateMusic(){
  if(!G.music)return;

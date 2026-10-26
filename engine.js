@@ -543,7 +543,7 @@ const sitting=n=>typeof n.sit==='function'?n.sit():!!n.sit;  // NPC sit: true | 
 function sitDown(o){
  const n=o.npc?C.NPC[o.npc]:null,[x,y]=n?npcPos(n):[o.x,o.y];
  const go=()=>Object.assign(player,{x,y,dir:o.dir||(n&&(n.home||n.dir))||player.dir,moving:false,t:0,sit:{npc:n,chair:o.chair||(n&&n.look)||null}});
- if(Math.abs(player.x-x)+Math.abs(player.y-y)>1){$('fade').classList.add('on');setTimeout(()=>{go();$('fade').classList.remove('on')},230)}  // from further off: a cut, not a jump
+ if(Math.abs(player.x-x)+Math.abs(player.y-y)>1){$('fade').classList.add('on');setTimeout(()=>{go();if(!(dlg&&dlg.black))$('fade').classList.remove('on')},230)}  // from further off: a cut, not a jump (inside a black time cut the screen stays black)
  else go();
 }
 const live=()=>NPCS.filter(n=>!n.hide||!n.hide());
@@ -769,7 +769,7 @@ if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target
    - msgs/after: [{id, from, text, time, now?, pic?, caption?}] (time: when it was sent; now: what the phone's clock shows as it
      arrives, default its time; the chat's own now: the clock when a finished exchange is reopened later) — from is a cast id (C.CAST / GAME.cast: {id:{name, look}}) or 'me' (the player:
      right-hand bubbles, no portrait). Each message is one press of A. pic: a picture card (C.PICS[pic](canvas) draws it) with a caption.
-   - reply: {id, ask, opts, w, reg?} — a question whose options are whole messages, answered in the reply strip under the thread (the
+   - reply: {id, ask, opts, w, reg?, time?, now?} — a question whose options are whole messages, answered in the reply strip under the thread (the
      dialogue's own #choices, moved there): a wrong one shows its hint over the thread and never becomes a bubble; the right one is sent.
      Or {id, choose:[[label, fn]]}: an ungraded reply whose fn waits for the commit.
    - The commit: the exchange's last step (the last after message, or the sent reply when there's none) runs set/award and the deferred
@@ -837,13 +837,14 @@ function chatCommitNow(c){  // the exchange is over: its deferred reply runs and
  (shared.chats||(shared.chats={}))[c.id]={done:1,sent:curChat.sent,msgs:curChat.msgs,ch:CH.id,t:Date.now()};saveShared();
  curChat.later.forEach(fn=>{try{fn()}catch(e){console.error(e)}});curChat.later=[];
 }
-function chatFb(t){const el=$('cfb');if(!el)return;if(!t){el.hidden=true;el.innerHTML='';return}el.innerHTML=`<span class="txt">${glossHTML(t)}</span>`;el.hidden=false}
+function chatFb(t){const el=$('cfb');if(!el)return;if(!t){el.hidden=true;el.innerHTML='';return}const e=lineEn(t);
+ el.innerHTML=`<span class="txt">${glossHTML(t)}</span>`+(e?`<button class="tq${enAll?' on':''}" type="button" aria-label="영어로 보기">?</button><span class="ten"${enAll?'':' hidden'}>${String(e).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</span>`:'');el.hidden=false}  // a wrong reply's hint, with its English behind ? like any line
 function renderChatChoose(s){
  const box=$('choices');box.hidden=false;
  box.innerHTML=s.chatChoose.map(([label],i)=>`<button class="choice" data-i="${i}">${plain(String(label))}</button>`).join('');
  box.querySelectorAll('.choice').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const [label,fn]=s.chatChoose[+b.dataset.i];
   box.hidden=true;box.innerHTML='';sfx('ok');if(fn)curChat.later.push(fn);curChat.sent=label;
-  dlg.next='advance';show({chatMsg:{from:'me',text:label,id:s.chatReply+':'+b.dataset.i},fb:1,...(s.chatCommit?{chatCommit:s.chatCommit,set:s.chatSet,award:s.chatAward}:{})})}));
+  dlg.next='advance';show({chatMsg:{from:'me',text:label,id:s.chatReply+':'+b.dataset.i,time:s.time,now:s.now},fb:1,...(s.chatCommit?{chatCommit:s.chatCommit,set:s.chatSet,award:s.chatAward}:{})})}));
  sel=-1;choicesAt=performance.now();markSel();
 }
 /* ---------- the postcard (opt-in; 소리 엽서): cards the player makes across the chapters, kept in the shared record ----------
@@ -1425,7 +1426,7 @@ function choose(s,i){
  const o=s.opts[i];if(s.w)askedIn[s.w]=talkN;
  if(s.chatReply&&curChat){  // a reply in a chat: right = sent as a bubble (the commit rides on it when nothing comes after); wrong = a hint over the thread
   if(o[1]){sfx('ok');if(s.review||dlg.review)gradeStep(s);dlg.next='advance';curChat.sent=String(o[0]);
-   show({chatMsg:{from:'me',text:String(o[0]),id:s.chatReply+':'+i},fb:1,...(s.chatCommit?{chatCommit:s.chatCommit,set:s.chatSet,award:s.chatAward}:{})})}
+   show({chatMsg:{from:'me',text:String(o[0]),id:s.chatReply+':'+i,time:s.time,now:s.now},fb:1,...(s.chatCommit?{chatCommit:s.chatCommit,set:s.chatSet,award:s.chatAward}:{})})}
   else{sfx('no');s.missed=true;if(s.w){dlg.missed.add(s.w);if(!has(s.w)){(state.miss=state.miss||{})[s.w]=1;save()}}
    dlg.next=s;show({chatFb:o[2]||T('다시 해 봐요.'),fb:1})}
   return}
@@ -1520,6 +1521,7 @@ function hear(r){if(unheard(r)){heard().push(rKey(r));save()}}
 function sayLine(n){
  const L=linesFor(n).filter(unheard);if(!L.length)return null;
  const r=L[Math.random()*L.length|0],ok=(r.opts||[]).find(o=>o[1]);hear(r);(state.heardB||(state.heardB={}))[rKey(r)]=beats();
+ if(r.plain)return [...says(r.pre||[]),{...(r.who?{who:r.who}:{}),say:r.plain}];  // plain: the line said when nothing is due, for a row that can't be filled in (a meaning question about an R word)
  return [...says(r.pre||[]),{...(r.who?{who:r.who}:{}),say:answered(r.ask,ok?ok[0]:r.w),enKey:r.ask}];  // its English is kept under the question as written
 }
 const usual=n=>n.badge?(n.badge.every(has)?says(n.after):null):(n.again&&metIds().includes(npcId(n))?says(typeof n.again==='function'?n.again():n.again):n.talk());  // again: what they say once you've met (no second introduction)  // what they'd say anyway (null: still teaching)

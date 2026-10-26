@@ -757,8 +757,87 @@ function openPhone(p){
   +`<div class="pcount txt">${glossHTML('댓글 '+p.count+'개')}</div><div class="plist">${c}${more>0?`<div class="pmore txt">${glossHTML('댓글 '+more+'개 더 보기')}</div>`:''}</div>`;
  $('phonePanel').hidden=false;phoneOpen=true;
 }
-function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidden=true;hideGloss();if(curPhone&&curPhone.culture)unlockCulture(curPhone.culture);if(curPhone&&curPhone.grammar)unlockGrammar(curPhone.grammar);curPhone=null}
-if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten');if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
+function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidden=true;if(curChat)closeChat();hideGloss();if(curPhone&&curPhone.culture)unlockCulture(curPhone.culture);if(curPhone&&curPhone.grammar)unlockGrammar(curPhone.grammar);curPhone=null}
+if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten');if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();return}const g=e.target.closest('.gl');if(g){e.stopPropagation();showGloss(g.dataset.k);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
+/* ---------- phone chat (opt-in; 소리 엽서). A dialogue step chat:{id, room, msgs, reply?, after?, set?, award?} is one exchange in a
+   messenger room, shown on the phone (#phonePanel) with the dialogue box out of the way:
+   - msgs/after: [{id, from, text, time, pic?, caption?}] — from is a cast id (C.CAST / GAME.cast: {id:{name, look}}) or 'me' (the player:
+     right-hand bubbles, no portrait). Each message is one press of A. pic: a picture card (C.PICS[pic](canvas) draws it) with a caption.
+   - reply: {id, ask, opts, w, reg?} — a question whose options are whole messages, answered in the reply strip under the thread (the
+     dialogue's own #choices, moved there): a wrong one shows its hint over the thread and never becomes a bubble; the right one is sent.
+     Or {id, choose:[[label, fn]]}: an ungraded reply whose fn waits for the commit.
+   - The commit: the exchange's last step (the last after message, or the sent reply when there's none) runs set/award and the deferred
+     fn once, and records the exchange in the shared record (GAME prefix + '-shared', across chapters): {done, sent, msgs}. Reopening a
+     done exchange shows that transcript, with nothing sent, set or awarded again. A reload before the commit starts the exchange over.
+   - English: a ? on each message with English, keyed 'chat:<exchange>:<message>' in lines-en (short and jamo-only texts need it), else
+     by the text itself. Every message and sent reply also goes to the talk log under the room's name.
+   - Keys: A next message / send the selected reply; ↑/↓ scroll the thread, or move between replies (↑ on the top one scrolls); B closes
+     word help, then a wrong-answer hint (back to the replies); with no reply pending it puts the phone away and ends the talk. */
+const SHARED_KEY=KEY('shared');let shared={};try{shared=JSON.parse(store.get(SHARED_KEY)||'{}')||{}}catch(e){shared={}}
+const saveShared=()=>store.set(SHARED_KEY,JSON.stringify(shared));
+const chatRoom=r=>({...(G.rooms||{}),...(C.ROOMS||{})})[r]||{t:r};
+const chatWho=id=>id==='me'?{name:T('나')}:({...(G.cast||{}),...(C.CAST||{})})[id]||C.NPC[id]||{name:id};
+let curChat=null;  // {c, msgs:[…shown], home:[parent, next] of #choices}
+function chatSteps(c){  // a chat step → its dialogue steps
+ const rec=(shared.chats||{})[c.id];
+ if(rec&&rec.done)return [{chatOpen:c,chatAll:rec.msgs}];  // done before: the transcript, nothing else happens
+ const msg=m=>({chatMsg:m}),list=[...(c.msgs||[]).map(msg)];
+ if(c.reply)list.push(c.reply.choose?{chatChoose:c.reply.choose,chatReply:c.reply.id,ask:c.reply.ask||''}:{...c.reply,chatReply:c.reply.id,ask:c.reply.ask||''});
+ list.push(...(c.after||[]).map(msg));
+ if(!list.length)return [];
+ list[0].chatOpen=c;
+ const last=list[list.length-1];  // the last step commits; a reply waits: its set/award ride on the bubble it sends
+ if(last.chatReply)Object.assign(last,{chatCommit:c,chatSet:c.set,chatAward:c.award});else Object.assign(last,{chatCommit:c,set:c.set,award:c.award});
+ return list;
+}
+function openChat(c,all){
+ if(!$('phonePanel'))return;curChat={c,msgs:[],sent:null,later:[]};curPhone={chat:1};
+ const R=chatRoom(c.room),bat=c.battery??72,bars='<i class="sig"><b></b><b></b><b></b><b class="off"></b></i>';
+ $('pscr').innerHTML=`<div class="pstat"><span>${c.time||(c.msgs&&c.msgs[0]&&c.msgs[0].time)||''}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
+  +`<div class="pbar chatbar"><span class="txt">${glossHTML(R.t||c.room)}${R.members?` <small>${R.members.length}</small>`:''}</span><span>☰</span></div>`
+  +`<div class="clist" id="clist"></div><div class="cfb" id="cfb" hidden></div><div class="creply" id="creply"><div class="cask txt" id="cask" hidden></div></div>`;
+ const ch=$('choices');curChat.home=[ch.parentNode,ch.nextSibling];$('creply').appendChild(ch);  // the dialogue's choices become the reply strip
+ $('phonePanel').hidden=false;phoneOpen=true;document.body.classList.add('chatting');
+ if(all)all.forEach(m=>chatPush(m,true));
+}
+function closeChat(){
+ if(!curChat)return;const ch=$('choices');ch.hidden=true;ch.innerHTML='';
+ const [par,nx]=curChat.home;if(par)par.insertBefore(ch,nx&&nx.parentNode===par?nx:null);
+ curChat=null;document.body.classList.remove('chatting');
+}
+function chatPush(m,quiet){
+ const L=$('clist');if(!L||!curChat)return;
+ const near=L.scrollHeight-L.scrollTop-L.clientHeight<48,mine=m.from==='me',who=chatWho(m.from);
+ const key=curChat.c&&m.id?'chat:'+curChat.c.id+':'+m.id:null,en=(key&&lineEn(key))||lineEn(m.text||'');
+ const esc=x=>String(x).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+ const row=document.createElement('div');row.className='cm'+(mine?' me':'');
+ row.innerHTML=(mine?'':`<canvas class="cface" width="48" height="48"></canvas>`)
+  +`<div class="cb">${mine?'':`<span class="cn">${esc(T(who.name||''))}</span>`}`
+  +(m.pic?`<canvas class="cpic" width="96" height="64"></canvas>`:'')
+  +`<span class="ct txt">${glossHTML(m.text||m.caption||'')}</span>`
+  +(en?`<button class="tq${enAll?' on':''}" type="button" aria-label="영어로 보기">?</button><span class="ten"${enAll?'':' hidden'}>${esc(en)}</span>`:'')
+  +`</div>`+(m.time?`<span class="ctime">${esc(m.time)}</span>`:'');
+ L.appendChild(row);
+ if(!mine&&who.look){try{drawPortrait(row.querySelector('.cface'),who.look,m.face||'happy',false)}catch(e){}}
+ if(m.pic){const P=(C.PICS||G.pics||{})[m.pic];if(P)try{P(row.querySelector('.cpic'))}catch(e){}}
+ curChat.msgs.push({from:m.from,text:m.text||m.caption||'',time:m.time,id:m.id,pic:m.pic});
+ if(!quiet)logTalk(chatRoom(curChat.c.room).t+' · '+(mine?T('나'):who.name),m.text||m.caption||'',key&&lineEn(key)?key:undefined);
+ if(near||mine||curChat.msgs.length<=1)L.scrollTop=L.scrollHeight;  // new messages don't pull you back down if you scrolled up to read
+}
+function chatCommitNow(c){  // the exchange is over: its deferred reply runs and the shared record keeps the transcript
+ if(!curChat||curChat.committed)return;curChat.committed=1;
+ (shared.chats||(shared.chats={}))[c.id]={done:1,sent:curChat.sent,msgs:curChat.msgs,t:Date.now()};saveShared();
+ curChat.later.forEach(fn=>{try{fn()}catch(e){console.error(e)}});curChat.later=[];
+}
+function chatFb(t){const el=$('cfb');if(!el)return;if(!t){el.hidden=true;el.innerHTML='';return}el.innerHTML=`<span class="txt">${glossHTML(t)}</span>`;el.hidden=false}
+function renderChatChoose(s){
+ const box=$('choices');box.hidden=false;
+ box.innerHTML=s.chatChoose.map(([label],i)=>`<button class="choice" data-i="${i}">${plain(String(label))}</button>`).join('');
+ box.querySelectorAll('.choice').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const [label,fn]=s.chatChoose[+b.dataset.i];
+  box.hidden=true;box.innerHTML='';sfx('ok');if(fn)curChat.later.push(fn);curChat.sent=label;
+  dlg.next='advance';show({chatMsg:{from:'me',text:label,id:s.chatReply+':'+b.dataset.i},fb:1,...(s.chatCommit?{chatCommit:s.chatCommit,set:s.chatSet,award:s.chatAward}:{})})}));
+ sel=-1;choicesAt=performance.now();markSel();
+}
 const CULTURE=globalThis.CULTURE_NOTES||{};  // a game's notes (its own file sets globalThis.CULTURE_NOTES)
 let cultureSeen=[];try{cultureSeen=JSON.parse(store.get(KEY('culture'))||'[]')}catch(e){}
 /* A new note shows on the screen for a few seconds as a tappable chip (#noteChip, made here when the shell has a notes section), then
@@ -853,6 +932,7 @@ function playScene(name){
 function show(s){
  if(!s||!dlg){if(dlg)closeDialog();return}  // a step that isn't there closes the talk instead of leaving a blank box
  if(s&&(s.set||s.award||s.give||s.take||s.go)&&dlg)dlg.moved=1;  // a story beat (spaced review counts them)
+ if(s&&s.chat&&!s.chatMsg){const more=chatSteps(s.chat);dlg.steps.splice(dlg.i,1,...more);if(!more.length||dlg.i>=dlg.steps.length){closeDialog();return}return show(dlg.steps[dlg.i])}  // a phone chat: its messages, reply and commit as steps
  if(s&&s.expand){const more=says(s.expand()||[]);dlg.steps.splice(dlg.i,1,...more);if(dlg.i>=dlg.steps.length){closeDialog();return}return show(dlg.steps[dlg.i])}  // expand:()=>steps, made when it's reached (class time picks words you have by then)
  dlg.cur=s;hideGloss();
  lastLines.push(((s.who||dlg.name||'')+': '+plain(s.say||s.ask||'')).slice(0,300));if(lastLines.length>3)lastLines.shift();
@@ -864,6 +944,8 @@ function show(s){
  if(s.walk||s.leave)queueWalks(s);
  if(s.move)moveNpcs(s);
  if(s.phone)openPhone(s.phone);
+ if(s.chatOpen){closePhone();openChat(s.chatOpen,s.chatAll)}
+ else if(curChat&&!s.chatMsg&&!s.chatReply&&!s.chatFb&&!s.chatAll){closePhone()}  // the talk goes on past the exchange: the phone goes away
  if(s.culture)unlockCulture(s.culture);
  if(s.grammar)unlockGrammar(s.grammar);
  if(s.sit)sitDown(s.sit);
@@ -875,6 +957,16 @@ function show(s){
  if(s.take){state.items=state.items.filter(i=>!s.take.includes(i));save()}
  if(s.award)award(s.award);
  if(s.listen)s=prepListen(s);
+ if(curChat&&(s.chatMsg||s.chatReply||s.chatFb||s.chatAll)){  // inside a chat: bubbles and the reply strip, no dialogue box
+  clearInterval(typing?.id);typing=null;$('more').hidden=true;
+  if(s.chatFb!==undefined)chatFb(s.chatFb);else chatFb(null);
+  if(s.chatMsg){chatPush(s.chatMsg);if(s.chatMsg.from==='me')curChat.sent=s.chatMsg.text;if(readOn&&s.chatMsg.from!=='me')speak(s.chatMsg.text||'')}
+  const L=$('clist'),pin=L&&L.scrollHeight-L.scrollTop-L.clientHeight<48;  // at the newest message: stay there when the replies take room
+  const ask=$('cask');if(ask){const q=(s.chatChoose||s.opts)&&s.ask?s.ask:'';ask.innerHTML=q?glossHTML(q):'';ask.hidden=!q}  // the reply's situation, above the replies
+  if(s.chatChoose){$('choices').innerHTML='';renderChatChoose(s)}else if(s.chatReply&&s.opts){$('choices').innerHTML='';renderChoices(s)}else{$('choices').hidden=true;$('choices').innerHTML=''}
+  if(pin)requestAnimationFrame(()=>{L.scrollTop=L.scrollHeight});
+  if(s.chatCommit&&!s.chatReply)chatCommitNow(s.chatCommit);
+  if(!dlg.questHold)updateQuest();return}
  $('who').textContent=T(s.who||dlg.name);  // '나' is the player in every game; GAME.ui names them in its language
  setEn(s.ask||s.build||s.listen?null:lineEn(s.enKey||s.say||''));  // an open question has no English (it would give the answer away); answered, its whole line has
  $('choices').hidden=true;$('choices').innerHTML='';$('build').hidden=true;$('more').hidden=true;writeKbOff();
@@ -899,7 +991,7 @@ function prepListen(s){
    all other words open the game's dictionary (LEX, built from the dialogue by lexicon/extract.py). */
 function glossHTML(t){
  const esc=x=>x.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- const words=x=>G.wordsHTML?G.wordsHTML(x,esc):esc(x).replace(/[가-힣]+/g,w=>`<span class="w">${w}</span>`);  // GAME.wordsHTML: the game's own word spans (data-w: the word to look up)
+ const words=x=>G.wordsHTML?G.wordsHTML(x,esc):esc(x).replace(/[가-힣]+|[ㄱ-ㅎㅏ-ㅣ]{2,}/g,w=>`<span class="w">${w}</span>`);  // GAME.wordsHTML: the game's own word spans (data-w: the word to look up)
  let out='',last=0;const re=/\{([^|}]+)\|([^}]+)\}/g;let m;
  while((m=re.exec(t))){out+=words(t.slice(last,m.index))+`<span class="gl" data-k="${esc(m[2])}">${esc(m[1])}</span>`;last=re.lastIndex}
  return out+words(t.slice(last));
@@ -1282,6 +1374,12 @@ function answered(ask,a){const f=ask.replace('___',a),i=ask.indexOf('___')+a.len
  const m=f.slice(i).match(/^([^"”]*["”][.!?]?)\s+([^"”]*\?)$/);return m?f.slice(0,i)+m[1]:f}  // only a quoted example's question
 function choose(s,i){
  const o=s.opts[i];if(s.w)askedIn[s.w]=talkN;
+ if(s.chatReply&&curChat){  // a reply in a chat: right = sent as a bubble (the commit rides on it when nothing comes after); wrong = a hint over the thread
+  if(o[1]){sfx('ok');if(s.review||dlg.review)gradeStep(s);dlg.next='advance';curChat.sent=String(o[0]);
+   show({chatMsg:{from:'me',text:String(o[0]),id:s.chatReply+':'+i},fb:1,...(s.chatCommit?{chatCommit:s.chatCommit,set:s.chatSet,award:s.chatAward}:{})})}
+  else{sfx('no');s.missed=true;if(s.w){dlg.missed.add(s.w);if(!has(s.w)){(state.miss=state.miss||{})[s.w]=1;save()}}
+   dlg.next=s;show({chatFb:o[2]||T('다시 해 봐요.'),fb:1})}
+  return}
  if(o[1]){
   sfx('ok');
   if(s.review||dlg.review)gradeStep(s);
@@ -1302,7 +1400,7 @@ function choose(s,i){
 function advance(){
  if(!dlg)return;
  if(typing&&!typing.finished){typing.fin();return}
- if(dlg.cur.ask||dlg.cur.build||dlg.cur.choose)return;
+ if(dlg.cur.ask||dlg.cur.build||dlg.cur.choose||dlg.cur.chatChoose)return;
  if(dlg.next){const n=dlg.next;dlg.next=null;if(n!=='advance'){show(n);return}}
  if(dlg.cur.finale){const p=pending;pending=null;closeDialog();finish(p);return}  // a note still waiting (20/20 words!) goes before the ending, not under its fade
  dlg.i++;
@@ -1326,6 +1424,10 @@ function closeDialog(){
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
 }
 function cancel(){
+ if(phoneOpen&&curChat){if(!$('gloss').hidden){hideGloss();return}
+  if(dlg&&dlg.cur&&dlg.cur.fb&&dlg.next&&dlg.next.chatReply){advance();return}  // a wrong-answer hint: back to the replies
+  if(choosing())return;  // a reply is waiting: B never throws it away
+  if(dlg)closeDialog();else closePhone();return}  // the phone goes away and the talk ends
  if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}closePhone();return}
  if(CREATOR&&!$('mePanel').hidden){if(me)closeMe(false);return}  // first time: you must pick (no B)
  if(!$('startPanel').hidden){$('startPanel').hidden=true;return}
@@ -1444,6 +1546,7 @@ function talkWith(n){
  openDialog(n.name,steps,{npc:n,review:isReview,snap});
 }
 function interact(){
+ if(phoneOpen&&curChat){if(!$('gloss').hidden){hideGloss();return}if(choosing()){confirmSel();return}if(dlg)advance();return}  // a chat: A is the next message, or sends the reply
  if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}if(typing&&!typing.finished){typing.fin();return}closePhone();return}  // A finishes the line, then puts the phone away
  if(!$('gloss').hidden){hideGloss();return}  // A closes the definition first, without advancing
  if(panelOpen())return;
@@ -1536,6 +1639,8 @@ function loadState(){
 
 /* ---------- input ---------- */
 function dirPress(d){
+ if(phoneOpen&&curChat){const l=$('clist');if(choosing()&&!(d==='up'&&sel<=0)&&(d==='up'||d==='down')){moveSel(d==='up'?-1:1);return true}
+  if(l&&(d==='up'||d==='down')){l.scrollBy({top:d==='down'?70:-70,behavior:'smooth'});if(d==='down'&&choosing()&&sel<0){sel=0;markSel()}}return true}
  if(phoneOpen){const l=$('pscr').querySelector('.plist');if(l&&(d==='up'||d==='down'))l.scrollBy({top:d==='down'?70:-70,behavior:'smooth'});return true}  // the D-pad scrolls the phone
  if(choosing()||building()){moveSel(d==='up'||d==='left'?-1:1);return true}
  return false;
@@ -1736,7 +1841,7 @@ let musicOn=store.get(KEY('music'))!=='0',bgm=null,bgmSrc='',musicT=0,musicVol=+
 if(!(musicVol>=0&&musicVol<=100))musicVol=30;
 /* GAME.music: the credit, a string or {by,url} (the credit links there); the playing track's name comes from its file
    (audio/cafe-alps.m4a → Cafe Alps) */
-function creditUI(){const c=$('credit');if(!c)return;const M=typeof G.music==='string'?{by:G.music}:G.music;
+function creditUI(){const c=$('credit');if(!c||!G.music)return;const M=typeof G.music==='string'?{by:G.music}:G.music;
  const t=bgmSrc.split('/').pop().replace(/\.\w+$/,'').split(/[-_]/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ');  // '' while quiet: no track name
  c.textContent='음악 · '+(t?t+' — ':'');const a=document.createElement(M.url?'a':'span');a.textContent=M.by;
  if(M.url){a.href=M.url;a.target='_blank';a.rel='noopener'}c.append(a)}

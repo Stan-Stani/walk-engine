@@ -30,6 +30,7 @@ class GameActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        loadGames(this)
         val game = gameOf(intent.getStringExtra(EXTRA_GAME)) ?: return finish()
         cache = OfflineCache(this)
         WebView.setWebContentsDebuggingEnabled(applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0)

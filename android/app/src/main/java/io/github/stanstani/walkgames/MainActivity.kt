@@ -24,6 +24,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        loadGames(this)
         cache = OfflineCache(this)
         val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -56,6 +57,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        pool.execute { if (refreshGames(this)) runOnUiThread { recreate() } }  // a game added to games.json since
         for (g in GAMES) {
             val have = cache.read(android.net.Uri.parse(g.url + "version.json"))?.let { runCatching { JSONObject(String(it.body)) }.getOrNull() }
             show(g, if (cache.read(android.net.Uri.parse(g.url)) != null) have ?: JSONObject() else null, updating = true)

@@ -763,7 +763,7 @@ function openPhone(p){
  $('phonePanel').hidden=false;phoneOpen=true;
 }
 function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidden=true;if(curChat)closeChat();if(curSlides){curSlides=null;document.body.classList.remove('chatting')}hideGloss();if(curPhone&&curPhone.culture)unlockCulture(curPhone.culture);if(curPhone&&curPhone.grammar)unlockGrammar(curPhone.grammar);curPhone=null}
-if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten')||(q.nextElementSibling&&q.nextElementSibling.classList.contains('ten')?q.nextElementSibling:null);if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();lineQOpened(q,t);return}const g=e.target.closest('.gl');if(g){e.stopPropagation();showGloss(g.dataset.k);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
+if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten')||(q.nextElementSibling&&q.nextElementSibling.classList.contains('ten')?q.nextElementSibling:null);if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();lineQOpened(q,t);return}const g=e.target.closest('.gl');if(g){e.stopPropagation();showGloss(g.dataset.k,g);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent,w)}});
 /* ---------- phone chat (opt-in; 소리 엽서). A dialogue step chat:{id, room, msgs, reply?, after?, set?, award?} is one exchange in a
    messenger room, shown on the phone (#phonePanel) with the dialogue box out of the way:
    - msgs/after: [{id, from, text, time, now?, pic?, caption?}] (time: when it was sent; now: what the phone's clock shows as it
@@ -874,7 +874,7 @@ function cardHTML(x,i,n){
 function drawCardPics(root){root.querySelectorAll('canvas.pcpic').forEach(cv=>{const P=(C.PICS||G.pics||{})[cv.dataset.pic];if(P)try{P(cv)}catch(e){}})}
 function renderPostcards(){const el=$('pcards');if(!el)return;const cs=pcCards();
  el.innerHTML=cs.length?cs.map(x=>cardHTML(x)).join(''):`<p class="none">${T('아직 없어요.')}</p>`;drawCardPics(el);
- el.onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();const t=q.nextElementSibling;if(t)t.hidden=!t.hidden;lineQOpened(q,t);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}}}
+ el.onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();const t=q.nextElementSibling;if(t)t.hidden=!t.hidden;lineQOpened(q,t);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent,w)}}}
 let curSlides=null;
 function slideSteps(){const cs=pcCards();return cs.map((x,i)=>({slide:i,slideAll:cs,...(i===0?{slideOpen:1}:{})}))}
 function showSlide(s){
@@ -940,7 +940,7 @@ function showNote(K,k){
 if(Object.values(NOTE_KINDS).some(N=>$(N.list))){
  for(const [K,N] of Object.entries(NOTE_KINDS))if($(N.list)){
   $(N.list).addEventListener('click',e=>{const b=e.target.closest('.nb');if(b)showNote(K,b.dataset.k)});
-  $(N.card).addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();document.body.classList.add('talkopen');showWord(w.dataset.w||w.textContent)}})}  // word help above the journal
+  $(N.card).addEventListener('click',e=>{const w=e.target.closest('.w');if(w){e.stopPropagation();document.body.classList.add('talkopen');showWord(w.dataset.w||w.textContent,w)}})}  // word help above the journal
  {const b=document.createElement('button');b.id='noteChip';b.className='notechip';b.type='button';b.hidden=true;$('toast').after(b);
   b.addEventListener('click',e=>{e.stopPropagation();openPanel();showNote(b.dataset.kind,b.dataset.k)});noteChip()}
  for(const id of ['closePanel','panel'])$(id).addEventListener('click',e=>{if(id==='closePanel'||e.target.id==='panel')document.body.classList.remove('talkopen')});
@@ -1105,8 +1105,8 @@ function typeText(text,done){
 }
 let allDicts=null;
 const otherDict=k=>{if(!allDicts){allDicts={};for(const ch of CHAPTERS)if(ch!==CH)try{Object.assign(allDicts,ch.make().DICT||{})}catch(e){}}return allDicts[k]};
-function showGloss(k){const d=C.DICT[k]||otherDict(k),rows=d?[[k,d]]:lexLookup(k);if(rows.length){noteTap(rows);popGloss(rows)}}  // {form|lemma}: this chapter's entry, else another chapter's (a review asked out of its chapter), else the lexicon
-function showWord(w){const rows=lexLookup(w);noteTap(rows);popGloss(rows);lastWord=(w+(rows.length?' → '+rows.map(([h,d])=>h+': '+d.k).join(' / '):' (사전에 없음)')).slice(0,400)}
+function showGloss(k,el){const d=C.DICT[k]||otherDict(k),rows=d?[[k,d]]:lexLookup(k);if(rows.length){noteTap(rows,el,el&&el.textContent);popGloss(rows)}}  // {form|lemma}: this chapter's entry, else another chapter's (a review asked out of its chapter), else the lexicon
+function showWord(w,el){const rows=lexLookup(w);noteTap(rows,el,w);popGloss(rows);lastWord=(w+(rows.length?' → '+rows.map(([h,d])=>h+': '+d.k).join(' / '):' (사전에 없음)')).slice(0,400)}
 /* ---------- 찾아본 말: every tap that finds a definition — how many times, and when last (all chapters, one list) ---------- */
 const TAPS_KEY=KEY('taps');let taps={},tapSort='t';
 try{taps=JSON.parse(store.get(TAPS_KEY)||'{}')||{}}catch(e){taps={}}
@@ -1143,7 +1143,28 @@ function hintWord(){  // a line has been on the screen 4 s and no word has ever 
  hintWord.t=setTimeout(()=>{if(!dlg||dlg.cur!==cur||hints.word===1||!$('gloss').hidden||phoneOpen)return;
   const ws=[...$('txt').querySelectorAll('.w')],w=ws.filter(e=>e.textContent.length>=2).sort((a,b)=>b.textContent.length-a.textContent.length)[0]||ws[0];
   if(w){w.classList.add('hintw');hintSeen('word',6)}},4000)}
-function noteTap(rows){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;if(d.r&&d.r!==h)r.r=d.r;store.set(TAPS_KEY,JSON.stringify(taps))}
+function noteTap(rows,el,sw){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;if(d.r&&d.r!==h)r.r=d.r;
+ const line=el&&el.closest&&el.closest('.txt')?shownText(el.closest('.txt')).replace(/\s+/g,' ').trim():'';if(line&&sw){r.s=line;r.sw=String(sw)}  // the line it was met in: the review computer quotes it (찾아본 말 복습)
+ store.set(TAPS_KEY,JSON.stringify(taps));
+ if(state&&state.lv&&known(h)&&lv(h).b>0&&!dueL(lv(h))){state.lv[h]={...lv(h),due:now(),beat:null};save()}}  // looking up a word you have: it didn't come back by itself, so it's due now (its level stays)
+/* ---------- 찾아본 말 복습: words you looked up that no chapter teaches ----------
+   The review computer (terminal) asks them after the due badge words (or alone when only they are due), at most two a round: a word
+   tapped at least twice that isn't any chapter's badge word, quoted in the line you met it in, its 사전 meaning among two others
+   you looked up. Their own record (KEY('looks'): level 0..3 and when due: now, then 4 hours, then a day; at 3 it stops), never
+   badges, ★ or the review levels. GAME.lookReview:false turns it off. */
+const LOOKS_KEY=KEY('looks');let looks={};try{looks=JSON.parse(store.get(LOOKS_KEY)||'{}')||{}}catch(e){looks={}}
+let taughtAll=null;
+const taught=w=>{if(!taughtAll){taughtAll=new Set();for(const ch of CHAPTERS)try{((ch===CH?C:ch.make()).WORDS||[]).forEach(x=>taughtAll.add(x))}catch(e){}}return taughtAll.has(w)};
+const lookDue=()=>G.lookReview===false?[]:Object.entries(taps).filter(([h,r])=>{const L=looks[h]||{b:0,due:0};return r.n>=2&&r.k&&!taught(h)&&!known(h)&&L.b<3&&L.due<=now()}).sort((a,b)=>b[1].n-a[1].n).map(([h])=>h);
+function lookQ(h){
+ const r=taps[h],ks=new Set([r.k]),pick=[];
+ for(const k of [...shuffle(Object.values(taps).map(o=>o.k)),...shuffle(Object.values((window.LEX||{}).defs||{}).map(d=>d.k))])if(k&&!ks.has(k)&&pick.length<2){ks.add(k);pick.push(k)}
+ let ctx=r.s||'';if(ctx.length>44){const i=Math.max(0,ctx.indexOf(r.sw||h));const a=Math.max(0,Math.min(i-18,ctx.length-44));ctx=(a?'…':'')+ctx.slice(a,a+44)+(a+44<ctx.length?'…':'')}  // the part of a long line around the word
+ const lab=k=>String(k).replace(/\s*[.。]$/,'');  // a choice is laid out word by word: no full stop left standing alone
+ return {lookup:h,ask:(ctx?`“${ctx}” `:'')+h+T(': 무슨 뜻이에요?'),opts:shuffle([[lab(r.k),1],...pick.map(k=>[lab(k)])]),done:`${h}: ${r.k}`,who:'…',review:true,ok:T('맞아요!')};
+}
+function gradeLook(h,ok){const L=looks[h]||{b:0,due:0};
+ looks[h]=!ok?{b:0,due:now()}:L.due<=now()?{b:L.b+1,due:now()+gapAt(Math.min(5,L.b+3))}:L;store.set(LOOKS_KEY,JSON.stringify(looks))}
 function ago(t){const m=Math.floor((Date.now()-t)/60000);if(m<1)return T('방금');if(m<60)return unit(m,'분')+T(' 전');const h=Math.floor(m/60);if(h<24)return unit(h,'시간')+T(' 전');const d=Math.floor(h/24);return d===1?T('어제'):unit(d,'일')+T(' 전')}
 function openTaps(){
  const esc=x=>String(x||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1212,7 +1233,7 @@ function renderChoices(s){
  box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${G.choiceHTML?G.choiceHTML(plain(String(s.opts[i][0]))):plain(String(s.opts[i][0])).replace(/[가-힣]+/g,w=>`<span class="cw">${w}</span>`)}</button>`).join('');
  let pressT=null,defined=false;  // long-press a word on a choice = its definition (doesn't answer)
  box.querySelectorAll('.choice').forEach(b=>{
-  b.addEventListener('pointerdown',e=>{const w=e.target.closest('.cw');defined=false;clearTimeout(pressT);if(w)pressT=setTimeout(()=>{defined=true;showWord(w.dataset.w||w.textContent)},450)});
+  b.addEventListener('pointerdown',e=>{const w=e.target.closest('.cw');defined=false;clearTimeout(pressT);if(w)pressT=setTimeout(()=>{defined=true;showWord(w.dataset.w||w.textContent,w)},450)});
   for(const t of ['pointerup','pointerleave','pointercancel'])b.addEventListener(t,()=>clearTimeout(pressT));
   b.addEventListener('click',e=>{e.stopPropagation();if(defined){defined=false;return}choose(s,+b.dataset.i)})});
  sel=-1;choicesAt=performance.now();markSel();  // nothing selected: A can't answer by accident
@@ -1431,6 +1452,7 @@ function pickTile(s,b){
 let explained={};try{explained=JSON.parse(localStorage.getItem(KEY('explained'))||'{}')}catch(e){}
 function firstTime(k){if(explained[k])return false;explained[k]=1;try{localStorage.setItem(KEY('explained'),JSON.stringify(explained))}catch(e){}return true}
 function gradeStep(s){
+ if(s.lookup){gradeLook(s.lookup,!s.missed);return}  // 찾아본 말 복습: its own record
  if(!s.w)return;
  if(s.reg){const r=(state.reg=state.reg||{})[s.w]||(state.reg[s.w]={ok:0,miss:0});s.missed?r.miss++:r.ok++;save();return}  // register judgment, kept apart from remembering the word
  const before=lv(s.w).b,b=grade(s.w,!s.missed,!!s.hinted);
@@ -1570,12 +1592,12 @@ function reviewFor(words){ // pick a question for the weakest of these words
  return {...freshQ(w,qs),...narr};
 }
 function terminal(){
- const due=dueWords();
- if(!state.badges.length&&!due.length)return [{who:TERM.name,say:TERM.empty}];  // empty only when there's nothing at all: earlier chapters' due words count (srs.shared)
- if(!due.length){const n=nextDue();return [{who:TERM.name,say:TERM.idle+(n?` ${TERM.next}: ${fmtWait(n-now())} 후.`:'')}]}
- const pick=shuffle(due.slice()).slice(0,4);
- const steps=[{who:TERM.name,say:TERM.due(due.length,pick.length)}];  // due(n,k): n words due, k asked this round (at most 4)
- pick.forEach(w=>steps.push(reviewFor([w])));
+ const due=dueWords(),lk=lookDue();
+ if(!state.badges.length&&!due.length&&!lk.length)return [{who:TERM.name,say:TERM.empty}];  // empty only when there's nothing at all: earlier chapters' due words count (srs.shared)
+ if(!due.length&&!lk.length){const n=nextDue();return [{who:TERM.name,say:TERM.idle+(n?` ${TERM.next}: ${fmtWait(n-now())} 후.`:'')}]}
+ const pick=shuffle(due.slice()).slice(0,4),steps=[];
+ if(pick.length){steps.push({who:TERM.name,say:TERM.due(due.length,pick.length)});pick.forEach(w=>steps.push(reviewFor([w])))}  // due(n,k): n words due, k asked this round (at most 4)
+ if(lk.length){steps.push({who:TERM.name,say:T('찾아본 말도 볼까요?')});lk.slice(0,pick.length>=4?1:2).forEach(h=>steps.push(lookQ(h)))}  // 찾아본 말 복습
  steps.push({who:TERM.name,say:TERM.end});
  return steps;
 }
@@ -1735,7 +1757,7 @@ function dirPress(d){
  for(const t of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(t,off);}
 $('btnA').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
 $('btnB').addEventListener('pointerdown',e=>{e.preventDefault();cancel()});
-$('dlg').addEventListener('click',e=>{const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.dataset.w||w.textContent);return}if(e.target.closest('#spk'))return;advance()});
+$('dlg').addEventListener('click',e=>{const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k,gl);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.dataset.w||w.textContent,w);return}if(e.target.closest('#spk'))return;advance()});
 $('spk').addEventListener('click',e=>{e.stopPropagation();if(dlg)speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.say||dlg.cur.ask||'')});
 $('gloss').addEventListener('click',e=>{if(e.target.closest('.gx'))hideGloss()});  // × closes; A and B close too
 $('choices').addEventListener('pointerdown',e=>{const b=e.target.closest('.choice');if(b){sel=choiceBtns().indexOf(b);markSel()}});
@@ -1863,6 +1885,35 @@ if(window.LINES_EN&&store.get(KEY('enAll'))!==null){const b=document.createEleme
  const upd=()=>b.setAttribute('aria-pressed',String(enAll));upd();menuAdd(b);
  b.addEventListener('click',()=>{enAll=!enAll;store.set(KEY('enAll'),enAll?'1':'0');upd();sfx('ok');
   const d=$('txtEn');if(d&&d.textContent){d.hidden=!enAll;$('enBtn').classList.toggle('on',enAll)}toast(enAll?T('영어 자막을 켰어요.'):T('영어 자막을 껐어요.'))})}
+/* ---------- 저장 옮기기 (START): every walk game's progress in this browser as text, to carry to another browser or the Android app.
+   내보내기 shows it in the box and copies it; 가져오기 reads text pasted there and, on a second tap, writes it over this browser's
+   (keys it doesn't have are left alone), then reloads. All the games share stan-stani.github.io, so one text carries all of them;
+   walk-count (left out of 통계) stays this browser's own. Plain JSON: {walkSaves:1, from, t, data:{key: value}}. ---------- */
+function savesText(){const data={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k!=='walk-count')data[k]=localStorage.getItem(k)}
+ return JSON.stringify({walkSaves:1,from:location.host,t:new Date().toISOString(),data})}
+function readSaves(txt){let o;try{o=JSON.parse(String(txt).trim())}catch(e){return null}
+ if(!o||o.walkSaves!==1||!o.data||typeof o.data!=='object')return null;
+ const data={};for(const [k,v] of Object.entries(o.data))if(typeof v==='string'&&k!=='walk-count')data[k]=v;return data}
+function openSaves(){
+ let p=$('savePanel');
+ if(!p){p=document.createElement('div');p.className='panel';p.id='savePanel';p.hidden=true;
+  p.innerHTML=`<div class="sheet talksheet" role="dialog" aria-label="${T('저장 옮기기')}"><h2><span>${T('저장 옮기기')}</span><button class="btn" id="saveClose">${T('닫기')}</button></h2>`
+   +`<div class="row tapsort" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn" id="saveOut">${T('내보내기')}</button><button class="btn" id="saveIn">${T('가져오기')}</button></div>`
+   +`<textarea id="saveText" spellcheck="false" autocomplete="off" style="width:100%;height:12em;font:.72rem/1.3 monospace;box-sizing:border-box;margin-top:8px"></textarea></div>`;
+  $('tapPanel').after(p);
+  const ta=$('saveText');let armT;
+  $('saveClose').addEventListener('click',()=>{p.hidden=true;document.body.classList.remove('talkopen');backToMenu()});
+  p.addEventListener('click',e=>{if(e.target===p)$('saveClose').click()});
+  $('saveOut').addEventListener('click',()=>{ta.value=savesText();ta.focus();ta.select();const ok=()=>toast(T('복사했어요!')),old=()=>{try{if(document.execCommand('copy'))ok()}catch(e){}};
+   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(ta.value).then(ok,old);else old()});
+  $('saveIn').addEventListener('click',e=>{const b=e.currentTarget,data=readSaves(ta.value);
+   if(!data){toast(T('저장 글이 아니에요.'));return}
+   if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent=T('한 번 더 누르면 덮어써요');clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent=T('가져오기')},3000);return}
+   for(const [k,v] of Object.entries(data))try{localStorage.setItem(k,v)}catch(err){toast(T('저장할 자리가 모자라요.'));return}
+   store.set=()=>{};location.reload()})}  // nothing of the old game is saved over it before the reload
+ $('saveText').value='';p.hidden=false;document.body.classList.add('talkopen');
+}
+{const b=document.createElement('button');b.className='mi';b.id='saveBtn';b.textContent=T('저장 옮기기');b.addEventListener('click',()=>{$('startPanel').hidden=true;openSaves()});menuAdd(b)}
 {const b=document.createElement('button');b.className='mi';b.id='repBtn';b.textContent=T('문제 알리기');b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});menuAdd(b)}
 $('startBtn').addEventListener('click',toggleStart);$('startClose').addEventListener('click',()=>$('startPanel').hidden=true);
 $('startPanel').addEventListener('click',e=>{if(e.target.id==='startPanel'){$('startPanel').hidden=true;return}
@@ -1870,7 +1921,7 @@ $('startPanel').addEventListener('click',e=>{if(e.target.id==='startPanel'){$('s
 $('tapBtn').addEventListener('click',openTaps);$('tapClose').addEventListener('click',closeTaps);
 $('tapSortT').addEventListener('click',()=>{tapSort='t';openTaps()});$('tapSortN').addEventListener('click',()=>{tapSort='n';openTaps()});
 $('tapPanel').addEventListener('click',e=>{if(e.target.id==='tapPanel'){closeTaps();return}const p=e.target.closest('.tp');if(p){const en=p.querySelector('.tpe');en.hidden=!en.hidden}});$('talkClose').addEventListener('click',closeTalk);
-$('talkPanel').addEventListener('click',e=>{if(e.target.id==='talkPanel'){closeTalk();return}const gl=e.target.closest('.gl');if(gl){showGloss(gl.dataset.k);return}const w=e.target.closest('.w');if(w)showWord(w.dataset.w||w.textContent)});
+$('talkPanel').addEventListener('click',e=>{if(e.target.id==='talkPanel'){closeTalk();return}const gl=e.target.closest('.gl');if(gl){showGloss(gl.dataset.k,gl);return}const w=e.target.closest('.w');if(w)showWord(w.dataset.w||w.textContent,w)});
 /* debug (START → 디버그, saved per game): a 건너뛰기 button on every conversation runs it to the end — right answers, finished word
    orders, every flag / item / word it sets, quietly — and stops at a real decision (a plain choice like "2교시로 갈까요?"). For testing. */
 /* only for development: shown off the published site (file://, localhost: the playtests) and in a browser that opened ?debug=1 once

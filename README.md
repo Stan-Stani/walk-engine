@@ -151,8 +151,32 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   when any conversation closes, `C.questLate()` → the 목표 line gets the `late` class, and `GAME.onBoot(CH, C)` when a chapter starts.
 - Android app (`android/`, see its README): every published game in one list, full screen at its real address, saved for
   offline play, never counted in 통계 (`?count=0` plus the app's own guard), with the phone's own voice for speech.
+- 찾아본 말 복습 (the review computer): a word you look up that you already have becomes due right away (its level stays); a word no
+  chapter teaches, looked up twice, is asked at the review computer after the due badge words (at most two a round), quoted in the
+  line you met it in, its 사전 meaning among two others you looked up. Its own record (`KEY('looks')`: asked now, after 4 hours,
+  after a day, then done), never badges or ★. `GAME.lookReview:false` turns it off. Taps keep the line they were met in (`taps[w].s`).
+- 저장 옮기기 (START): every walk game's progress in this browser as text (내보내기, copied), and 가져오기 writes pasted text back (a
+  second tap confirms) and reloads. One text carries every game on the site; `walk-count` stays each browser's own. For moving
+  progress from Chrome into the Android app, or to another phone.
 
 ## Tools
+- `games.json`: every game in one list (folder, repo, branch, Pages path, public twin, smoke chapter, title). `sync.sh`,
+  `tools/ship.sh`, the engine tests and the Android app read it; add a game there first.
+- `tools/ship.sh [--dry-run] [game …]`: from committed engine to live in one command: every repo on its default branch, clean and
+  fast-forwarded; engine tests; sync; per game build, validate and the smoke playtest; the engine-sync commits; push, `sync_public.sh`
+  for the twins, then wait until every live version.json is the new build. Stops at the first failure. `WALK_PYTHON` picks the
+  Python (fugashi for ことばのむら).
+- `tests/run.mjs [spec …]`: the engine's own tests. The test games (점심 방송, ことばのむら, 단어 마을) are copied and built with the
+  working-copy engine.js, before any sync, and each `tests/specs/*.mjs` runs on them in headless Chrome with real taps (사전 문장,
+  찾아본 말 복습, 저장 옮기기). Screenshots in `tests/out/`.
+- `tools/play.mjs`: the playtest runner every game shares (a game's `tests/play.mjs` calls it; or run it from a game's root). In
+  `--fast` mode the driver's time limits run on the real clock (`window.__realNow`), so a busy machine doesn't fail a wait.
+- `tools/chrome.mjs`: finds Chrome on any machine ($CHROME, the flatpak Chrome on bluefin, Google Chrome on macOS, or one on the
+  PATH); every tool here starts Chrome through it.
+- Claude Code: `tools/ctl-mcp.mjs` is ctl.mjs as an MCP server (each game's `.mcp.json` registers it as `walk-ctl`: start, walk,
+  key, tap, tapword, look, shot, stop, each returning the visible text and the screenshot). Each game's `.claude/settings.json`
+  has a Stop hook (`tools/check-hook.sh`) that builds and validates before Claude stops with changes in src/, and links the
+  `walk-diff-review` skill (`.claude/skills/`). `tools/triage-reports.md` is the prompt for triaging 문제 알리기 reports on bluefin.
 - `tools/ctl.mjs`: hands-on controller for playing a game like a player would (one phone-sized Chrome; each command presses keys,
   walks, taps, or looks, then saves a screenshot and prints the visible text). From a game's repo root:
   `node ../walk-engine/tools/ctl.mjs start ch1`, then `walk`, `key`, `tap`, `tapword`, `shot`, `stop`. `look` (around the player),

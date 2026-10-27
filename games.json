@@ -1,0 +1,17 @@
+{
+  "about": "Every walk game, in one place: sync.sh, tools/ship.sh, the engine tests and the Android app read this. dir = the clone's folder next to walk-engine; repo = its GitHub repo; site = its GitHub Pages path (null: not published); twin = the public mirror made by tools/sync_public.sh; smoke = the chapter play.mjs --fast plays after an engine change; app: listed in the Android app.",
+  "games": [
+    {"dir": "sora-vocab", "repo": "jeomsim-bangsong", "branch": "main", "site": "jeomsim-bangsong", "smoke": "ch1", "app": true,
+     "title": "점심 방송", "blurb": "A transfer student, the broadcast club and the lunchtime show"},
+    {"dir": "exodus-a", "repo": "exodus-a", "branch": "master", "site": "seongsilho", "twin": "seongsilho", "smoke": "ch1", "app": true,
+     "title": "성실호", "blurb": "Following Peter F. Hamilton's Exodus"},
+    {"dir": "expert-brother", "repo": "expert-brother", "branch": "main", "site": "hyeongje", "twin": "hyeongje", "smoke": "ch1", "app": true,
+     "title": "형제", "blurb": "Following Adrian Tchaikovsky's The Expert System's Brother"},
+    {"dir": "daneo-maul", "repo": "daneo-maul", "branch": "main", "site": "daneo-maul", "smoke": "c1", "app": true,
+     "title": "단어 마을", "blurb": "A tiny vocabulary village"},
+    {"dir": "kotoba-mura", "repo": "kotoba-mura", "branch": "main", "site": "kotoba-mura", "smoke": "c1", "app": true,
+     "title": "ことばのむら", "blurb": "A tiny Japanese village for beginners"},
+    {"dir": "sori-yeopseo", "repo": "sori-yeopseo", "branch": "main", "site": null, "smoke": "ch1", "app": false,
+     "title": "소리 엽서", "blurb": "In development"}
+  ]
+}

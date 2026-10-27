@@ -4,6 +4,7 @@
 //   node ../walk-engine/tools/linecheck.mjs [max-lines=3]
 // Prints every string over the limit (with its file) and exits 1 if there is one.
 import {spawn,execSync} from 'node:child_process';import fs from 'node:fs';import path from 'node:path';
+import {chrome} from './chrome.mjs';
 const ROOT=process.cwd();
 if(!fs.existsSync(path.join(ROOT,'index.html'))){console.log('run from a game repo root (no index.html here)');process.exit(1)}
 const MAX=+(process.argv[2]||3);
@@ -21,7 +22,7 @@ for(;;){try{fs.writeFileSync(LOCK,String(process.pid),{flag:'wx'});break}catch(e
 const DIR=fs.mkdtempSync('/tmp/linecheck-');fs.copyFileSync(path.join(ROOT,'index.html'),DIR+'/index.html');
 const PORT=9600+Math.floor(Math.random()*90);
 process.on('exit',()=>{try{execSync(`pkill -9 -f "user-data-dir=${DIR}/prof"`)}catch(e){}try{if(fs.readFileSync(LOCK,'utf8')===String(process.pid))fs.rmSync(LOCK)}catch(e){}fs.rmSync(DIR,{recursive:true,force:true})});
-spawn('flatpak',['run','--nodevice=all',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank'],{stdio:'ignore',detached:true}).unref();
+spawn(...chrome(DIR,['--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank']),{stdio:'ignore',detached:true}).unref();
 let ws;for(let i=0;i<60&&!ws;i++){try{const l=await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();const p=l.find(x=>x.type==='page');if(p)ws=p.webSocketDebuggerUrl}catch(e){}if(!ws)await wait(500)}
 if(!ws){console.log('chrome did not start');process.exit(2)}
 const sock=new WebSocket(ws);await new Promise(r=>sock.onopen=r);let id=0;const pend={};

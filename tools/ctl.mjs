@@ -17,6 +17,7 @@
 //   node $C stop
 // After each action it prints the screenshot path and the text a player can see (dialogue, choices, popups, toasts).
 import {spawn,execSync} from 'node:child_process';import fs from 'node:fs';import path from 'node:path';
+import {chrome} from './chrome.mjs';
 const ROOT=process.cwd();if(!fs.existsSync(ROOT+'/index.html')){console.log('run from a game repo root (no index.html here)');process.exit(1)}
 // CTL_SESSION=name: a separate Chrome (profile, port, screenshots) per tester, so two can play at once (never more than two)
 const SES=(process.env.CTL_SESSION||'').replace(/[^\w-]/g,'');
@@ -40,13 +41,13 @@ if(cmd==='start'||cmd==='resume')for(const d of fs.readdirSync(path.dirname(DIR)
 if(cmd==='resume'){  // relaunch Chrome on the same profile: the game's saves (localStorage) are still there
   await closeChrome();await wait(500);
   if(!fs.existsSync(DIR+'/index.html'))fs.copyFileSync(ROOT+'/index.html',DIR+'/index.html');
-  const c=spawn('flatpak',['run','--nodevice=all',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank'],{stdio:'ignore',detached:true});c.unref();
+  const c=spawn(...chrome(DIR,['--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank']),{stdio:'ignore',detached:true});c.unref();
 }
 if(cmd==='start'){
   try{execSync(`pkill -9 -f "user-data-dir=${DIR}/[p]rof"`)}catch(e){}await wait(500);
   fs.rmSync(DIR+'/prof',{recursive:true,force:true});fs.copyFileSync(ROOT+'/index.html',DIR+'/index.html');
   for(const f of fs.readdirSync(DIR+'/shots'))fs.unlinkSync(DIR+'/shots/'+f);
-  const c=spawn('flatpak',['run','--nodevice=all',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank'],{stdio:'ignore',detached:true});c.unref();
+  const c=spawn(...chrome(DIR,['--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank']),{stdio:'ignore',detached:true});c.unref();
 }
 let ws;for(let i=0;i<60&&!ws;i++){try{const l=await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();const p=l.find(x=>x.type==='page');if(p)ws=p.webSocketDebuggerUrl}catch(e){}if(!ws)await wait(500)}
 if(!ws){console.log('browser not running — use: start');process.exit(1)}

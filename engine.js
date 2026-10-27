@@ -975,6 +975,7 @@ function playScene(name){
  frame(performance.now());
 }
 function show(s){
+ readEnd();  // the line before this one: read long enough, its words count as seen
  if(!s||!dlg){if(dlg)closeDialog();return}  // a step that isn't there closes the talk instead of leaving a blank box
  if(s&&(s.set||s.award||s.give||s.take||s.go)&&dlg)dlg.moved=1;  // a story beat (spaced review counts them)
  if(s&&s.slides&&s.slide===undefined){const more=slideSteps();dlg.steps.splice(dlg.i,1,...more);if(!more.length||dlg.i>=dlg.steps.length){closeDialog();return}return show(dlg.steps[dlg.i])}  // the postcard on the phone, a card per step
@@ -1098,7 +1099,7 @@ function typeText(text,done){
  clearInterval(typing?.id);const el=$('txt');const p=plain(text);el.innerHTML='<span style="visibility:hidden">'+p.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</span>';let i=0;
  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
  typing={id:null,finished:false};
- const fin=()=>{clearInterval(typing.id);el.innerHTML=glossHTML(text);typing.finished=true;hintWord();done()};
+ const fin=()=>{clearInterval(typing.id);el.innerHTML=glossHTML(text);typing.finished=true;hintWord();readStart();done()};
  typing.fin=fin;
  if(reduce||!p)return fin();  // nothing to type (a word-order question has no line of its own): its tiles come at once, never after a blank box and a tap
  const seg=(()=>{try{return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(p)].map(x=>x.segment)}catch(e){return Array.from(p)}})();  // whole characters: never half an emoji (it shows as ? for a tick)
@@ -1146,7 +1147,7 @@ function hintWord(){  // a line has been on the screen 4 s and no word has ever 
  hintWord.t=setTimeout(()=>{if(!dlg||dlg.cur!==cur||hints.word===1||!$('gloss').hidden||phoneOpen)return;
   const ws=[...$('txt').querySelectorAll('.w')],w=ws.filter(e=>e.textContent.length>=2).sort((a,b)=>b.textContent.length-a.textContent.length)[0]||ws[0];
   if(w){w.classList.add('hintw');hintSeen('word',6)}},4000)}
-function noteTap(rows,el,sw){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;if(d.r&&d.r!==h)r.r=d.r;
+function noteTap(rows,el,sw){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(!h)return;tapSeen(h);const r=taps[h]||(taps[h]={n:0,t:0});r.n++;r.t=Date.now();r.k=d.k;r.e=d.e;if(d.r&&d.r!==h)r.r=d.r;
  const line=el&&el.closest&&el.closest('.txt')?shownText(el.closest('.txt')).replace(/\s+/g,' ').trim():'';if(line&&sw){r.s=line;r.sw=String(sw)}  // the line it was met in: the review computer quotes it (찾아본 말 복습)
  store.set(TAPS_KEY,JSON.stringify(taps));
  if(state&&state.lv&&known(h)&&lv(h).b>0&&!dueL(lv(h))){state.lv[h]={...lv(h),due:now(),beat:null};save()}}  // looking up a word you have: it didn't come back by itself, so it's due now (its level stays)
@@ -1158,7 +1159,7 @@ function noteTap(rows,el,sw){hintDone('word');unhintWord();const [h,d]=rows[0]||
 const LOOKS_KEY=KEY('looks');let looks={};try{looks=JSON.parse(store.get(LOOKS_KEY)||'{}')||{}}catch(e){looks={}}
 let taughtAll=null;
 const taught=w=>{if(!taughtAll){taughtAll=new Set();for(const ch of CHAPTERS)try{((ch===CH?C:ch.make()).WORDS||[]).forEach(x=>taughtAll.add(x))}catch(e){}}return taughtAll.has(w)};
-const lookDue=()=>G.lookReview===false?[]:Object.entries(taps).filter(([h,r])=>{const L=looks[h]||{b:0,due:0};return r.n>=2&&r.k&&!taught(h)&&!known(h)&&L.b<3&&L.due<=now()}).sort((a,b)=>b[1].n-a[1].n).map(([h])=>h);
+const lookDue=()=>G.lookReview===false?[]:Object.entries(taps).filter(([h,r])=>{const L=looks[h]||{b:0,due:0};return r.n>=2&&r.k&&!taught(h)&&!known(h)&&L.b<3&&L.due<=now()&&wordState(h)!=='known'}).sort((a,b)=>b[1].n-a[1].n).map(([h])=>h);
 function lookQ(h){
  const r=taps[h],ks=new Set([r.k]),pick=[];
  for(const k of [...shuffle(Object.values(taps).map(o=>o.k)),...shuffle(Object.values((window.LEX||{}).defs||{}).map(d=>d.k))])if(k&&!ks.has(k)&&pick.length<2){ks.add(k);pick.push(k)}
@@ -1173,16 +1174,23 @@ function openTaps(){
  const esc=x=>String(x||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  const rows=tapRows(taps),lines=tapRows(lineQs),n=tapLines?lines.length:rows.length;
  $('tapCount').textContent=n?unit(n,'개'):'';
- $('tapList').innerHTML=tapLines?(lines.length?lines.map(([t,r])=>`<div class="tp"><div class="tph"><b>${esc(t)}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc([r.w,r.ch].filter(Boolean).join(' · '))}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
+ const gaps=tapLines?gramGaps():[];if(tapPat&&!gaps.some(g=>g.p===tapPat))tapPat=null;
+ const shownLines=tapPat?lines.filter(([t])=>linePats(t).includes(tapPat)):lines;
+ if(tapPat)$('tapCount').textContent=unit(shownLines.length,'개');  // a pattern picked: its lines
+ $('tapList').innerHTML=(gaps.length?`<div class="tpg"><b>${T('문법')}</b>`+gaps.map(g=>`<button type="button" class="tpgp${g.p===tapPat?' on':''}" data-p="${esc(g.p)}">${esc(g.p)} <small>${g.k}</small></button>`).join('')+'</div>':'')
+  +(tapLines?(shownLines.length?shownLines.map(([t,r])=>`<div class="tp"><div class="tph"><b>${esc(t)}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc([r.w,r.ch].filter(Boolean).join(' · '))}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
   :'<p class="tl-empty">'+T('아직 영어로 본 문장이 없어요.')+'</p>')
   :rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}${r.r?`<small class="rd">${esc(r.r)}</small>`:''}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
-  :'<p class="tl-empty">'+T('아직 찾아본 말이 없어요.')+'</p>';
+  :'<p class="tl-empty">'+T('아직 찾아본 말이 없어요.')+'</p>');
+ $('tapList').onclick=e=>{const g=e.target.closest('.tpgp');if(g){e.stopPropagation();tapPat=tapPat===g.dataset.p?null:g.dataset.p;openTaps()}};  // a pattern: only its lines (again: all)
  if(!$('tapCopy')){const b=document.createElement('button');b.className='btn';b.id='tapCopy';b.textContent=T('복사');b.style.marginLeft='auto';b.addEventListener('click',copyTaps);$('tapSortN').after(b)}
  if(!$('tapLines')&&(window.LINES_EN||lines.length)){const b=document.createElement('button');b.className='btn';b.id='tapLines';b.textContent=T('문장');b.addEventListener('click',()=>{tapLines=!tapLines;openTaps()});$('tapSortN').after(b)  // 문장: the lines whose English was opened, instead of the words
-  const st=document.createElement('style');st.textContent='.tapsort{flex-wrap:wrap}.tapsort .btn{white-space:nowrap}';document.head.appendChild(st)}  // a fourth button: longer labels (ことばのむら) wrap the row, never a word
+  const st=document.createElement('style');st.textContent='.tapsort{flex-wrap:wrap}.tapsort .btn{white-space:nowrap}'
+   +'.tpg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}.tpgp{font:inherit;font-size:.8rem;padding:2px 9px;border:1px solid currentColor;border-radius:12px;background:none;color:inherit;opacity:.75;cursor:pointer}.tpgp.on{opacity:1;font-weight:700}.tpgp small{opacity:.7}';document.head.appendChild(st)}  // a fourth button: longer labels (ことばのむら) wrap the row, never a word
  if($('tapLines')){$('tapLines').classList.toggle('on',tapLines);$('tapLines').setAttribute('aria-pressed',String(tapLines))}
  if(!$('tapSend')){const b=document.createElement('button');b.className='btn';b.id='tapSend';b.textContent=T('보내기');b.addEventListener('click',sendTaps);$('tapCopy').after(b)}
- $('tapCopy').hidden=$('tapSend').hidden=!rows.length&&!lines.length;if($('tapText'))$('tapText').hidden=true;
+ if(!$('tapAnki')&&ankiOn()){const b=document.createElement('button');b.className='btn';b.id='tapAnki';b.textContent='Anki';b.addEventListener('click',sendAnki);$('tapSend').after(b)}  // the app, with AnkiDroid
+ $('tapCopy').hidden=$('tapSend').hidden=!rows.length&&!lines.length;if($('tapAnki'))$('tapAnki').hidden=$('tapCopy').hidden;if($('tapText'))$('tapText').hidden=true;
  $('tapSortT').classList.toggle('on',tapSort==='t');$('tapSortN').classList.toggle('on',tapSort==='n');
  $('tapPanel').hidden=false;document.body.classList.add('talkopen');$('tapList').scrollTop=0;
 }
@@ -1224,8 +1232,72 @@ function sendText(){
   +`Give English only when I ask or get stuck, and correct me briefly.\n\n`
   +(words.length?`Words I looked up${all||!since?'':' since '+fmt(since)} (word, times: meaning):\n`+words.slice(0,40).map(([h,r])=>`- ${h}${r.r?' ('+r.r+')':''}, ${r.n}: ${r.k||''}${r.s?` — in "${r.s}"`:''}`).join('\n')+'\n\n':'')
   +(lines.length?`Sentences I opened the English for (Korean / English, who, where):\n`.replace('Korean',L)+lines.slice(0,25).map(([t,r])=>`- ${t} / ${r.e||''}${r.w||r.ch?` (${[r.w,r.ch].filter(Boolean).join(', ')})`:''}`).join('\n')+'\n\n':'')
-  +(weak.length?`Words I'm still learning: ${weak.slice(0,20).join(', ')}\n`:'');
+  +(weak.length?`Words I'm still learning: ${weak.slice(0,20).join(', ')}\n\n`:'')
+  +((g=>g.length?`Grammar that shows up in the sentences I needed the English for, more than usual in this game (pattern, sentences): ${g.map(x=>x.p+' '+x.k).join(', ')}. Please teach these, using my sentences as examples.\n\n`:'')(gramGaps()))
+  +((ws=>ws.length?`Words I keep looking up although I've read them often (looked up / read): ${ws.join(', ')}\n`:'')(tapRows(taps).filter(([h,r])=>r.n>=2&&(seen[h]||[0])[0]>=8&&wordState(h)!=='known').slice(0,15).map(([h,r])=>`${h} ${r.n}/${seen[h][0]}`)));
 }
+/* ---------- 문법: the grammar patterns the lines you opened English for share (LINE_GRAMMAR, from walk-engine/tools/grammar_tags.py,
+   in games that have it). A pattern counts when at least two such lines have it and it is more common in them than in the game's
+   lines as a whole (lift ≥ 1.3, so -(으)ㄹ 때 doesn't top every list just by being everywhere). The 사전's 문장 view lists them
+   above the lines (tap one: only its lines); 보내기 names them for the tutor. ---------- */
+const LG=globalThis.LINE_GRAMMAR||null;let tapPat=null;
+const linePats=t=>LG?(LG.lines[String(t).replace(/\s+/g,' ').trim()]||[]).map(i=>LG.pats[i]):[];
+function gramGaps(){
+ if(!LG)return [];const ls=Object.keys(lineQs),c={};
+ for(const t of ls)for(const p of linePats(t))c[p]=(c[p]||0)+1;
+ return Object.entries(c).map(([p,k])=>({p,k,lift:(k/ls.length)/(LG.cnt[LG.pats.indexOf(p)]/LG.n)}))
+  .filter(x=>x.k>=2&&x.lift>=1.3).sort((a,b)=>b.k*Math.log(1+b.lift)-a.k*Math.log(1+a.lift)).slice(0,8);
+}
+/* ---------- 본 말: every word you read, counted by its dictionary form, across every game in this language (one record on the site,
+   walk-seen-<lang>: word → [times read, times looked up, times read since the last lookup]). A line counts once it has stayed on
+   screen long enough to read (a second, plus a tenth of a second a letter). wordState(w): 'known' (a badge word at ★, or read 4
+   times, the last 3 without looking it up), 'learning' (looked up, read fewer than 3 times since), else 'new'. An estimate: not
+   looking a word up isn't knowing it. 찾아본 말 복습 stops asking a word that's become known; 보내기 names the words still looked up
+   though read often; the chapter list shows about how much of a chapter's words are known (games with LINE_GRAMMAR). ---------- */
+const SEEN_KEY='walk-seen-'+lang2();let seen={};try{seen=JSON.parse(store.get(SEEN_KEY)||'{}')||{}}catch(e){seen={}}
+let seenT=null,reading=null;
+const saveSeen=()=>{clearTimeout(seenT);seenT=setTimeout(()=>store.set(SEEN_KEY,JSON.stringify(seen)),1500)};
+function readStart(){  // a line has typed out: its words, and how long reading it takes
+ const el=$('txt');if(!el)return;const ws=new Set();
+ el.querySelectorAll('.w').forEach(x=>{const r=lexLookup(x.dataset.w||x.textContent)[0];if(r)ws.add(r[0])});
+ el.querySelectorAll('.gl').forEach(x=>ws.add(x.dataset.k));
+ reading={ws:[...ws],at:Date.now(),need:1000+shownText(el).replace(/\s/g,'').length*100};
+}
+function readEnd(){if(!reading)return;const r=reading;reading=null;if(Date.now()-r.at<r.need)return;
+ for(const w of r.ws){const x=seen[w]||(seen[w]=[0,0,0]);x[0]++;x[2]++}saveSeen()}
+function tapSeen(w){const x=seen[w]||(seen[w]=[0,0,0]);x[1]++;x[2]=0;saveSeen()}
+function wordState(w){
+ if(state&&known(w)&&lv(w).b>=3)return 'known';
+ const x=seen[w];if(!x)return 'new';
+ if(x[1]&&x[2]<3)return 'learning';
+ return x[0]>=4&&x[2]>=3?'known':'new';
+}
+function chapterKnown(id){  // about how much of a chapter's words (by use) are known; null without the data or before much reading
+ const ws=LG&&LG.chw&&LG.chw[id];if(!ws||Object.keys(seen).length<50)return null;let all=0,k=0;
+ for(const [w,n] of Object.entries(ws)){all+=n;if(wordState(w)==='known')k+=n}
+ return all?Math.round(100*k/all):null;
+}
+/* ---------- Anki (the Android app, with AnkiDroid installed: window.WalkAnki): the 사전's Anki button adds every looked-up word and
+   every line whose English was opened that hasn't gone before (KEY('ankiSent')) as AnkiDroid notes, deck "Walk Games::<game>": a
+   word's card shows the line it was met in with the word in bold (or the word alone), a line's card the line; AnkiDroid reads the
+   front aloud; the back has the meaning, the English and where it came from. ---------- */
+const ankiOn=()=>{try{return !!(window.WalkAnki&&WalkAnki.available())}catch(e){return false}};
+let ankiSent={},ankiPending=null;try{ankiSent=JSON.parse(store.get(KEY('ankiSent'))||'{}')||{}}catch(e){ankiSent={}}
+function ankiNotes(){
+ const esc=x=>String(x||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),out=[];
+ const notes=Object.values(NOTE_KINDS).map(N=>T(N.name)+' · ');  // a note card's ? (문화 노트 · …) isn't a line
+ for(const [h,r] of tapRows(taps)){if(ankiSent['w:'+h]||!r.k)continue;const sw=r.sw||h;
+  const front=r.s&&r.s.includes(sw)?esc(r.s).replace(esc(sw),'<b>'+esc(sw)+'</b>'):'<b>'+esc(h)+'</b>';
+  out.push({key:'w:'+h,front,word:esc(h)+(r.r?' ('+esc(r.r)+')':''),meaning:esc(r.k),english:esc(r.e),source:esc(G.title||document.title)})}
+ for(const [t,r] of tapRows(lineQs)){if(ankiSent['l:'+t]||notes.some(n=>t.startsWith(n)))continue;
+  out.push({key:'l:'+t,front:esc(t),word:'',meaning:'',english:esc(r.e),source:esc([G.title||document.title,r.ch,r.w].filter(Boolean).join(' · '))})}
+ return out;
+}
+function sendAnki(){const ns=ankiNotes();if(!ns.length){toast(T('새로 보낼 게 없어요.'));return}
+ ankiPending=ns.map(n=>n.key);WalkAnki.add(JSON.stringify({lang:lang2(),deck:G.title||document.title,tag:G.prefix||'',notes:ns.map(({key,...n})=>n)}))}
+window.__ankiDone=(n,err)=>{  // the app's answer: how many notes went in, or why none did
+ if(n<0||err){toast(T('Anki에 못 넣었어요.')+(err?' ('+err+')':''));ankiPending=null;return}
+ const t=Date.now();(ankiPending||[]).forEach(k=>ankiSent[k]=t);ankiPending=null;store.set(KEY('ankiSent'),JSON.stringify(ankiSent));toast('Anki +'+n)};
 function sendTaps(){shareText(sendText(),()=>store.set(KEY('sentAt'),String(Date.now())))}
 function askText(){  // the line in the dialogue box, its English, who says it, where, and the lines just before it
  const line=shownText($('txt')).replace(/\s+/g,' ').trim(),en=($('txtEn')&&$('txtEn').textContent)||'',who=$('who').textContent,L=LANGNAME[lang2()]||lang2();
@@ -1544,6 +1616,7 @@ function dropTalk(){
  $('fade').classList.remove('on');playScene(null);
 }
 function closeDialog(){
+ readEnd();
  writeKbOff();
  const wasBlack=dlg&&dlg.black;if(wasBlack){$('fade').classList.remove('on');playScene(null)}
  closedAt=performance.now();if(dlg&&dlg.moved){pushBack(dlg.snap);beat()}dlg=null;camT=null;startWalks();clearInterval(typing?.id);$('dlg').hidden=true;$('dlg').classList.remove('attop');closePhone();hideGloss();if(TTS)try{speechSynthesis.cancel()}catch(e){}
@@ -2085,7 +2158,7 @@ function boot(id){
 function chapterProgress(c){try{const s=JSON.parse(store.get(c.save)||'null');return s?{got:(s.badges||[]).length,done:!!(s.f&&s.f.done)}:{got:0,done:false}}catch(e){return {got:0,done:false}}}
 function openChapters(){
  $('chList').innerHTML=CHAPTERS.map(c=>{const p=chapterProgress(c);
-  return `<button class="chap${c===CH?' cur':''}" data-id="${c.id}"><span class="cn" style="background:${c.color}">${c.n}</span><span class="ci"><b>${c.title}</b><small>${c.place||''}</small></span><span class="cp">${p.done?'끝':p.got+'/'+c.words}</span></button>`}).join('');
+  return `<button class="chap${c===CH?' cur':''}" data-id="${c.id}"><span class="cn" style="background:${c.color}">${c.n}</span><span class="ci"><b>${c.title}</b><small>${c.place||''}${(k=>k==null?'':` · ${T('아는 말')} ${k}%`)(chapterKnown(c.id))}</small></span><span class="cp">${p.done?'끝':p.got+'/'+c.words}</span></button>`}).join('');
  $('chList').querySelectorAll('.chap').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.id;$('chPanel').hidden=true;if(id!==CH.id){boot(id);sfx('door')}}));
  $('chPanel').hidden=false;$('chList').querySelector('.cur')?.focus();
 }

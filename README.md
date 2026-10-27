@@ -160,6 +160,16 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   words and sentences looked up since the last 보내기 (`KEY('sentAt')`; everything when nothing is new) and the badge words not yet
   remembered. 물어보기, under a line's English once it's open, shares that line, its English, who says it and the lines before it,
   asking for its meaning, grammar and nuance. No share sheet (desktop): copied instead. `GAME.learner` overrides "Korean (about TOPIK 3)".
+- 문법 (사전 · 문장): the grammar patterns the lines you opened English for share, from the game's `src/grammar-tags.json` (made by
+  `tools/grammar_tags.py`, built in as `LINE_GRAMMAR`): a pattern shows when at least two such lines have it and it is more common
+  in them than in the game (lift ≥ 1.3). Tap one: only its lines. 보내기 names them for the tutor.
+- 본 말: every word read, counted by dictionary form across every game in a language (`walk-seen-ko`): a line counts once it stayed
+  up long enough to read. `wordState(w)`: known (★, or read 4 times, the last 3 without a lookup), learning (looked up, read fewer
+  than 3 times since), new. An estimate. 찾아본 말 복습 stops asking known words; 보내기 lists words still looked up though read
+  often; the chapter list shows "아는 말 N%" (games with LINE_GRAMMAR, after 50 words read).
+- Anki (the Android app with AnkiDroid): the 사전's Anki button adds every word and opened-English line not sent before
+  (`KEY('ankiSent')`) to AnkiDroid, deck "Walk Games::<game>": a word's card is the line it was met in with the word in bold, read
+  aloud by AnkiDroid; the back has the meaning, the English and the source.
 - 저장 옮기기 (START): every walk game's progress in this browser as text (내보내기, copied), and 가져오기 writes pasted text back (a
   second tap confirms) and reloads. One text carries every game on the site; `walk-count` stays each browser's own. For moving
   progress from Chrome into the Android app, or to another phone.
@@ -167,6 +177,8 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 ## Tools
 - `games.json`: every game in one list (folder, repo, branch, Pages path, public twin, smoke chapter, title). `sync.sh`,
   `tools/ship.sh`, the engine tests and the Android app read it; add a game there first.
+- `tools/grammar_tags.py` (from a Korean game's root, needs kiwipiepy): every line in lines-en.json → its grammar patterns, and each
+  chapter's words → `src/grammar-tags.json` (commit it; the build only reads it). Run it after lines change.
 - `tools/ship.sh [--dry-run] [game …]`: from committed engine to live in one command: every repo on its default branch, clean and
   fast-forwarded; engine tests; sync; per game build, validate and the smoke playtest; the engine-sync commits; push, `sync_public.sh`
   for the twins, then wait until every live version.json is the new build. Stops at the first failure. `WALK_PYTHON` picks the

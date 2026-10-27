@@ -149,6 +149,8 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - A look's `hairHi`: the colour of the hair's shading strands (grey streaks in dark hair); default a darker shade of `hair`.
 - More chapter hooks (all optional): `C.onStep()` after every step taken (count steps, start a scene on a square), `C.afterTalk()`
   when any conversation closes, `C.questLate()` → the 목표 line gets the `late` class, and `GAME.onBoot(CH, C)` when a chapter starts.
+- Android app (`android/`, see its README): every published game in one list, full screen at its real address, saved for
+  offline play, never counted in 통계 (`?count=0` plus the app's own guard), with the phone's own voice for speech.
 
 ## Tools
 - `tools/ctl.mjs`: hands-on controller for playing a game like a player would (one phone-sized Chrome; each command presses keys,

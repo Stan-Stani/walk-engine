@@ -107,6 +107,11 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   the games share stan-stani.github.io): a line on screen 4 s with no word ever tapped → its longest word bobs, dotted underline
   (stops once any word is tapped, or after 6 showings); the word popup's ? pulses until used (3 popups); once words are tapped, the
   line's ? pulses until used (12 lines). The word-order tile hint uses the same record, so it shows once across the games.
+- 사전 (START → 찾아본 말) keeps every looked-up word (`KEY('taps')`: times, last time) and, beside it, every line whose English was
+  opened with a ? (`KEY('lineQ')`: the line as shown → times, last time, English, who said it, chapter): the dialogue box's ?, the talk
+  log's, the phone's (posts, comments, chat, captions), the postcards' and a note card's (recorded as "문화 노트 · title"). Opening counts,
+  closing doesn't; 영어 자막 showing it on its own doesn't. The panel's 문장 button lists the lines instead of the words (shown when the
+  game has lines-en or lines were recorded); 복사 exports both tables. At most 500 lines (the oldest go: the site shares one storage).
 - Word help (tap a word) stays open until ×, A, B or the next line. Word-order tiles have no instruction text: only in the very first
   word-order question a player ever meets (per game, saved), after a 4 s pause the first right tile gets the `hint` class (bobbing,
   via each game's shell CSS). Never again after that, and never past the first tile. Number keys 1–9 place the nth tile still on the

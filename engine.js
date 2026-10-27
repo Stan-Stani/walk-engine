@@ -763,7 +763,7 @@ function openPhone(p){
  $('phonePanel').hidden=false;phoneOpen=true;
 }
 function closePhone(){if(!phoneOpen)return;phoneOpen=false;$('phonePanel').hidden=true;if(curChat)closeChat();if(curSlides){curSlides=null;document.body.classList.remove('chatting')}hideGloss();if(curPhone&&curPhone.culture)unlockCulture(curPhone.culture);if(curPhone&&curPhone.grammar)unlockGrammar(curPhone.grammar);curPhone=null}
-if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten')||(q.nextElementSibling&&q.nextElementSibling.classList.contains('ten')?q.nextElementSibling:null);if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();return}const g=e.target.closest('.gl');if(g){e.stopPropagation();showGloss(g.dataset.k);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
+if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();hintDone('lineQ');const t=q.closest('.pc,.ppost,.pcapen')?.querySelector('.ten')||(q.nextElementSibling&&q.nextElementSibling.classList.contains('ten')?q.nextElementSibling:null);if(t)t.hidden=!t.hidden;q.classList.toggle('on',!!t&&!t.hidden);q.blur();lineQOpened(q,t);return}const g=e.target.closest('.gl');if(g){e.stopPropagation();showGloss(g.dataset.k);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}});
 /* ---------- phone chat (opt-in; 소리 엽서). A dialogue step chat:{id, room, msgs, reply?, after?, set?, award?} is one exchange in a
    messenger room, shown on the phone (#phonePanel) with the dialogue box out of the way:
    - msgs/after: [{id, from, text, time, now?, pic?, caption?}] (time: when it was sent; now: what the phone's clock shows as it
@@ -874,7 +874,7 @@ function cardHTML(x,i,n){
 function drawCardPics(root){root.querySelectorAll('canvas.pcpic').forEach(cv=>{const P=(C.PICS||G.pics||{})[cv.dataset.pic];if(P)try{P(cv)}catch(e){}})}
 function renderPostcards(){const el=$('pcards');if(!el)return;const cs=pcCards();
  el.innerHTML=cs.length?cs.map(x=>cardHTML(x)).join(''):`<p class="none">${T('아직 없어요.')}</p>`;drawCardPics(el);
- el.onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();const t=q.nextElementSibling;if(t)t.hidden=!t.hidden;return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}}}
+ el.onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();const t=q.nextElementSibling;if(t)t.hidden=!t.hidden;lineQOpened(q,t);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent)}}}
 let curSlides=null;
 function slideSteps(){const cs=pcCards();return cs.map((x,i)=>({slide:i,slideAll:cs,...(i===0?{slideOpen:1}:{})}))}
 function showSlide(s){
@@ -934,7 +934,7 @@ function showNote(K,k){
   +`<ol>${n.lines.map(([t,e,s])=>`<li>${ko(t)}${s?`<sup>${s.join(',')}</sup>`:''}${eng(e)}</li>`).join('')}</ol>`
   +(n.ex&&n.ex.length?`<div class="nex"><b>예문</b><ul>${n.ex.map(([t,e])=>`<li>${ko(t)}${eng(e)}</li>`).join('')}</ul></div>`:'')
   +(n.src?`<div class="src"><b>출처</b>${n.src.map(([t,u],i)=>`<span>${i+1}. <a href="${u}" target="_blank" rel="noopener">${t}</a></span>`).join('')}</div>`:'');
-  c.querySelector('.enb').addEventListener('click',e=>{e.stopPropagation();en=!en;draw()})};
+  c.querySelector('.enb').addEventListener('click',e=>{e.stopPropagation();en=!en;draw();if(en)noteLineQ(T(N.name)+' · '+n.t,n.lines.map(l=>l[1]).join(' '))})};
  draw();c.hidden=false;c.scrollIntoView({block:'nearest'});readNote(K,k);
 }
 if(Object.values(NOTE_KINDS).some(N=>$(N.list))){
@@ -1067,7 +1067,7 @@ const lineEn=t=>{const L=window.LINES_EN;return L&&t?L[plain(t)]||null:null};
 function enUI(){let b=$('enBtn');if(b)return b;
  b=document.createElement('button');b.id='enBtn';b.className='spk enq';b.type='button';b.textContent='?';b.setAttribute('aria-label',T('영어로 보기'));$('spk').before(b);
  const d=document.createElement('div');d.id='txtEn';d.className='txt-en';d.hidden=true;$('txt').after(d);
- b.addEventListener('click',e=>{e.stopPropagation();hintDone('lineQ');b.classList.remove('hintq');d.hidden=!d.hidden;b.classList.toggle('on',!d.hidden);b.blur()});  // blur: A/Enter go on talking, not toggle it again
+ b.addEventListener('click',e=>{e.stopPropagation();hintDone('lineQ');b.classList.remove('hintq');d.hidden=!d.hidden;b.classList.toggle('on',!d.hidden);b.blur();if(!d.hidden)noteLineQ(shownText($('txt')),d.textContent,$('who').textContent)});  // blur: A/Enter go on talking, not toggle it again
  const st=document.createElement('style');st.textContent='.spk.enq{margin-left:auto;font:700 .9rem/1 var(--body,sans-serif)}.spk.enq+.spk{margin-left:0}'
   +'.txt-en{font-family:var(--body,sans-serif);font-size:.86rem;line-height:1.4;opacity:.8;margin-top:6px;word-break:normal}'
   +'.tl .tq{margin-left:6px;padding:0 5px;font:700 .72rem/1.4 var(--body,sans-serif);color:inherit;background:none;border:1px solid currentColor;border-radius:4px;opacity:.55;cursor:pointer;vertical-align:1px}'
@@ -1110,6 +1110,21 @@ function showWord(w){const rows=lexLookup(w);noteTap(rows);popGloss(rows);lastWo
 /* ---------- 찾아본 말: every tap that finds a definition — how many times, and when last (all chapters, one list) ---------- */
 const TAPS_KEY=KEY('taps');let taps={},tapSort='t';
 try{taps=JSON.parse(store.get(TAPS_KEY)||'{}')||{}}catch(e){taps={}}
+const tapRows=o=>Object.entries(o).sort((a,b)=>tapSort==='n'?(b[1].n-a[1].n||b[1].t-a[1].t):b[1].t-a[1].t);
+/* ---------- 영어로 본 문장: every ? that opens a line's English (dialogue box, talk log, phone, postcards, notes): the line, how many times,
+   when last, who said it and in which chapter (all chapters, one list). The 사전 panel lists them under 문장, and 복사 adds them. ---------- */
+const LINEQ_KEY=KEY('lineQ');let lineQs={},tapLines=false;
+try{lineQs=JSON.parse(store.get(LINEQ_KEY)||'{}')||{}}catch(e){lineQs={}}
+function noteLineQ(t,e,who){
+ t=String(t||'').replace(/\s+/g,' ').trim();if(!t)return;const r=lineQs[t]||(lineQs[t]={n:0,t:0});r.n++;r.t=Date.now();
+ if(e){e=String(e).replace(/\s+/g,' ').trim();r.e=e.length>400?e.slice(0,399)+'…':e}if(who)r.w=String(who).trim();if(CH)r.ch=CH.n+' '+CH.title;
+ const ks=Object.keys(lineQs);if(ks.length>500)ks.sort((a,b)=>lineQs[a].t-lineQs[b].t).slice(0,ks.length-500).forEach(k=>delete lineQs[k]);  // the oldest go: every game on the site shares one storage
+ store.set(LINEQ_KEY,JSON.stringify(lineQs))}
+const shownText=el=>{if(!el)return '';const x=el.cloneNode(true);x.querySelectorAll('.tq,.ten,rt,rp').forEach(n=>n.remove());return x.textContent};  // a line as read: no ? or English, no furigana
+function lineQOpened(q,ten){  // a ? in a list (talk log, phone, chat, postcards) just showed its English: note its line and who said it
+ if(!ten||ten.hidden)return;const c=q.closest('.tt,.pc,.ppost,.pphoto,.cb,#cfb,.pccap,.pcl');if(!c)return;
+ const w=c.closest('.tl')?.querySelector('.tw')||c.querySelector('.pn,.cn,.pcw');
+ noteLineQ(shownText(c.matches('.txt')?c:c.querySelector('.txt')),ten.textContent,c.closest('.cm.me')?T('나'):w?shownText(w):c.querySelector('.pmeta')?.textContent.split(' · ')[0])}
 /* ---------- first-time hints, no instruction text: tap a word · the popup's ? (English) · the line's ? (the line in English) ----------
    One record for every game on this site, not per game: browsers keep saved data per site, and all the walk games live on
    stan-stani.github.io, so a player who learned to tap words in one game isn't shown it again in another. Each hint ends for good once
@@ -1132,22 +1147,29 @@ function noteTap(rows){hintDone('word');unhintWord();const [h,d]=rows[0]||[];if(
 function ago(t){const m=Math.floor((Date.now()-t)/60000);if(m<1)return T('방금');if(m<60)return unit(m,'분')+T(' 전');const h=Math.floor(m/60);if(h<24)return unit(h,'시간')+T(' 전');const d=Math.floor(h/24);return d===1?T('어제'):unit(d,'일')+T(' 전')}
 function openTaps(){
  const esc=x=>String(x||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- const rows=Object.entries(taps).sort((a,b)=>tapSort==='n'?(b[1].n-a[1].n||b[1].t-a[1].t):b[1].t-a[1].t);
- $('tapCount').textContent=rows.length?unit(rows.length,'개'):'';
- $('tapList').innerHTML=rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}${r.r?`<small class="rd">${esc(r.r)}</small>`:''}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
+ const rows=tapRows(taps),lines=tapRows(lineQs),n=tapLines?lines.length:rows.length;
+ $('tapCount').textContent=n?unit(n,'개'):'';
+ $('tapList').innerHTML=tapLines?(lines.length?lines.map(([t,r])=>`<div class="tp"><div class="tph"><b>${esc(t)}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc([r.w,r.ch].filter(Boolean).join(' · '))}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
+  :'<p class="tl-empty">'+T('아직 영어로 본 문장이 없어요.')+'</p>')
+  :rows.length?rows.map(([h,r])=>`<div class="tp"><div class="tph"><b>${esc(h)}${r.r?`<small class="rd">${esc(r.r)}</small>`:''}</b><span class="tpm">${unit(r.n,'번')} · ${ago(r.t)}</span></div><div class="tpk">${esc(r.k)}</div><div class="tpe" hidden>${esc(r.e)}</div></div>`).join('')
   :'<p class="tl-empty">'+T('아직 찾아본 말이 없어요.')+'</p>';
  if(!$('tapCopy')){const b=document.createElement('button');b.className='btn';b.id='tapCopy';b.textContent=T('복사');b.style.marginLeft='auto';b.addEventListener('click',copyTaps);$('tapSortN').after(b)}
- $('tapCopy').hidden=!rows.length;if($('tapText'))$('tapText').hidden=true;
+ if(!$('tapLines')&&(window.LINES_EN||lines.length)){const b=document.createElement('button');b.className='btn';b.id='tapLines';b.textContent=T('문장');b.addEventListener('click',()=>{tapLines=!tapLines;openTaps()});$('tapSortN').after(b)  // 문장: the lines whose English was opened, instead of the words
+  const st=document.createElement('style');st.textContent='.tapsort{flex-wrap:wrap}.tapsort .btn{white-space:nowrap}';document.head.appendChild(st)}  // a fourth button: longer labels (ことばのむら) wrap the row, never a word
+ if($('tapLines')){$('tapLines').classList.toggle('on',tapLines);$('tapLines').setAttribute('aria-pressed',String(tapLines))}
+ $('tapCopy').hidden=!rows.length&&!lines.length;if($('tapText'))$('tapText').hidden=true;
  $('tapSortT').classList.toggle('on',tapSort==='t');$('tapSortN').classList.toggle('on',tapSort==='n');
  $('tapPanel').hidden=false;document.body.classList.add('talkopen');$('tapList').scrollTop=0;
 }
 function closeTaps(){$('tapPanel').hidden=true;document.body.classList.remove('talkopen');backToMenu()}
-/* 복사: every looked-up word as plain text (word | times | last day | meaning | English), to paste into a chat and practise */
+/* 복사: every looked-up word as plain text (word | times | last day | meaning | English), to paste into a chat and practise; then every
+   line whose English was opened with ? (line | times | last time | who | chapter | English) */
 function tapsText(){
- const d=t=>{const x=new Date(t);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
- const rows=Object.entries(taps).sort((a,b)=>tapSort==='n'?(b[1].n-a[1].n||b[1].t-a[1].t):b[1].t-a[1].t);
+ const p2=x=>String(x).padStart(2,'0'),d=t=>{const x=new Date(t);return x.getFullYear()+'-'+p2(x.getMonth()+1)+'-'+p2(x.getDate())},hm=t=>{const x=new Date(t);return d(t)+' '+p2(x.getHours())+':'+p2(x.getMinutes())};
+ const cells=a=>a.map(x=>String(x).replace(/\s*\|\s*/g,' / ')).join(' | '),rows=tapRows(taps),lines=tapRows(lineQs);
  return `${G.title||document.title} · 찾아본 말 ${rows.length}개 (${d(Date.now())})\n단어 | 찾은 횟수 | 마지막으로 찾은 날 | 뜻 | English\n`
-  +rows.map(([h,r])=>[h,r.n,d(r.t),r.k||'',r.e||''].map(x=>String(x).replace(/\s*\|\s*/g,' / ')).join(' | ')).join('\n')+'\n';
+  +rows.map(([h,r])=>cells([h,r.n,d(r.t),r.k||'',r.e||''])).join('\n')+'\n'
+  +(lines.length?`\n영어로 본 문장 ${lines.length}개\n문장 | 본 횟수 | 마지막으로 본 때 | 누가 | 어디서 | English\n`+lines.map(([t,r])=>cells([t,r.n,hm(r.t),r.w||'',r.ch||'',r.e||''])).join('\n')+'\n':'');
 }
 function copyTaps(){
  const txt=tapsText();
@@ -1170,7 +1192,7 @@ function openTalk(){
  const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  $('talkList').innerHTML=talk.length?talk.map(([w,t,k])=>{const en=lineEn(k||t);return `<div class="tl"><span class="tw">${esc(T(w))}</span><span class="tt txt">${glossHTML(t)}${en?`<button class="tq" type="button" aria-label="영어로 보기">?</button><span class="ten" hidden>${esc(en)}</span>`:''}</span></div>`}).join('')
   :'<p class="tl-empty">'+T('아직 대화가 없어요.')+'</p>';
- $('talkList').onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();q.nextElementSibling.hidden=!q.nextElementSibling.hidden}};if(window.LINES_EN)enUI();  // enUI: the ?'s style
+ $('talkList').onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();const t=q.nextElementSibling;t.hidden=!t.hidden;lineQOpened(q,t)}};if(window.LINES_EN)enUI();  // enUI: the ?'s style
  $('talkPanel').hidden=false;document.body.classList.add('talkopen');
  const L=$('talkList');L.scrollTop=L.scrollHeight;
 }

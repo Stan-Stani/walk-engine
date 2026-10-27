@@ -12,8 +12,8 @@ export async function open(html,out,ch){
  const c=spawn(...chrome(dir,['--headless=new','--mute-audio','--hide-scrollbars','--disable-gpu',`--remote-debugging-port=${port}`,'--window-size=420,860',
   `--user-data-dir=${prof}`,`file://${html}?listen=0${ch?'&ch='+ch:''}`]),{stdio:'ignore'});
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
- const close=async()=>{try{sock.close()}catch(e){}c.kill();try{execFileSync('pkill',['-9','-f',`user-data-dir=${prof}`])}catch(e){}try{fs.rmSync(prof,{recursive:true,force:true})}catch(e){}};
- process.on('exit',()=>{c.kill();try{execFileSync('pkill',['-9','-f',`user-data-dir=${prof}`])}catch(e){}});
+ const close=async()=>{process.off('exit',onExit);try{sock.close()}catch(e){}c.kill();try{execFileSync('pkill',['-9','-f',`user-data-dir=${prof}`])}catch(e){}try{fs.rmSync(prof,{recursive:true,force:true})}catch(e){}};
+ const onExit=()=>{c.kill();try{execFileSync('pkill',['-9','-f',`user-data-dir=${prof}`])}catch(e){}};process.on('exit',onExit);
  let ws;for(let i=0;i<60&&!ws;i++){try{const l=await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();const pg=l.find(t=>t.type==='page');if(pg)ws=pg.webSocketDebuggerUrl}catch(e){}if(!ws)await sleep(300)}
  if(!ws)throw new Error('chrome did not start');
  const sock=new WebSocket(ws);let id=0;const pend={},errors=[];

@@ -155,6 +155,11 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   chapter teaches, looked up twice, is asked at the review computer after the due badge words (at most two a round), quoted in the
   line you met it in, its 사전 meaning among two others you looked up. Its own record (`KEY('looks')`: asked now, after 4 hours,
   after a day, then done), never badges or ★. `GAME.lookReview:false` turns it off. Taps keep the line they were met in (`taps[w].s`).
+- 보내기 and 물어보기: the 사전's 보내기 shares a ready message for an AI tutor (Claude, ChatGPT, Gemini, Grok… whatever the phone's share
+  sheet offers; you pick the app and the conversation): a brief (who's learning what, "quiz me one question at a time"), then the
+  words and sentences looked up since the last 보내기 (`KEY('sentAt')`; everything when nothing is new) and the badge words not yet
+  remembered. 물어보기, under a line's English once it's open, shares that line, its English, who says it and the lines before it,
+  asking for its meaning, grammar and nuance. No share sheet (desktop): copied instead. `GAME.learner` overrides "Korean (about TOPIK 3)".
 - 저장 옮기기 (START): every walk game's progress in this browser as text (내보내기, copied), and 가져오기 writes pasted text back (a
   second tap confirms) and reloads. One text carries every game on the site; `walk-count` stays each browser's own. For moving
   progress from Chrome into the Android app, or to another phone.

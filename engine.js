@@ -1067,13 +1067,16 @@ const lineEn=t=>{const L=window.LINES_EN;return L&&t?L[plain(t)]||null:null};
 function enUI(){let b=$('enBtn');if(b)return b;
  b=document.createElement('button');b.id='enBtn';b.className='spk enq';b.type='button';b.textContent='?';b.setAttribute('aria-label',T('영어로 보기'));$('spk').before(b);
  const d=document.createElement('div');d.id='txtEn';d.className='txt-en';d.hidden=true;$('txt').after(d);
- b.addEventListener('click',e=>{e.stopPropagation();hintDone('lineQ');b.classList.remove('hintq');d.hidden=!d.hidden;b.classList.toggle('on',!d.hidden);b.blur();if(!d.hidden)noteLineQ(shownText($('txt')),d.textContent,$('who').textContent)});  // blur: A/Enter go on talking, not toggle it again
+ const a=document.createElement('button');a.id='askBtn';a.className='txt-ask';a.type='button';a.textContent=T('물어보기');a.hidden=true;d.after(a);  // 물어보기: this line, explained by an AI tutor
+ a.addEventListener('click',e=>{e.stopPropagation();a.blur();shareText(askText())});
+ b.addEventListener('click',e=>{e.stopPropagation();hintDone('lineQ');b.classList.remove('hintq');d.hidden=!d.hidden;$('askBtn').hidden=d.hidden;b.classList.toggle('on',!d.hidden);b.blur();if(!d.hidden)noteLineQ(shownText($('txt')),d.textContent,$('who').textContent)});  // blur: A/Enter go on talking, not toggle it again
  const st=document.createElement('style');st.textContent='.spk.enq{margin-left:auto;font:700 .9rem/1 var(--body,sans-serif)}.spk.enq+.spk{margin-left:0}'
   +'.txt-en{font-family:var(--body,sans-serif);font-size:.86rem;line-height:1.4;opacity:.8;margin-top:6px;word-break:normal}'
+  +'.txt-ask{display:block;margin:4px 0 0 auto;padding:1px 8px;font:700 .72rem/1.5 var(--body,sans-serif);color:inherit;background:none;border:1px solid currentColor;border-radius:6px;opacity:.6;cursor:pointer}'
   +'.tl .tq{margin-left:6px;padding:0 5px;font:700 .72rem/1.4 var(--body,sans-serif);color:inherit;background:none;border:1px solid currentColor;border-radius:4px;opacity:.55;cursor:pointer;vertical-align:1px}'
   +'.tl .ten{display:block;font-weight:400;font-size:.84rem;opacity:.75;margin-top:2px;word-break:normal}';
  document.head.appendChild(st);return b}
-function setEn(en){if(!window.LINES_EN)return;const b=enUI(),d=$('txtEn');b.hidden=!en;b.classList.toggle('on',enAll&&!!en);d.hidden=!(enAll&&en);d.textContent=en||'';
+function setEn(en){if(!window.LINES_EN)return;const b=enUI(),d=$('txtEn');b.hidden=!en;b.classList.toggle('on',enAll&&!!en);d.hidden=!(enAll&&en);d.textContent=en||'';$('askBtn').hidden=d.hidden;
  const h=!!en&&!enAll&&hints.word===1&&hints.lineQ!==1;b.classList.toggle('hintq',h);if(h)hintSeen('lineQ',12)}  // after the word hint: the line's ? pulses
 /* a right answer: the words that filled the blank (or the whole line built from word tiles) take the answer color, and an underline
    under them fades away (about a second; none with reduced motion). Never moves or covers anything: the line is the feedback. */
@@ -1178,7 +1181,8 @@ function openTaps(){
  if(!$('tapLines')&&(window.LINES_EN||lines.length)){const b=document.createElement('button');b.className='btn';b.id='tapLines';b.textContent=T('문장');b.addEventListener('click',()=>{tapLines=!tapLines;openTaps()});$('tapSortN').after(b)  // 문장: the lines whose English was opened, instead of the words
   const st=document.createElement('style');st.textContent='.tapsort{flex-wrap:wrap}.tapsort .btn{white-space:nowrap}';document.head.appendChild(st)}  // a fourth button: longer labels (ことばのむら) wrap the row, never a word
  if($('tapLines')){$('tapLines').classList.toggle('on',tapLines);$('tapLines').setAttribute('aria-pressed',String(tapLines))}
- $('tapCopy').hidden=!rows.length&&!lines.length;if($('tapText'))$('tapText').hidden=true;
+ if(!$('tapSend')){const b=document.createElement('button');b.className='btn';b.id='tapSend';b.textContent=T('보내기');b.addEventListener('click',sendTaps);$('tapCopy').after(b)}
+ $('tapCopy').hidden=$('tapSend').hidden=!rows.length&&!lines.length;if($('tapText'))$('tapText').hidden=true;
  $('tapSortT').classList.toggle('on',tapSort==='t');$('tapSortN').classList.toggle('on',tapSort==='n');
  $('tapPanel').hidden=false;document.body.classList.add('talkopen');$('tapList').scrollTop=0;
 }
@@ -1192,12 +1196,42 @@ function tapsText(){
   +rows.map(([h,r])=>cells([h,r.n,d(r.t),r.k||'',r.e||''])).join('\n')+'\n'
   +(lines.length?`\n영어로 본 문장 ${lines.length}개\n문장 | 본 횟수 | 마지막으로 본 때 | 누가 | 어디서 | English\n`+lines.map(([t,r])=>cells([t,r.n,hm(r.t),r.w||'',r.ch||'',r.e||''])).join('\n')+'\n':'');
 }
-function copyTaps(){
- const txt=tapsText();
+function copyTaps(){copyText(tapsText())}
+function copyText(txt){
  const show=()=>{  // no clipboard (some embeds block it): show the text selected, ready for the phone's own copy
   let ta=$('tapText');if(!ta){ta=document.createElement('textarea');ta.id='tapText';ta.readOnly=true;ta.style.cssText='width:100%;height:9em;font-size:.8rem;margin:6px 0;box-sizing:border-box';$('tapList').before(ta)}
   ta.hidden=false;ta.value=txt;ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}if(ok)toast(T('복사했어요!'))};
  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>toast(T('복사했어요!')),show);else show();
+}
+/* ---------- 보내기 and 물어보기: the 사전, or one line, as a message to an AI tutor (Claude, ChatGPT, Gemini, Grok… whichever app the
+   phone's share sheet offers; the player picks the app and the conversation). A short brief says who's learning what and asks to be
+   quizzed (보내기) or to have the line explained (물어보기); then the data. 보내기 sends what was looked up since the last 보내기
+   (KEY('sentAt')), everything when nothing is new, and the badge words not yet remembered. No share sheet (a desktop browser): the
+   text is copied. GAME.learner overrides the brief's "Korean (about TOPIK 3)". ---------- */
+const LEARNER={ko:'Korean (about TOPIK 3)',ja:'Japanese (a beginner)'},LANGNAME={ko:'Korean',ja:'Japanese'};
+const lang2=()=>(G.lang||'ko').slice(0,2);
+const brief=()=>`I'm learning ${G.learner||LEARNER[lang2()]||lang2()} by playing ${G.title||document.title}, a walk-around story game. `;
+function shareText(txt,sent){
+ if(navigator.share)navigator.share({text:txt}).then(()=>{if(sent)sent();toast(T('보냈어요!'))},()=>{});  // cancelled: nothing marked
+ else{copyText(txt);if(sent)sent()}}
+function sendText(){
+ const since=+(store.get(KEY('sentAt'))||0),fmt=t=>{const x=new Date(t);return (x.getMonth()+1)+'/'+x.getDate()+' '+String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0')};
+ let words=tapRows(taps).filter(([,r])=>r.t>since),lines=tapRows(lineQs).filter(([,r])=>r.t>since);const all=!words.length&&!lines.length;
+ if(all){words=tapRows(taps);lines=tapRows(lineQs)}
+ words.sort((a,b)=>b[1].n-a[1].n);lines.sort((a,b)=>b[1].n-a[1].n);
+ const weak=state&&state.badges?state.badges.filter(w=>lv(w).b<=1).map(w=>{const d=(C.DICT||{})[w]||carryDict(w);return w+(d&&d.k?` (${d.k})`:'')}):[],L=LANGNAME[lang2()]||lang2();
+ return brief()+`Please be my tutor: quiz me one question at a time, in ${L}, starting with the words I looked up most and the sentences I needed the English for (use the sentences as context). `
+  +`Give English only when I ask or get stuck, and correct me briefly.\n\n`
+  +(words.length?`Words I looked up${all||!since?'':' since '+fmt(since)} (word, times: meaning):\n`+words.slice(0,40).map(([h,r])=>`- ${h}${r.r?' ('+r.r+')':''}, ${r.n}: ${r.k||''}${r.s?` — in "${r.s}"`:''}`).join('\n')+'\n\n':'')
+  +(lines.length?`Sentences I opened the English for (Korean / English, who, where):\n`.replace('Korean',L)+lines.slice(0,25).map(([t,r])=>`- ${t} / ${r.e||''}${r.w||r.ch?` (${[r.w,r.ch].filter(Boolean).join(', ')})`:''}`).join('\n')+'\n\n':'')
+  +(weak.length?`Words I'm still learning: ${weak.slice(0,20).join(', ')}\n`:'');
+}
+function sendTaps(){shareText(sendText(),()=>store.set(KEY('sentAt'),String(Date.now())))}
+function askText(){  // the line in the dialogue box, its English, who says it, where, and the lines just before it
+ const line=shownText($('txt')).replace(/\s+/g,' ').trim(),en=($('txtEn')&&$('txtEn').textContent)||'',who=$('who').textContent,L=LANGNAME[lang2()]||lang2();
+ const before=talk.slice(0,-1).slice(-3).filter(([,t])=>plain(t)!==line).map(([w,t])=>`- ${w}: ${plain(t)}`);
+ return brief()+`Please explain this line to me: what it means, its grammar, and its nuance (how it sounds, who would say it to whom). Answer mostly in ${L} at my level, with English where it helps.\n\n`
+  +`${who}${CH?' ('+CH.n+' '+CH.title+')':''}: ${line}\nEnglish: ${en}`+(before.length?`\n\nJust before it:\n${before.join('\n')}`:'')+'\n';
 }
 function hideGloss(){$('gloss').hidden=true}
 /* ---------- conversation log: every line shown, scrollable, words tappable like in the dialogue box ---------- */

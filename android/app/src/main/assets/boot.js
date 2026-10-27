@@ -19,3 +19,6 @@ try{localStorage.setItem('walk-count','0')}catch(e){}
   Object.defineProperty(window,'SpeechSynthesisUtterance',{value:Utterance,configurable:true,writable:true})}catch(e){}
  window.__walkVoices=function(v){voices=v||[];if(S.onvoiceschanged)try{S.onvoiceschanged()}catch(e){}};
 })();
+
+/* Sharing: WebView has no navigator.share, so the games' 보내기 (send to Claude, ChatGPT, Gemini…) goes to Android's share sheet. */
+if(window.WalkShare){navigator.share=function(d){d=d||{};WalkShare.share(String([d.title,d.text,d.url].filter(Boolean).join('\n')));return Promise.resolve()};navigator.canShare=function(){return true}}

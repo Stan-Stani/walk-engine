@@ -14,6 +14,11 @@ One app with every published walk game (점심 방송, 성실호, 형제, 단어
   scripts run and drops a count beacon, and the app answers `/api/word-reports/count` itself (204) without sending it.
 - **Voice.** Android's WebView has no `speechSynthesis`; `boot.js` provides one backed by the phone's text-to-speech
   (`Speech.kt`), so lines are read aloud and 듣기 문제 work as in Chrome.
+- **Saves backup**: every walk game's saves (the 저장 옮기기 format) go to `Downloads/WalkGames/` when you leave a game, every 10
+  minutes while playing and when the list opens, only when something changed; the newest 10 stay. Downloads outlives an uninstall.
+  **Restore…** on the list: pick a backup file (the picker opens in that folder), or paste text copied from a game's 저장 옮기기 in
+  Chrome; your saves as they were are backed up first. (Android 9 and older keep them in the app's own folder, lost on uninstall.)
+- **Sharing**: a game's 보내기 and 물어보기 open Android's share sheet (WebView has no navigator.share; boot.js adds one).
 - Links to other sites (문제 알리기, a note's sources) open in the browser.
 
 The list is `Games.kt`: add 소리 엽서 there once it's public.

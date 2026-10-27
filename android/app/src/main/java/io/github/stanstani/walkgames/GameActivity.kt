@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -43,6 +44,7 @@ class GameActivity : Activity() {
         }
         speech = Speech(this) { voices -> web.post { web.evaluateJavascript("window.__walkVoices&&__walkVoices($voices)", null) } }
         web.addJavascriptInterface(speech, "WalkTTS")
+        web.addJavascriptInterface(Share(), "WalkShare")
         web.webChromeClient = WebChromeClient()
         web.webViewClient = Client()
         setContentView(web)
@@ -84,6 +86,14 @@ class GameActivity : Activity() {
         }
     }
 
+    /** The page's navigator.share (boot.js; WebView has none): Android's share sheet, so the player picks the app and the conversation. */
+    private inner class Share {
+        @JavascriptInterface
+        fun share(text: String) = runOnUiThread {
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
+        }
+    }
+
     /** boot.js goes first in <head>, before any of the game's own scripts. */
     private fun withBoot(html: ByteArray): ByteArray {
         val s = String(html, Charsets.UTF_8)
@@ -111,12 +121,29 @@ class GameActivity : Activity() {
         }
     }
 
+    /** A backup of the saves while playing (every 10 minutes) and on leaving the game; [Backups] skips one that changed nothing. */
+    private val backupTick = object : Runnable {
+        override fun run() {
+            backup()
+            web.postDelayed(this, 10 * 60_000L)
+        }
+    }
+
+    private fun backup() {
+        if (Uri.parse(web.url ?: "").host != SITE_HOST) return
+        val c = applicationContext
+        web.evaluateJavascript(Backups.EXPORT_JS) { r -> Backups.unquote(r)?.let { t -> Thread { Backups.save(c, t) }.start() } }
+    }
+
     override fun onResume() {
         super.onResume()
         web.onResume()
+        web.postDelayed(backupTick, 10 * 60_000L)
     }
 
     override fun onPause() {
+        web.removeCallbacks(backupTick)
+        backup()
         speech.stop()
         web.onPause()
         super.onPause()

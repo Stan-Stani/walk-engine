@@ -19,7 +19,7 @@ const DIR=fs.mkdtempSync('/tmp/zoom-');fs.copyFileSync(path.join(ROOT,'index.htm
 const PORT=9800+Math.floor(Math.random()*150);
 const done=()=>{try{execSync(`pkill -9 -f "user-data-dir=${DIR}/prof"`)}catch(e){}try{if(fs.readFileSync(LOCK,'utf8')===String(process.pid))fs.rmSync(LOCK)}catch(e){}fs.rmSync(DIR,{recursive:true,force:true})};
 process.on('exit',done);
-spawn('flatpak',['run',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,`file://${DIR}/index.html?ch=${spec.ch||'ch1'}`],{stdio:'ignore'});
+spawn('flatpak',['run','--nodevice=all',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,`file://${DIR}/index.html?ch=${spec.ch||'ch1'}`],{stdio:'ignore'});
 let ws;for(let i=0;i<60&&!ws;i++){try{const l=await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();const p=l.find(x=>x.type==='page');if(p)ws=p.webSocketDebuggerUrl}catch(e){}if(!ws)await wait(500)}
 if(!ws){console.log('chrome did not start');process.exit(2)}
 const sock=new WebSocket(ws);await new Promise(r=>sock.onopen=r);let id=0;const pend={};

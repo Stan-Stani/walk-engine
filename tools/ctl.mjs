@@ -40,13 +40,13 @@ if(cmd==='start'||cmd==='resume')for(const d of fs.readdirSync(path.dirname(DIR)
 if(cmd==='resume'){  // relaunch Chrome on the same profile: the game's saves (localStorage) are still there
   await closeChrome();await wait(500);
   if(!fs.existsSync(DIR+'/index.html'))fs.copyFileSync(ROOT+'/index.html',DIR+'/index.html');
-  const c=spawn('flatpak',['run',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank'],{stdio:'ignore',detached:true});c.unref();
+  const c=spawn('flatpak',['run','--nodevice=all',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank'],{stdio:'ignore',detached:true});c.unref();
 }
 if(cmd==='start'){
   try{execSync(`pkill -9 -f "user-data-dir=${DIR}/[p]rof"`)}catch(e){}await wait(500);
   fs.rmSync(DIR+'/prof',{recursive:true,force:true});fs.copyFileSync(ROOT+'/index.html',DIR+'/index.html');
   for(const f of fs.readdirSync(DIR+'/shots'))fs.unlinkSync(DIR+'/shots/'+f);
-  const c=spawn('flatpak',['run',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank'],{stdio:'ignore',detached:true});c.unref();
+  const c=spawn('flatpak',['run','--nodevice=all',`--filesystem=${DIR}`,'com.google.Chrome','--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${PORT}`,`--user-data-dir=${DIR}/prof`,'about:blank'],{stdio:'ignore',detached:true});c.unref();
 }
 let ws;for(let i=0;i<60&&!ws;i++){try{const l=await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();const p=l.find(x=>x.type==='page');if(p)ws=p.webSocketDebuggerUrl}catch(e){}if(!ws)await wait(500)}
 if(!ws){console.log('browser not running — use: start');process.exit(1)}

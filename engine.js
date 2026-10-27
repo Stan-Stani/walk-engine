@@ -858,7 +858,7 @@ const PC=()=>G.postcard||globalThis.POSTCARD||[];  // GAME.postcard, or a POSTCA
 const pcIdx=id=>CHAPTERS.findIndex(c=>c.id===id);
 function pcCards(){  // the cards up to this chapter: [{e, v (the version shown), made}]
  const cur=pcIdx(CH.id),got=shared.postcard||{};
- return PC().filter(e=>{const i=pcIdx(e.ch);return i>=0&&i<=cur}).map(e=>{const m=got[e.id];return {e,k:m?m.v:e.def,made:!!m}}).filter(x=>x.e.v[x.k]);
+ return PC().filter(e=>{const i=pcIdx(e.ch);return i>=0&&(i<cur||(i===cur&&got[e.id]))}).map(e=>{const m=got[e.id];return {e,k:m?m.v:e.def,made:!!m}}).filter(x=>x.e.v[x.k]);  // this chapter's cards once made; earlier chapters' (a default for one skipped)
 }
 function putCard(c){const e=PC().find(x=>x.id===c.id);if(!e||!e.v[c.v])return;(shared.postcard||(shared.postcard={}))[c.id]={v:c.v,ch:CH.id,t:Date.now()};saveShared();
  sfx('item');setTimeout(()=>toast(T('엽서에 추가')+': '+plain(e.v[c.v].caption||e.place||'')),200)}
@@ -1056,7 +1056,7 @@ function lexLookup(w){ // word as written → [[lemma,{k,e}],…]; falls back to
 function popGloss(rows){ // rows: [[headword,{k,e}],…] — Korean first; English only behind the ? button. Stays until ×, A, B or the next line
  if(!rows.length){hideGloss();toast(T('사전에 없는 말이에요.'));return}
  const el=$('gloss');
- el.innerHTML=rows.map(([h,d])=>`<div class="gr"><b>${h}${d.r&&d.r!==h?`<small class="rd">${d.r}</small>`:''}</b>${d.k}<span class="en" hidden>${d.e||''}</span>${d.reg?`<span class="rg">${T('말투')}: ${d.reg}</span><span class="en" hidden>${lineEn(d.reg)||''}</span>`:''}</div>`).join('')+'<button class="q" type="button" aria-label="영어로 보기">?</button><button class="gx" type="button" aria-label="닫기">×</button>';
+ el.innerHTML=rows.map(([h,d])=>`<div class="gr"><b>${h}${d.r&&d.r!==h?`<small class="rd">${d.r}</small>`:''}</b>${d.k}<span class="en" hidden>${d.e||''}</span>${d.reg?`<span class="rg">${T('말투')}: ${d.reg}</span><span class="en" hidden>${lineEn(d.reg)||''}</span>`:''}${d.note?`<span class="rg note">${T('참고')}: ${d.note}</span><span class="en" hidden>${lineEn(d.note)||''}</span>`:''}</div>`).join('')+'<button class="q" type="button" aria-label="영어로 보기">?</button><button class="gx" type="button" aria-label="닫기">×</button>';
  el.hidden=false;const q=el.querySelector('.q');if(hints.glossQ!==1){q.classList.add('hintq');hintSeen('glossQ',3)}
  q.addEventListener('click',e=>{e.stopPropagation();hintDone('glossQ');q.classList.remove('hintq');el.querySelectorAll('.en').forEach(x=>x.hidden=!x.hidden)});
 }
@@ -1479,7 +1479,7 @@ function cancel(){
   if(dlg&&dlg.cur&&dlg.cur.fb&&dlg.next&&dlg.next.chatReply){advance();return}  // a wrong-answer hint: back to the replies
   if(choosing())return;  // a reply is waiting: B never throws it away
   if(dlg)closeDialog();else closePhone();return}  // the phone goes away and the talk ends
- if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}closePhone();return}
+ if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}closePhone();if(dlg&&dlg.cur&&dlg.cur.phone&&!(dlg.cur.say||'').trim())advance();return}
  if(CREATOR&&!$('mePanel').hidden){if(me)closeMe(false);return}  // first time: you must pick (no B)
  if(!$('startPanel').hidden){$('startPanel').hidden=true;return}
  if($('repPanel')&&!$('repPanel').hidden){closeReport();return}
@@ -1601,7 +1601,7 @@ function talkWith(n){
 function interact(){
  if(phoneOpen&&curChat){if(!$('gloss').hidden){hideGloss();return}if(choosing()){confirmSel();return}if(dlg)advance();return}
  if(phoneOpen&&curSlides){if(!$('gloss').hidden){hideGloss();return}if(dlg)advance();else closePhone();return}  // the postcard: A is the next card  // a chat: A is the next message, or sends the reply
- if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}if(typing&&!typing.finished){typing.fin();return}closePhone();return}  // A finishes the line, then puts the phone away
+ if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}if(typing&&!typing.finished){typing.fin();return}closePhone();if(dlg&&dlg.cur&&dlg.cur.phone&&!(dlg.cur.say||'').trim())advance();return}  // A finishes the line, then puts the phone away (a step that is only the phone goes on: no empty box left behind)
  if(!$('gloss').hidden){hideGloss();return}  // A closes the definition first, without advancing
  if(panelOpen())return;
  if(choosing()||building()){confirmSel();return}
@@ -1662,7 +1662,7 @@ function openPanel(){
  $('wlist').querySelectorAll('button.wd').forEach(b=>b.addEventListener('click',()=>{logSel=b.dataset.w;showEn=false;openPanel();speak(logSel)}));
  if(logSel){const d=C.DICT[logSel],L=lv(logSel);
   $('card').innerHTML=`<div class="top"><span class="big">${logSel}</span>${d.r&&d.r!==logSel?`<span class="rd">${d.r}</span>`:''}<button class="spk${canSpeak()?'':' '}" id="cardSpk" aria-label="듣기" ${canSpeak()?'':'hidden'}>${$('spk').innerHTML}</button></div>
-   <span class="def">${d.k}</span>${d.reg?`<span class="rg">${T('말투')}: ${d.reg}</span>`:''}<span class="ex">${T('예')}: ${d.ex}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
+   <span class="def">${d.k}</span>${d.reg?`<span class="rg">${T('말투')}: ${d.reg}</span>`:''}${d.note?`<span class="rg note">${T('참고')}: ${d.note}</span>`:''}<span class="ex">${T('예')}: ${d.ex}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
    <span class="hj">${T('기억 레벨')} ${L.b}/5 · ${isDue(logSel)?T('지금 복습할 수 있어요'):T('다음 복습: ')+fmtWait(L.due-now())+T(' 후')}</span>
    ${showEn?`<span class="en">${d.e}${d.reg&&lineEn(d.reg)?' · '+lineEn(d.reg):''}</span>`:'<button class="enb" id="cardEn" aria-label="영어로 보기">?</button>'}`;
   $('cardSpk')?.addEventListener('click',()=>speak(logSel+'. '+d.ex));

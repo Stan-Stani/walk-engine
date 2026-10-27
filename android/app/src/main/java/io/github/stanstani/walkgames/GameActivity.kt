@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,6 +18,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 
 /**
@@ -45,6 +47,7 @@ class GameActivity : Activity() {
         speech = Speech(this) { voices -> web.post { web.evaluateJavascript("window.__walkVoices&&__walkVoices($voices)", null) } }
         web.addJavascriptInterface(speech, "WalkTTS")
         web.addJavascriptInterface(Share(), "WalkShare")
+        web.addJavascriptInterface(AnkiBridge(), "WalkAnki")
         web.webChromeClient = WebChromeClient()
         web.webViewClient = Client()
         setContentView(web)
@@ -93,6 +96,38 @@ class GameActivity : Activity() {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
         }
     }
+
+    /** The 사전's Anki button: AnkiDroid installed? and add these notes (asking for AnkiDroid's permission the first time). */
+    private var ankiPending: String? = null
+
+    private inner class AnkiBridge {
+        @JavascriptInterface
+        fun available() = Anki.installed(this@GameActivity)
+
+        @JavascriptInterface
+        fun add(payload: String) = runOnUiThread {
+            ankiPending = payload
+            if (checkSelfPermission(Anki.PERMISSION) == PackageManager.PERMISSION_GRANTED) sendAnki() else requestPermissions(arrayOf(Anki.PERMISSION), ANKI)
+        }
+    }
+
+    override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
+        super.onRequestPermissionsResult(code, permissions, results)
+        if (code != ANKI) return
+        if (results.firstOrNull() == PackageManager.PERMISSION_GRANTED) sendAnki() else ankiDone(-1, "no permission")
+    }
+
+    private fun sendAnki() {
+        val p = ankiPending ?: return
+        ankiPending = null
+        val c = applicationContext
+        Thread {
+            val r = runCatching { Anki.add(c, JSONObject(p)) }
+            runOnUiThread { ankiDone(r.getOrDefault(-1), r.exceptionOrNull()?.message ?: "") }
+        }.start()
+    }
+
+    private fun ankiDone(n: Int, err: String) = web.evaluateJavascript("window.__ankiDone&&__ankiDone($n,${JSONObject.quote(err)})", null)
 
     /** boot.js goes first in <head>, before any of the game's own scripts. */
     private fun withBoot(html: ByteArray): ByteArray {
@@ -157,6 +192,7 @@ class GameActivity : Activity() {
 
     companion object {
         const val EXTRA_GAME = "game"
+        private const val ANKI = 7
         private const val OFFLINE_PAGE = """<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
 <body style="background:#111;color:#ddd;font:16px/1.5 sans-serif;padding:24px">
 <p>This game hasn't been saved for offline play yet.</p><p>Open the app once with internet and it downloads every game.</p></body>"""

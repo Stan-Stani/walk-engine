@@ -2,9 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- AnkiDroid's, to add a game's cards to it (asked the first time the 사전's Anki button is used) -->
+    <uses-permission android:name="com.ichi2.anki.permission.READ_WRITE_DATABASE" />
 
     <!-- Android 11+ only lets an app see the text-to-speech engines (the games' voice) and browsers (links out) it declares. -->
     <queries>
+        <package android:name="com.ichi2.anki" />
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>

@@ -19,6 +19,8 @@ One app with every published walk game (점심 방송, 성실호, 형제, 단어
   **Restore…** on the list: pick a backup file (the picker opens in that folder), or paste text copied from a game's 저장 옮기기 in
   Chrome; your saves as they were are backed up first. (Android 9 and older keep them in the app's own folder, lost on uninstall.)
 - **Sharing**: a game's 보내기 and 물어보기 open Android's share sheet (WebView has no navigator.share; boot.js adds one).
+- **AnkiDroid**: a game's Anki button sends cards through AnkiDroid's content provider (`Anki.kt`, no library): note type "Walk
+  Games (ko)" (front read aloud by AnkiDroid's TTS) and a deck per game, made on first use; AnkiDroid's permission is asked once.
 - Links to other sites (문제 알리기, a note's sources) open in the browser.
 
 The list is `Games.kt`: add 소리 엽서 there once it's public.

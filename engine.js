@@ -2103,8 +2103,9 @@ function skipTalk(){
 (()=>{const grid=document.querySelector('#startPanel .mgrid');if(!grid)return;
  if(debugOK){const b=document.createElement('button');b.className='mi toggle';b.id='dbgBtn';b.setAttribute('aria-pressed','false');b.textContent=T('디버그');menuAdd(b)}
  $('spk').insertAdjacentHTML('beforebegin','<button class="spk" id="skipBtn" type="button" hidden style="width:auto;padding:0 8px;margin-left:auto;margin-right:6px;font-size:.8rem;font-weight:700">건너뛰기</button>');
- $('resetBtn').insertAdjacentHTML('beforebegin','<button class="btn" id="backBtn" type="button" hidden>한 단계 뒤로</button>');
- const upd=()=>{$('dbgBtn')?.setAttribute('aria-pressed',debugOn?'true':'false');$('skipBtn').hidden=!debugOn;updBack()};upd();
+ $('resetBtn').insertAdjacentHTML('beforebegin','<button class="btn" id="sceneBtn" type="button" hidden>장면으로</button><button class="btn" id="backBtn" type="button" hidden>한 단계 뒤로</button>');
+ const upd=()=>{$('dbgBtn')?.setAttribute('aria-pressed',debugOn?'true':'false');$('skipBtn').hidden=!debugOn;$('sceneBtn').hidden=!debugOn;updBack()};upd();
+ $('sceneBtn').addEventListener('click',()=>{$('panel').hidden=true;sceneMenu(CH,true)});  // debug: any chapter's moments, in the replay save
  $('dbgBtn')?.addEventListener('click',()=>{debugOn=!debugOn;store.set(KEY('debug'),debugOn?'1':'0');upd();sfx('ok');toast(debugOn?'디버그: 대화에 건너뛰기 버튼':'디버그 꺼짐')});
  $('skipBtn').addEventListener('click',e=>{e.stopPropagation();skipTalk()});
  $('backBtn').addEventListener('click',stepBack);
@@ -2185,7 +2186,8 @@ const BASE_TILES={...TILES};
 function boot(id,rp){
  CH=CHAPTERS.find(c=>c.id===id)||CHAPTERS[0];
  if(RP&&!rp)try{shared=JSON.parse(store.get(SHARED_KEY)||'{}')||{}}catch(e){shared={}}  // leaving a replay: the real shared record again
- RP=rp&&chapterProgress(CH).done?{mode:rp.mode||'plain'}:null;store.set(KEY('replay'),RP?JSON.stringify({id:CH.id,mode:RP.mode}):'');
+ RP=rp&&(chapterProgress(CH).done||(rp.force&&debugOK))?{mode:rp.mode||'plain',force:!!rp.force}:null;store.set(KEY('replay'),RP?JSON.stringify({id:CH.id,mode:RP.mode,force:RP.force}):'');
+ if(RP&&rp.at){store.set(SK(),JSON.stringify(rp.at.state));store.set(SK()+'-talk',JSON.stringify(rp.at.talk||[]));store.set(SK()+'~back','[]')}  // 장면: that moment, in the replay save
  if(RP&&RP.mode==='listen'&&!canSpeak()){RP.mode='plain';setTimeout(()=>toast(T('이 기기에는 한국어 음성이 없어요.')),600)}
  C=CH.make();mergeLooks();
  Object.keys(TILES).forEach(k=>{if(!(k in BASE_TILES))delete TILES[k]});Object.assign(TILES,C.TILES||{});
@@ -2199,7 +2201,7 @@ function boot(id,rp){
  if(G.onBoot)G.onBoot(CH,C);  // the game's own page parts for this chapter (단어 마을: tips, news sources)
  if(!state.seenIntro){state.seenIntro=true;state.steps=[];save();if(!RP){countPlay('start');countStep()}const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
  else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over
- if(RP)setTimeout(()=>toast(T('다시 보기')+' · '+T(RP_MODES[RP.mode])+': '+T('지금까지 한 건 그대로예요.')),700);
+ if(RP){const m=RP.mode;setTimeout(()=>toast(T('다시 보기')+' · '+T(RP_MODES[m])+': '+T('지금까지 한 건 그대로예요.')),700)}  // the mode now: it may have ended by then
 }
 const RP_MODES={plain:'보통',listen:'듣기'};
 function chapterProgress(c){try{const s=JSON.parse(store.get(c.save)||'null');return s?{got:(s.badges||[]).length,done:!!(s.f&&s.f.done)}:{got:0,done:false}}catch(e){return {got:0,done:false}}}
@@ -2212,13 +2214,31 @@ function openChapters(){
  $('chPanel').hidden=false;$('chList').querySelector('.cur')?.focus();
 }
 function replayMenu(c){  // 그대로 보기 = the real save; 다시 보기 = a fresh run in its own save, in one of three modes
- const opts=[['',T('그대로 보기')],...Object.entries(RP_MODES).filter(([m])=>m!=='listen'||canSpeak()).map(([m,l])=>[m,T('다시 보기')+' · '+T(l)])];
+ const opts=[['',T('그대로 보기')],...Object.entries(RP_MODES).filter(([m])=>m!=='listen'||canSpeak()).map(([m,l])=>[m,T('다시 보기')+' · '+T(l)]),['scenes',T('장면 고르기')]];
  $('chList').innerHTML=`<div class="chap cur" style="cursor:default"><span class="cn" style="background:${c.color}">${c.n}</span><span class="ci"><b>${c.title}</b><small>${T('지금까지 한 건 그대로예요.')}</small></span></div>`
   +opts.map(([m,l])=>`<button class="mi rpo" data-m="${m}" style="width:100%;margin-top:6px">${l}</button>`).join('')
   +`<button class="mi rpo" data-m="back" style="width:100%;margin-top:6px">${T('뒤로')}</button>`;
  $('chList').querySelectorAll('.rpo').forEach(b=>b.addEventListener('click',()=>{const m=b.dataset.m;if(m==='back'){openChapters();return}
+  if(m==='scenes'){sceneMenu(c,false);return}
   $('chPanel').hidden=true;const want=m?{mode:m}:null;if(c.id!==CH.id||!!RP!==!!want||(RP&&want&&RP.mode!==want.mode)){boot(c.id,want);sfx('door')}}));
  $('chList').querySelector('.rpo')?.focus();
+}
+/* 장면: checkpoints.json next to the game (tools/play.mjs --checkpoints writes it from the walk scripts): per chapter, the moments the
+   목표 changed with no talk open: [{q: the 목표, zone, state, talk}]. A finished chapter's 장면 고르기 starts 다시 보기 at one of them;
+   with 디버그 on, 장면으로 (in the 일지) does it in any chapter, so a story beat can be tried without playing up to it. */
+let cpAll=null;const loadCps=()=>cpAll||(cpAll=fetch('checkpoints.json',{cache:'no-cache'}).then(r=>r.ok?r.json():{}).catch(()=>({})));
+let sceneListen=false;
+function sceneMenu(c,force){
+ loadCps().then(all=>{const L=(all||{})[c.id]||[];
+  if(L.length<2){toast(T('장면이 아직 없어요.'));return}  // one moment is just the start
+  const esc=x=>String(x).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  $('chList').innerHTML=(canSpeak()?`<button class="mi toggle" id="scListen" aria-pressed="${sceneListen}" style="width:100%;margin-bottom:6px">${T('듣기')}</button>`:'')
+   +L.map((x,i)=>`<button class="mi rpo" data-i="${i}" style="width:100%;margin-top:6px;text-align:left;white-space:normal">${i+1}. ${esc(x.q)}</button>`).join('')
+   +`<button class="mi rpo" data-i="back" style="width:100%;margin-top:6px">${T('뒤로')}</button>`;
+  $('scListen')?.addEventListener('click',()=>{sceneListen=!sceneListen;$('scListen').setAttribute('aria-pressed',String(sceneListen))});
+  $('chList').querySelectorAll('.rpo').forEach(b=>b.addEventListener('click',()=>{const i=b.dataset.i;if(i==='back'){force?($('chPanel').hidden=true):replayMenu(c);return}
+   $('chPanel').hidden=true;boot(c.id,{mode:sceneListen&&canSpeak()?'listen':'plain',at:L[+i],force});sfx('door')}));
+  $('chPanel').hidden=false;$('chList').querySelector('.rpo')?.focus()});
 }
 $('chBtn').addEventListener('click',openChapters);
 $('chPanel').addEventListener('click',e=>{if(e.target.id==='chPanel')$('chPanel').hidden=true});

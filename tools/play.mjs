@@ -6,13 +6,22 @@
 //     performance.now and Date, so the review schedule keeps pace and it plays out like the full run; the game loop takes at most
 //     50 ms a frame, so more would only skip frames) and only the end screenshot is kept. The full speed run is for chapter work.
 //   node ../walk-engine/tools/play.mjs ch1 --fast   (from a game's root) the same without the game's wrapper
+//   node tests/play.mjs ch1 --fast --checkpoints   also keeps the walk's 장면 (each moment the 목표 changes with no talk open: the
+//     chapter's state and talk log) in <game>/checkpoints.json, which the game's 장면 고르기 and debug 장면으로 load. Run it per chapter
+//     after the story or its walk changes; only a run with no errors writes.
 // In fast mode the real clock stays at window.__realNow: a driver measures its time limits with it, so a busy machine (slow frames)
 // doesn't turn a wait into a failure.
 import {execFileSync,spawn} from 'node:child_process';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 import {chrome} from './chrome.mjs';
 const here=path.dirname(new URL(import.meta.url).pathname);
+// the 장면 poller: every 200 ms, a new 목표 (its counts aside: 3/6, 80걸음) with nothing open is a moment; a chapter without 목표
+// marks each room it walks into, named as the header names it (levels left out: a replay starts from the player's own; after
+// the ending only its first moment). No // comments inside: it's injected as one script and they'd swallow the rest of a line.
+const CP_POLL=`;window.__cps=[];setInterval(()=>{try{if(!CH||!state||!state.seenIntro||dlg||phoneOpen||panelOpen())return;const q0=C.questText(),key=q0?q0.replace(/[0-9]+/g,'#'):'@'+ZID,q=q0||(document.getElementById('reg')||{}).textContent||ZID;
+ const last=__cps[__cps.length-1];if(last&&last.ch===CH.id&&(last.key===key||(last.state.f||{}).done))return;const s=JSON.parse(JSON.stringify(state));s.lv={};
+ let t=[];try{t=JSON.parse(localStorage.getItem(talkKey())||'[]').slice(-40)}catch(e){}__cps.push({ch:CH.id,key,q,zone:ZID,state:s,talk:t})}catch(e){}},200);`;
 export async function play(root){
- const FAST=process.argv.includes('--fast'),argv=process.argv.slice(2).filter(a=>a!=='--fast');
+ const FAST=process.argv.includes('--fast'),CPS=process.argv.includes('--checkpoints'),argv=process.argv.slice(2).filter(a=>!a.startsWith('--'));
  const me=JSON.parse(fs.readFileSync(path.join(here,'../games.json'),'utf8')).games.find(g=>g.dir===path.basename(root)||g.repo===path.basename(root));
  const ch=argv[0]||me?.smoke||'ch1',walkName=argv[1]||ch;
  // Alternate authored walks keep their own evidence instead of deleting the main chapter's contact sheets.
@@ -40,7 +49,7 @@ export async function play(root){
  const WARP=`(()=>{const K=3,pn=performance.now.bind(performance),t0=pn(),st=setTimeout,si=setInterval,raf=requestAnimationFrame;window.__realNow=pn;performance.now=()=>t0+(pn()-t0)*K;
   window.setTimeout=(f,ms,...a)=>st(f,(+ms||0)/K,...a);window.setInterval=(f,ms,...a)=>si(f,(+ms||0)/K,...a);window.requestAnimationFrame=f=>raf(t=>f(t0+(t-t0)*K));
   const D=Date,dn=D.now.bind(D),d0=dn(),now=()=>d0+(dn()-d0)*K;window.Date=class extends D{constructor(...a){a.length?super(...a):super(now())}static now(){return now()}}})();`;
- fs.writeFileSync(path.join(tmp,'play.html'),(FAST?html.replace('<head>',`<head><script>${WARP}</script>`):html).replace('</body></html>',`<script>${driver}\ntry{localStorage.clear()}catch(e){}\nsetTimeout(()=>__play(${walk}),900);</script>\n</body></html>`));
+ fs.writeFileSync(path.join(tmp,'play.html'),(FAST?html.replace('<head>',`<head><script>${WARP}</script>`):html).replace('</body></html>',`<script>${driver}\ntry{localStorage.clear()}catch(e){}\nsetTimeout(()=>__play(${walk}),900);${CPS?CP_POLL:''}</script>\n</body></html>`));
  const port=9300+Math.floor(Math.random()*500);
  const c=spawn(...chrome(tmp,['--headless=new','--mute-audio','--disable-gpu','--hide-scrollbars',`--remote-debugging-port=${port}`,
   '--window-size=420,860',`--user-data-dir=${tmp}/prof`,'--autoplay-policy=no-user-gesture-required',`file://${tmp}/play.html?ch=${ch}`]),{stdio:'ignore'});
@@ -62,6 +71,9 @@ export async function play(root){
  }
  const res=await send('Runtime.evaluate',{expression:'JSON.stringify({err:window.__err||["no run"],log:window.__log||[]})',returnByValue:true});
  const {err,log}=JSON.parse(res.result.value);
+ if(CPS&&done&&!err.length){const r=await send('Runtime.evaluate',{expression:'JSON.stringify(window.__cps||[])',returnByValue:true});const cps=JSON.parse(r.result.value);
+  const f=path.join(root,'checkpoints.json');let all={};try{all=JSON.parse(fs.readFileSync(f,'utf8'))}catch(e){}
+  all[ch]=cps.filter(x=>x.ch===ch);fs.writeFileSync(f,JSON.stringify(all)+'\n');console.log(`checkpoints: ${all[ch].length} for ${ch} → ${f}`)}
  const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'99-end.png'),Buffer.from(shot.data,'base64'));
  fs.writeFileSync(path.join(out,'log.txt'),'ERRORS:\n'+(err.join('\n')||'none')+'\n\nLOG:\n'+log.join('\n'));
  sock.close();c.kill();reap();

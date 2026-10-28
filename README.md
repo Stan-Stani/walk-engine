@@ -187,6 +187,9 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   찾아본 말 복습, 저장 옮기기). Screenshots in `tests/out/`.
 - `tools/play.mjs`: the playtest runner every game shares (a game's `tests/play.mjs` calls it; or run it from a game's root). In
   `--fast` mode the driver's time limits run on the real clock (`window.__realNow`), so a busy machine doesn't fail a wait.
+  `--checkpoints` also writes the walk's 장면 to `<game>/checkpoints.json` (each moment the 목표 changes with no talk open):
+  a finished chapter's 장면 고르기 starts 다시 보기 there, and with 디버그 on, 장면으로 (in the 일지) jumps to any of them in any
+  chapter, in the replay save, so a story beat can be tried without playing up to it. Re-run it when a chapter or its walk changes.
 - `tools/chrome.mjs`: finds Chrome on any machine ($CHROME, the flatpak Chrome on bluefin, Google Chrome on macOS, or one on the
   PATH); every tool here starts Chrome through it.
 - Claude Code: `tools/ctl-mcp.mjs` is ctl.mjs as an MCP server (each game's `.mcp.json` registers it as `walk-ctl`: start, walk,

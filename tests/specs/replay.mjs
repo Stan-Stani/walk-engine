@@ -31,6 +31,14 @@ export default async function(t){
  await t.shot('listen');
  await t.tap('#txt');await t.sleep(200);
  t.ok(await t.ev(`!$('txt').classList.contains('lhide')&&dlg&&dlg.i===0`),'a tap shows it (and doesn\'t go on)');
+ // 장면 고르기: a checkpoint (tools/play.mjs --checkpoints) starts the replay at that moment
+ await t.ev(`closeDialog(),boot(CH.id),1`);await t.sleep(400);
+ await t.ev(`(()=>{const s=JSON.parse(JSON.stringify(state));s.f={...s.f,__scene:1};s.lv={};cpAll=Promise.resolve({[CH.id]:[{ch:CH.id,q:'시작',zone:ZID,state:{...s,f:{}},talk:[]},{ch:CH.id,q:'장면 하나',zone:ZID,state:s,talk:[]}]})})(),1`);
+ await t.ev('openChapters(),1');await t.ev(`$('chList').querySelector('.chap.cur').click(),1`);await t.ev(`$('chList').querySelector('.rpo[data-m="scenes"]').click(),1`);await t.sleep(400);
+ t.ok(await t.ev(`$('chList').querySelectorAll('.rpo[data-i]').length===3`),'장면 고르기 lists the chapter\'s moments');
+ await t.ev(`$('chList').querySelector('.rpo[data-i="1"]').click(),1`);await t.sleep(600);
+ t.ok(await t.ev(`!!RP&&state.f.__scene===1&&!JSON.parse(localStorage.getItem(CH.save)).f.__scene`),'a 장면 starts the replay there; the real save is as it was');
+ t.ok(await t.ev(`lv(${JSON.stringify(w0)}).b===4`),'with the player\'s own levels');
  // back to the real save
  await t.ev(`closeDialog(),koVoice=null,boot(CH.id),1`);await t.sleep(500);
  t.ok(await t.ev(`!RP&&state.badges.length===3&&state.f.done===1&&localStorage.getItem(KEY('replay'))===''`),'그대로 보기: the real save again');

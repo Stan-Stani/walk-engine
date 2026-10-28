@@ -1832,10 +1832,10 @@ function openPanel(){
  $('wlist').querySelectorAll('button.wd').forEach(b=>b.addEventListener('click',()=>{logSel=b.dataset.w;showEn=false;openPanel();speak(logSel)}));
  if(logSel){const d=C.DICT[logSel],L=lv(logSel);
   $('card').innerHTML=`<div class="top"><span class="big">${logSel}</span>${d.r&&d.r!==logSel?`<span class="rd">${d.r}</span>`:''}<button class="spk${canSpeak()?'':' '}" id="cardSpk" aria-label="듣기" ${canSpeak()?'':'hidden'}>${$('spk').innerHTML}</button></div>
-   <span class="def">${d.k}</span>${d.reg?`<span class="rg">${T('말투')}: ${d.reg}</span>`:''}${d.note?`<span class="rg note">${T('참고')}: ${d.note}</span>`:''}<span class="ex">${T('예')}: ${d.ex}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
+   <span class="def">${d.k}</span>${d.reg?`<span class="rg">${T('말투')}: ${d.reg}</span>`:''}${d.note?`<span class="rg note">${T('참고')}: ${d.note}</span>`:''}<span class="ex">${T('예')}: ${plain(d.ex)}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
    <span class="hj">${T('기억 레벨')} ${L.b}/5 · ${isDue(logSel)?T('지금 복습할 수 있어요'):T('다음 복습: ')+fmtWait(L.due-now())+T(' 후')}</span>
    ${showEn?`<span class="en">${d.e}${d.reg&&lineEn(d.reg)?' · '+lineEn(d.reg):''}</span>`:'<button class="enb" id="cardEn" aria-label="영어로 보기">?</button>'}`;
-  $('cardSpk')?.addEventListener('click',()=>speak(logSel+'. '+d.ex));
+  $('cardSpk')?.addEventListener('click',()=>speak(logSel+'. '+plain(d.ex)));
   $('cardEn')?.addEventListener('click',()=>{showEn=true;openPanel()});  // its own id: it once shared the dialogue's #enBtn, so this handler went onto the line's ? (re-rendering the 일지 on every tap)
  }else $('card').innerHTML='<span class="def">'+T('아직 단어가 없어요.')+'</span><span class="ex">'+T('사람들한테 말을 걸면 일지에 단어가 생겨요.')+'</span>';
  $('items').innerHTML=state.items.length?state.items.map((i,k)=>`<li data-k="${k}" title="${String(C.ITEMS[i]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(i).replace(/</g,'&lt;')}</li>`).join(''):'<li class="none">'+T('비어 있어요.')+'</li>';

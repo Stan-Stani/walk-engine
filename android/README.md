@@ -16,8 +16,10 @@ One app with every published walk game (점심 방송, 성실호, 형제, 단어
   (`Speech.kt`), so lines are read aloud and 듣기 문제 work as in Chrome.
 - **Saves backup**: every walk game's saves (the 저장 옮기기 format) go to `Downloads/WalkGames/` when you leave a game, every 10
   minutes while playing and when the list opens, only when something changed; the newest 10 stay. Downloads outlives an uninstall.
-  **Restore…** on the list: pick a backup file (the picker opens in that folder), or paste text copied from a game's 저장 옮기기 in
-  Chrome; your saves as they were are backed up first. (Android 9 and older keep them in the app's own folder, lost on uninstall.)
+  **Restore…** on the list: pick a backup file (the picker opens in that folder), or a game's 저장 옮기기 file from Chrome; your saves
+  as they were are backed up first, and no game opens until the restore is written (it would load the old saves and keep them).
+  Backups and restores have their own worker, never queued behind the offline downloads. A game's 저장 옮기기 works here too: the
+  app gives the page a file picker and writes 내보내기's file to Downloads/WalkGames. (Android 9 and older keep them in the app's own folder, lost on uninstall.)
 - **Sharing**: a game's 보내기 and 물어보기 open Android's share sheet (WebView has no navigator.share; boot.js adds one).
 - **AnkiDroid**: a game's Anki button sends cards through AnkiDroid's content provider (`Anki.kt`, no library): note type "Walk
   Games (ko)" (front read aloud by AnkiDroid's TTS) and a deck per game, made on first use; AnkiDroid's permission is asked once.

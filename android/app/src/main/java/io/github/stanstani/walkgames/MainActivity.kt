@@ -2,7 +2,6 @@ package io.github.stanstani.walkgames
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -29,6 +28,8 @@ class MainActivity : Activity() {
     private lateinit var cache: OfflineCache
     private val status = mutableMapOf<String, TextView>()
     private val pool = Executors.newSingleThreadExecutor()
+    private val saver = Executors.newSingleThreadExecutor()  // backups and restores: never behind the offline downloads in [pool]
+    @Volatile private var restoring = false  // a restore under way: no game opens until it's written (it would load the old saves)
     private lateinit var site: SitePage
     private lateinit var saves: TextView
 
@@ -49,7 +50,10 @@ class MainActivity : Activity() {
                 background = GradientDrawable().apply { setColor(0xFF1E2230.toInt()); cornerRadius = dp(12).toFloat() }
                 isClickable = true
                 isFocusable = true
-                setOnClickListener { startActivity(Intent(this@MainActivity, GameActivity::class.java).putExtra(GameActivity.EXTRA_GAME, g.slug)) }
+                setOnClickListener {
+                    if (restoring) Toast.makeText(this@MainActivity, "Restoring…", Toast.LENGTH_SHORT).show()
+                    else startActivity(Intent(this@MainActivity, GameActivity::class.java).putExtra(GameActivity.EXTRA_GAME, g.slug))
+                }
             }
             card.addView(text(g.title, 22f, 0xFFFFFFFF, bold = true))
             card.addView(text(g.blurb, 14f, 0xFFC4CAD6))
@@ -116,7 +120,7 @@ class MainActivity : Activity() {
 
     /** Takes a backup of the saves as they are now (nothing is written when they haven't changed), then [then] on the main thread. */
     private fun backup(then: () -> Unit) = site.run(Backups.EXPORT_JS) { r ->
-        pool.execute { Backups.unquote(r)?.let { Backups.save(this, it) }; runOnUiThread(then) }
+        saver.execute { Backups.unquote(r)?.let { Backups.save(this, it) }; runOnUiThread(then) }
     }
 
     private fun showSaves() {
@@ -126,16 +130,9 @@ class MainActivity : Activity() {
             DateTimeFormatter.ofPattern("MMM d, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(t))
     }
 
-    private fun chooseRestore() {
-        AlertDialog.Builder(this).setTitle("Restore saves")
-            .setItems(arrayOf("From a backup file…", "From copied text (a game's 저장 옮기기)")) { _, i ->
-                if (i == 0) startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
-                    .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain", "application/octet-stream"))
-                    .putExtra(DocumentsContract.EXTRA_INITIAL_URI, DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download/WalkGames")), PICK)  // opens where the backups are
-                else confirmRestore((getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).primaryClip?.takeIf { it.itemCount > 0 }
-                    ?.getItemAt(0)?.coerceToText(this)?.toString().orEmpty())
-            }.setNegativeButton("Cancel", null).show()
-    }
+    private fun chooseRestore() = startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+        .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain", "application/octet-stream"))
+        .putExtra(DocumentsContract.EXTRA_INITIAL_URI, DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download/WalkGames")), PICK)  // opens where the backups are
 
     @Deprecated("framework Activity result")
     override fun onActivityResult(request: Int, result: Int, data: Intent?) {
@@ -157,8 +154,10 @@ class MainActivity : Activity() {
             .setMessage("${data.length()} saved items" + (from?.let { ", from $it" } ?: "") + ".\n\nThey replace the same saves on this phone; " +
                 "anything not in the backup stays. Your saves as they are now are backed up first.")
             .setPositiveButton("Restore") { _, _ ->
+                restoring = true
                 backup {  // so a restore can be undone
                     site.run(Backups.importJs(o.toString())) { n ->
+                        restoring = false
                         Toast.makeText(this, "Restored ${n ?: 0} saved items.", Toast.LENGTH_LONG).show()
                         showSaves()
                     }
@@ -182,6 +181,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         site.destroy()
         pool.shutdownNow()
+        saver.shutdown()
         super.onDestroy()
     }
 }

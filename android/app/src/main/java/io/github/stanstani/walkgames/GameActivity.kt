@@ -8,10 +8,12 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -48,7 +50,23 @@ class GameActivity : Activity() {
         web.addJavascriptInterface(speech, "WalkTTS")
         web.addJavascriptInterface(Share(), "WalkShare")
         web.addJavascriptInterface(AnkiBridge(), "WalkAnki")
-        web.webChromeClient = WebChromeClient()
+        web.addJavascriptInterface(Files(), "WalkFiles")
+        web.webChromeClient = object : WebChromeClient() {
+            /** A page's <input type=file> (저장 옮기기 → 가져오기): the system file picker; WebView shows none by itself. */
+            override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+                fileCallback?.onReceiveValue(null)
+                fileCallback = callback
+                return try {
+                    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                        .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain", "application/octet-stream"))
+                        .putExtra(DocumentsContract.EXTRA_INITIAL_URI, DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download/WalkGames")), FILE)
+                    true
+                } catch (e: ActivityNotFoundException) {
+                    fileCallback = null
+                    false
+                }
+            }
+        }
         web.webViewClient = Client()
         setContentView(web)
         fullScreen()
@@ -87,6 +105,22 @@ class GameActivity : Activity() {
             if (!req.isForMainFrame) return
             view.loadDataWithBaseURL(null, OFFLINE_PAGE, "text/html", "utf-8", null)
         }
+    }
+
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    @Deprecated("framework Activity result")
+    override fun onActivityResult(request: Int, result: Int, data: Intent?) {
+        super.onActivityResult(request, result, data)
+        if (request != FILE) return
+        fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data))
+        fileCallback = null
+    }
+
+    /** 저장 옮기기 → 내보내기 in the app: the saves file into Downloads/WalkGames ([Backups.export]). */
+    private inner class Files {
+        @JavascriptInterface
+        fun save(name: String, text: String) = Backups.export(applicationContext, name, text)
     }
 
     /** The page's navigator.share (boot.js; WebView has none): Android's share sheet, so the player picks the app and the conversation. */
@@ -193,6 +227,7 @@ class GameActivity : Activity() {
     companion object {
         const val EXTRA_GAME = "game"
         private const val ANKI = 7
+        private const val FILE = 8
         private const val OFFLINE_PAGE = """<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
 <body style="background:#111;color:#ddd;font:16px/1.5 sans-serif;padding:24px">
 <p>This game hasn't been saved for offline play yet.</p><p>Open the app once with internet and it downloads every game.</p></body>"""

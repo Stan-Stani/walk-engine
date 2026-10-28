@@ -58,6 +58,12 @@ object Backups {
         return ok
     }
 
+    /** A game's 저장 옮기기 → 내보내기 in the app: the file goes where the backups go, whether or not anything changed. */
+    fun export(c: Context, name: String, text: String): Boolean {
+        if (dataOf(text) == null || !name.matches(Regex("walk-saves-[0-9-]+\\.json"))) return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) writeDownloads(c, name, text) else writeAppFolder(c, name, text)
+    }
+
     private fun writeDownloads(c: Context, name: String, text: String): Boolean {
         val r = c.contentResolver
         val rel = Environment.DIRECTORY_DOWNLOADS + "/" + DIR + "/"

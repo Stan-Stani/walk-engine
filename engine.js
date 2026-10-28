@@ -555,7 +555,7 @@ const warpAt=(x,y)=>Z.warps&&Z.warps[x+','+y];
 const walkable=(x,y)=>{const c=at(x,y);return c!=null&&!!(Z.legend[c]||{}).walk};
 const blocked=(x,y)=>!walkable(x,y)||!!npcAt(x,y);
 const CREATOR=!!document.getElementById('mePanel');  // 나 꾸미기 only where the page has the panel
-const panelOpen=()=>(CREATOR&&!$('mePanel').hidden)||!$('startPanel').hidden||!$('panel').hidden||!$('chPanel').hidden||!$('talkPanel').hidden||!$('tapPanel').hidden||(!!$('repPanel')&&!$('repPanel').hidden);
+const panelOpen=()=>(CREATOR&&!$('mePanel').hidden)||!$('startPanel').hidden||!$('panel').hidden||!$('chPanel').hidden||!$('talkPanel').hidden||!$('tapPanel').hidden||(!!$('repPanel')&&!$('repPanel').hidden)||(!!$('setPanel')&&!$('setPanel').hidden);
 
 const boxedIn=(px,py)=>Object.values(D).every(([dx,dy])=>{const x=player.x+dx,y=player.y+dy;return x===px&&y===py||blocked(x,y)});  // every other way is shut: a press toward the follower swaps at once (else the turn-first rule reads as a wall)
 function tryMove(){
@@ -1641,6 +1641,7 @@ function cancel(){
  if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}closePhone();if(dlg&&dlg.cur&&dlg.cur.phone&&!(dlg.cur.say||'').trim())advance();return}
  if(CREATOR&&!$('mePanel').hidden){if(me)closeMe(false);return}  // first time: you must pick (no B)
  if(!$('startPanel').hidden){$('startPanel').hidden=true;return}
+ if($('setPanel')&&!$('setPanel').hidden){closeSettings();return}  // B: back to START
  if($('repPanel')&&!$('repPanel').hidden){closeReport();return}
  if(!$('tapPanel').hidden){closeTaps();return}
  if(!$('talkPanel').hidden){if(!$('gloss').hidden)hideGloss();else closeTalk();return}
@@ -1992,7 +1993,7 @@ function openReport(){
 function setRepKind(k){repKind=k;$('repGame').classList.toggle('on',k==='game');$('repKo').classList.toggle('on',k==='korean');syncSend()}
 function syncSend(){const ok=!!$('repNote').value.trim(),a=$('repSend');if(ok)a.href=reportHref();else a.removeAttribute('href');a.setAttribute('aria-disabled',String(!ok));a.style.opacity=ok?'':'.45'}  // no note, no link
 function closeReport(){$('repPanel').hidden=true;document.body.classList.remove('talkopen')}
-function toggleStart(){const P=$('startPanel');if(P.hidden&&panelOpen())return;P.hidden=!P.hidden;hideGloss()}
+function toggleStart(){const P=$('startPanel');if(P.hidden&&panelOpen())return;P.hidden=!P.hidden;hideGloss();if(!P.hidden)nowCard()}
 /* a button the engine adds to the START menu goes into the first gap (a lone half-width button before a wide one, e.g. 소리 above
    듣기 문제), else after the last lone one, else on a row of its own */
 function menuAdd(b){const g=$('startPanel').querySelector('.mgrid');if(!g)return;let col=0;
@@ -2164,7 +2165,7 @@ $('resetBtn').addEventListener('click',()=>{
  const b=$('resetBtn');
  if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent=T('한 번 더 누르면 지워져요');clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent=T('처음부터')},3000);return}
  b.classList.remove('armed');b.textContent=T('처음부터');
- dropTalk();state=fresh();state.seenIntro=true;if(RP)state.counted=1;save();if(!RP){forgetNotes();forgetShared()}store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
+ $('chPanel').hidden=true;dropTalk();state=fresh();state.seenIntro=true;if(RP)state.counted=1;save();if(!RP){forgetNotes();forgetShared()}store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
  setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);  // starting over replays the intro, like a first start
 });
 document.addEventListener('contextmenu',e=>e.preventDefault());
@@ -2209,18 +2210,21 @@ function openChapters(){
  $('chList').innerHTML=CHAPTERS.map(c=>{const p=chapterProgress(c);
   return `<button class="chap${c===CH?' cur':''}" data-id="${c.id}"><span class="cn" style="background:${c.color}">${c.n}</span><span class="ci"><b>${c.title}</b><small>${c.place||''}${(k=>k==null?'':` · ${T('아는 말')} ${k}%`)(chapterKnown(c.id))}</small></span><span class="cp">${p.done?'끝':p.got+'/'+c.words}</span></button>`}).join('');
  $('chList').querySelectorAll('.chap').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.id,c=CHAPTERS.find(x=>x.id===id);
-  if(chapterProgress(c).done){replayMenu(c);return}  // finished: play it as it is, or again (다시 보기)
+  if(chapterProgress(c).done||c===CH){replayMenu(c);return}  // finished: play it as it is, or again (다시 보기); this one: 처음부터 is here
   $('chPanel').hidden=true;if(id!==CH.id||RP){boot(id);sfx('door')}}));
  $('chPanel').hidden=false;$('chList').querySelector('.cur')?.focus();
 }
 function replayMenu(c){  // 그대로 보기 = the real save; 다시 보기 = a fresh run in its own save, in one of three modes
- const opts=[['',T('그대로 보기')],...Object.entries(RP_MODES).filter(([m])=>m!=='listen'||canSpeak()).map(([m,l])=>[m,T('다시 보기')+' · '+T(l)]),['scenes',T('장면 고르기')]];
- $('chList').innerHTML=`<div class="chap cur" style="cursor:default"><span class="cn" style="background:${c.color}">${c.n}</span><span class="ci"><b>${c.title}</b><small>${T('지금까지 한 건 그대로예요.')}</small></span></div>`
+ const done=chapterProgress(c).done;
+ const opts=done?[['',T('그대로 보기')],...Object.entries(RP_MODES).filter(([m])=>m!=='listen'||canSpeak()).map(([m,l])=>[m,T('다시 보기')+' · '+T(l)]),['scenes',T('장면 고르기')]]:[['',T('이어서 하기')]];
+ $('chList').innerHTML=`<div class="chap cur" style="cursor:default"><span class="cn" style="background:${c.color}">${c.n}</span><span class="ci"><b>${c.title}</b><small>${done?T('지금까지 한 건 그대로예요.'):(c.place||'')}</small></span></div>`
   +opts.map(([m,l])=>`<button class="mi rpo" data-m="${m}" style="width:100%;margin-top:6px">${l}</button>`).join('')
   +`<button class="mi rpo" data-m="back" style="width:100%;margin-top:6px">${T('뒤로')}</button>`;
  $('chList').querySelectorAll('.rpo').forEach(b=>b.addEventListener('click',()=>{const m=b.dataset.m;if(m==='back'){openChapters();return}
   if(m==='scenes'){sceneMenu(c,false);return}
+  if(m==null)return;  // 처음부터 has its own handler
   $('chPanel').hidden=true;const want=m?{mode:m}:null;if(c.id!==CH.id||!!RP!==!!want||(RP&&want&&RP.mode!==want.mode)){boot(c.id,want);sfx('door')}}));
+ if(c===CH&&RESET){RESET.classList.add('mi','rpo','danger');RESET.style.cssText='width:100%;margin-top:14px';$('chList').querySelector('.rpo[data-m="back"]').before(RESET)}  // the one red button, beside the chapter it wipes
  $('chList').querySelector('.rpo')?.focus();
 }
 /* 장면: checkpoints.json next to the game (tools/play.mjs --checkpoints writes it from the walk scripts): per chapter, the moments the
@@ -2243,6 +2247,74 @@ function sceneMenu(c,force){
 $('chBtn').addEventListener('click',openChapters);
 $('chPanel').addEventListener('click',e=>{if(e.target.id==='chPanel')$('chPanel').hidden=true});
 $('chClose').addEventListener('click',()=>$('chPanel').hidden=true);
+
+/* ---------- START, sorted by how often you reach for it ----------
+   Built once from the buttons the shell and the engine made (same ids and handlers, so games and tests keep working):
+   the 지금 card on top (the chapter button: where you are and your 목표; tap for the chapter list and 처음부터), three tiles
+   (대화 · 사전 · 일지), the two toggles flipped mid-scene (소리, 읽기) beside 설정, and the rare ones as small links. Every other
+   toggle moves to the 설정 sheet as a switch row, grouped 소리 · 읽기 · 복습 · 화면, with 개발 (디버그, 장면으로, 한 단계 뒤로)
+   only where 디버그 is offered. A switch clicks the original button, so its state and sound stay the button's own. */
+let RESET=null;
+function menuCss(){if($('menuCss'))return;const st=document.createElement('style');st.id='menuCss';
+ st.textContent='.mgrid.v2{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.mgrid.v2>*{grid-column:auto}'
+  +'.nowcard{grid-column:1/-1!important;display:grid!important;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;text-align:left;background:var(--ink)!important;color:var(--hull)!important;border-color:var(--ink)!important}'
+  +'.nowcard #chName{margin:0;opacity:1;font-size:.8rem;font-weight:700;background:var(--amber,#E8952B);color:var(--ink);border-radius:5px;padding:3px 6px;white-space:nowrap}'
+  +'.nowcard .nci{display:grid;min-width:0}.nowcard .nci b{font-size:1rem}.nowcard .nci small{margin:0;font-size:.78rem;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nowcard .ncg{font-size:.8rem;opacity:.8;white-space:nowrap}'
+  +'.mgrid.v2 .tile{padding:16px 4px}.mgrid.v2 .qk{font-size:.95rem;padding:10px 6px}'
+  +'.mlinks{display:flex;flex-wrap:wrap;gap:2px 16px;padding-top:6px;border-top:1px solid color-mix(in srgb,var(--ink) 25%,transparent)}'
+  +'.mlinks .mi{border:none!important;background:none!important;color:var(--ink)!important;padding:6px 0;font-size:.9rem;font-weight:500;text-decoration:underline;text-underline-offset:3px;opacity:.85}'
+  +'.srows{display:grid;gap:4px}.sgrp{font-size:.72rem;letter-spacing:.1em;opacity:.65;margin:10px 2px 0}'
+  +'.srow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;border:2px solid color-mix(in srgb,var(--ink) 18%,transparent);border-radius:8px;padding:8px 10px;font-weight:700}'
+  +'.srow .btn{padding:4px 12px;font-size:.85rem}.srow input[type=range]{width:100%;accent-color:var(--accent,#E8952B)}'
+  +'.sw{width:44px;height:26px;border-radius:999px;border:2px solid var(--ink);background:transparent;position:relative;cursor:pointer;padding:0}'
+  +'.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--ink);transition:left .15s}'
+  +'.sw[aria-checked="true"]{background:var(--ink)}.sw[aria-checked="true"]::after{left:21px;background:var(--hull)}'
+  +'.sw:focus-visible,.nowcard:focus-visible{outline:3px solid var(--amber,#E8952B);outline-offset:2px}'
+  +'.mi.danger{border-color:#b3412f!important;color:#b3412f!important}'
+  +'@media (prefers-reduced-motion:reduce){.sw::after{transition:none}}';
+ document.head.appendChild(st)}
+function nowCard(){const t=$('nowTitle'),q=$('nowQuest');if(!t||!CH)return;t.textContent=CH.title||'';q.textContent=C&&C.questText?C.questText():''}
+function closeSettings(){$('setPanel').hidden=true;$('startPanel').hidden=false;nowCard()}
+const SET_GROUPS=[['소리',['sndBtn','musicBtn']],['읽기',['readBtn','enAllBtn']],['복습',['listenBtn','writeBtn']],['화면',['landBtn']]];
+function reworkMenu(){
+ const P=$('startPanel'),g=P&&P.querySelector('.mgrid');if(!g||g.classList.contains('v2'))return;menuCss();
+ const keep={};['chBtn','talkBtn','tapBtn','sndBtn','readBtn','musicBtn','listenBtn','writeBtn','landBtn','enAllBtn','dbgBtn','sceneBtn','backBtn','resetBtn'].forEach(id=>keep[id]=$(id));  // before the grid is emptied: detached buttons can't be found by id
+ const el=id=>keep[id]||$(id);
+ const mk=(id,text,cls)=>{const b=document.createElement('button');b.type='button';b.id=id;b.className=cls;b.textContent=text;return b};
+ const ch=el('chBtn'),label=[...ch.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim();
+ ch.className='mi nowcard';ch.innerHTML=`<small id="chName">${CH?CH.n:''}</small><span class="nci"><b id="nowTitle"></b><small id="nowQuest"></small></span><span class="ncg">${label} ›</span>`;
+ const log=mk('logTile',G.hud||T('일지'),'mi tile');log.addEventListener('click',()=>{setTimeout(()=>$('logBtn').click(),0)});
+ const setB=mk('setBtn',T('설정'),'mi qk');setB.addEventListener('click',()=>{setTimeout(()=>{$('setPanel').hidden=false;syncSw()},0)});
+ const toggles=[...g.querySelectorAll('.mi.toggle')],others=[...g.querySelectorAll('.mi:not(.toggle)')].filter(b=>!['talkBtn','tapBtn','chBtn'].includes(b.id));
+ const vol=P.querySelector('.vol');
+ // START
+ g.classList.add('v2');g.innerHTML='';
+ [ch,el('talkBtn'),el('tapBtn'),log].forEach(b=>{b.classList.remove('wide');if(b!==ch)b.classList.add('tile');g.append(b)});
+ const quick=['sndBtn','readBtn'].map(el).filter(Boolean);quick.forEach(b=>{b.classList.remove('wide');b.classList.add('qk');g.append(b)});g.append(setB);
+ const links=document.createElement('div');links.className='mlinks';others.forEach(b=>{b.classList.remove('wide');links.append(b)});g.after(links);
+ // 설정
+ const S=document.createElement('div');S.className='panel';S.id='setPanel';S.hidden=true;
+ S.innerHTML=`<div class="sheet startsheet" role="dialog" aria-label="${T('설정')}"><h2>${T('설정')} <button class="btn" id="setClose" type="button">${T('뒤로')}</button></h2><div class="srows" id="srows"></div><div hidden id="setHold"></div></div>`;
+ P.after(S);const rows=S.querySelector('#srows'),hold=S.querySelector('#setHold');
+ const rowFor=b=>{const r=document.createElement('div');r.className='srow';const name=document.createElement('span');name.textContent=b.textContent;
+  const sw=document.createElement('button');sw.type='button';sw.className='sw';sw.setAttribute('role','switch');sw.setAttribute('aria-label',b.textContent);sw.dataset.for=b.id;
+  sw.addEventListener('click',()=>{b.click();syncSw()});r.append(name,sw);if(!quick.includes(b))hold.append(b);return r};
+ const placed=new Set();
+ for(const [name,ids] of SET_GROUPS){const bs=ids.map(el).filter(b=>b&&(toggles.includes(b)||quick.includes(b)||b.id==='musicBtn'));if(!bs.length)continue;
+  if(!(bs.length===1&&bs[0].textContent.trim()===T(name)))rows.insertAdjacentHTML('beforeend',`<div class="sgrp">${T(name)}</div>`);  // no heading that only repeats its one row
+  for(const b of bs){rows.append(rowFor(b));placed.add(b);if(b.id==='musicBtn'&&vol){const r=document.createElement('div');r.className='srow';r.style.gridTemplateColumns='1fr';const i=vol.querySelector('input');r.append(i);rows.append(r);vol.remove()}}}
+ const rest=toggles.filter(b=>!placed.has(b)&&b.id!=='dbgBtn');
+ if(rest.length){rows.insertAdjacentHTML('beforeend',`<div class="sgrp">${T('기타')}</div>`);rest.forEach(b=>rows.append(rowFor(b)))}
+ if(el('dbgBtn')){rows.insertAdjacentHTML('beforeend',`<div class="sgrp">${T('개발')}</div>`);rows.append(rowFor(el('dbgBtn')));
+  for(const id of ['sceneBtn','backBtn']){const b=el(id);if(b){const r=document.createElement('div');r.className='srow dev-'+id;const n=document.createElement('span');n.textContent=b.textContent.replace(/\s*\(\d+\)$/,'');r.append(n,b);rows.append(r)}}}
+ RESET=el('resetBtn');if(RESET)RESET.remove();
+ S.querySelector('#setClose').addEventListener('click',closeSettings);
+ S.addEventListener('click',e=>{if(e.target===S)closeSettings()});
+ syncSw();nowCard();
+}
+function syncSw(){document.querySelectorAll('#srows .sw').forEach(s=>{const b=$(s.dataset.for);s.setAttribute('aria-checked',String(!!b&&b.getAttribute('aria-pressed')==='true'))});
+ for(const id of ['sceneBtn','backBtn']){const r=document.querySelector('.dev-'+id),b=$(id);if(r&&b)r.hidden=b.hidden}}
+reworkMenu();
 
 /* ---------- start ---------- */
 function start(){

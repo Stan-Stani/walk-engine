@@ -2032,6 +2032,24 @@ function openSaves(){
  }
  $('saveMsg').textContent='';p.hidden=false;document.body.classList.add('talkopen');
 }
+/* 가로 화면 (START, phones): fullscreen plus a landscape lock, the only way a page may lock the screen (Android Chrome and Firefox;
+   iPhone Safari can't, and the app's WebView has no fullscreen: it isn't offered there, turning the phone still works). Leaving
+   fullscreen drops the lock; the choice (walk-landscape, every game) comes back with the first tap after the next load. */
+const landOK=matchMedia('(pointer:coarse)').matches&&!!document.documentElement.requestFullscreen&&!!(screen.orientation&&screen.orientation.lock)&&!window.WalkFiles;
+let landOn=false;
+function landLock(){return (document.fullscreenElement?Promise.resolve():document.documentElement.requestFullscreen({navigationUI:'hide'}))
+ .then(()=>screen.orientation.lock('landscape')).then(()=>{landOn=true;store.set('walk-landscape','1');updLand()})}
+const updLand=()=>{const b=$('landBtn');if(b)b.setAttribute('aria-pressed',landOn?'true':'false')};
+if(landOK){const b=document.createElement('button');b.className='mi toggle';b.id='landBtn';b.textContent=T('가로 화면');
+ b.addEventListener('click',()=>{if(landOn){try{screen.orientation.unlock()}catch(e){}landOn=false;store.set('walk-landscape','');updLand();return}
+  landLock().catch(()=>{landOn=false;updLand();toast(T('이 브라우저는 화면을 돌릴 수 없어요.'))})});
+ menuAdd(b);updLand();
+ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&landOn){landOn=false;updLand()}});
+ if(store.get('walk-landscape')==='1'){const again=()=>{removeEventListener('pointerup',again,true);if(landOn)return;
+  // the first-tap fullscreen above usually asks first (a second request meanwhile is refused): lock once it's in, or ask ourselves
+  let done=false;const go=()=>{if(done)return;done=true;landLock().catch(()=>{})};
+  if(document.fullscreenElement)go();else{document.addEventListener('fullscreenchange',go,{once:true});setTimeout(go,800)}};
+ addEventListener('pointerup',again,true)}}
 {const b=document.createElement('button');b.className='mi';b.id='saveBtn';b.textContent=T('저장 옮기기');b.addEventListener('click',()=>{$('startPanel').hidden=true;openSaves()});menuAdd(b)}
 {const b=document.createElement('button');b.className='mi';b.id='repBtn';b.textContent=T('문제 알리기');b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});menuAdd(b)}
 $('startBtn').addEventListener('click',toggleStart);$('startClose').addEventListener('click',()=>$('startPanel').hidden=true);

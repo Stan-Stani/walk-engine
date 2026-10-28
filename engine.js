@@ -807,13 +807,22 @@ function openChat(c,all){
   +`<div class="clist" id="clist"></div><div class="cfb" id="cfb" hidden></div><div class="creply" id="creply"><div class="cask txt" id="cask" hidden></div></div>`;
  const ch=$('choices');curChat.home=[ch.parentNode,ch.nextSibling];$('creply').appendChild(ch);  // the dialogue's choices become the reply strip
  $('phonePanel').hidden=false;phoneOpen=true;document.body.classList.add('chatting');
+ chatFollow();
  if(all){all.forEach(m=>chatPush(m,true));setNow(c.now||'')}  // reopened later: the transcript keeps its send times, the clock shows c.now (now) if given
+}
+/* a reader at the newest message stays there when the phone reflows (rotation, the reply strip, a bubble's English opening);
+   one who scrolled back keeps their place. A scroll that only clamps during a resize isn't the reader moving. */
+function chatFollow(){
+ const L=$('clist');let w=L.clientWidth,h=L.clientHeight;curChat.atEnd=true;
+ L.addEventListener('scroll',()=>{if(L.clientWidth!==w||L.clientHeight!==h)return;if(curChat)curChat.atEnd=L.scrollHeight-L.scrollTop-L.clientHeight<48},{passive:true});
+ curChat.ro=new ResizeObserver(()=>{w=L.clientWidth;h=L.clientHeight;if(curChat&&curChat.atEnd)L.scrollTop=L.scrollHeight});
+ curChat.ro.observe(L);
 }
 const setNow=t=>{const el=$('pscr')&&$('pscr').querySelector('.pnow');if(el&&t)el.textContent=t};
 function closeChat(){
  if(!curChat)return;const ch=$('choices');ch.hidden=true;ch.innerHTML='';
  const [par,nx]=curChat.home;if(par)par.insertBefore(ch,nx&&nx.parentNode===par?nx:null);
- curChat=null;document.body.classList.remove('chatting');
+ curChat.ro&&curChat.ro.disconnect();curChat=null;document.body.classList.remove('chatting');
 }
 function chatPush(m,quiet){
  const L=$('clist');if(!L||!curChat)return;
@@ -827,7 +836,7 @@ function chatPush(m,quiet){
   +`<span class="ct txt">${glossHTML(m.text||m.caption||'')}</span>`
   +(en?`<button class="tq${enAll?' on':''}" type="button" aria-label="영어로 보기">?</button><span class="ten"${enAll?'':' hidden'}>${esc(en)}</span>`:'')
   +`</div>`+(m.time?`<span class="ctime">${esc(m.time)}</span>`:'');
- L.appendChild(row);
+ L.appendChild(row);curChat.ro&&curChat.ro.observe(row);
  if(!mine&&who.look){try{drawPortrait(row.querySelector('.cface'),who.look,m.face||'happy',false)}catch(e){}}
  if(m.pic){const P=(C.PICS||G.pics||{})[m.pic];if(P)try{P(row.querySelector('.cpic'))}catch(e){}}
  if(!quiet)setNow(m.now||m.time);  // the phone's clock: the story's time now (m.now), else the message's send time

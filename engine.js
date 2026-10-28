@@ -2306,11 +2306,23 @@ function reworkMenu(){
  const rest=toggles.filter(b=>!placed.has(b)&&b.id!=='dbgBtn');
  if(rest.length){rows.insertAdjacentHTML('beforeend',`<div class="sgrp">${T('기타')}</div>`);rest.forEach(b=>rows.append(rowFor(b)))}
  if(el('dbgBtn')){rows.insertAdjacentHTML('beforeend',`<div class="sgrp">${T('개발')}</div>`);rows.append(rowFor(el('dbgBtn')));
-  for(const id of ['sceneBtn','backBtn']){const b=el(id);if(b){const r=document.createElement('div');r.className='srow dev-'+id;const n=document.createElement('span');n.textContent=b.textContent.replace(/\s*\(\d+\)$/,'');r.append(n,b);rows.append(r)}}}
+  for(const id of ['sceneBtn','backBtn']){const b=el(id);if(b){const r=document.createElement('div');r.className='srow dev-'+id;const n=document.createElement('span');n.textContent=b.textContent.replace(/\s*\(\d+\)$/,'');r.append(n,b);rows.append(r)}}
+  loadLabs().then(L=>L.forEach(l=>{const r=document.createElement('div');r.className='srow';const n=document.createElement('span');n.textContent=T('실험')+' · '+l.name;
+   const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=T('시작');b.addEventListener('click',()=>{$('setPanel').hidden=true;startLab(l)});r.append(n,b);rows.append(r)}))}
  RESET=el('resetBtn');if(RESET)RESET.remove();
  S.querySelector('#setClose').addEventListener('click',closeSettings);
  S.addEventListener('click',e=>{if(e.target===S)closeSettings()});
  syncSw();nowCard();
+}
+/* 실험 (labs): a feature tried out before it belongs to the game, in its own file next to the game (labs.json lists them:
+   [{id, name, file}]), never in the build. Only where 디버그 is offered: 설정 · 개발 lists them, ?lab=<id> starts one at load. A lab
+   registers WALK_LABS[id] = {start()} and may wrap engine functions while it runs; taking it out = deleting its file and entry. */
+window.WALK_LABS=window.WALK_LABS||{};
+let labsP=null;const loadLabs=()=>labsP||(labsP=fetch('labs.json',{cache:'no-cache'}).then(r=>r.ok?r.json():[]).catch(()=>[]));
+function startLab(l){
+ const go=()=>{const L=WALK_LABS[l.id];if(L&&L.start){$('startPanel').hidden=true;L.start()}else toast(T('실험을 못 열었어요.'))};
+ if(WALK_LABS[l.id])return go();
+ const sc=document.createElement('script');sc.src=l.file+'?t='+Date.now();sc.onload=go;sc.onerror=()=>toast(T('실험을 못 열었어요.'));document.head.appendChild(sc);
 }
 function syncSw(){document.querySelectorAll('#srows .sw').forEach(s=>{const b=$(s.dataset.for);s.setAttribute('aria-checked',String(!!b&&b.getAttribute('aria-pressed')==='true'))});
  for(const id of ['sceneBtn','backBtn']){const r=document.querySelector('.dev-'+id),b=$(id);if(r&&b)r.hidden=b.hidden}}
@@ -2326,6 +2338,7 @@ function start(){
  const upd=store.get(KEY('updated'));if(upd)store.set(KEY('updated'),'');
  if(upd&&upd===VER.v)setTimeout(()=>toast('새 버전으로 업데이트했어요.'),1500);else countPlay('open');  // our own reload isn't a new visit
  if(window.LINES_EN&&(enQ==='0'||enQ==='1'))setTimeout(()=>toast(enAll?'English under every line (tester link).':'영어 자동 보기를 껐어요.'),2600);
+ {const q=new URLSearchParams(location.search).get('lab');if(q&&debugOK)loadLabs().then(L=>{const l=L.find(x=>x.id===q);if(l)setTimeout(()=>startLab(l),900)})}  // ?lab=<id>: straight into a lab
  if(countQ==='0'||countQ==='1')setTimeout(()=>toast(countQ==='0'?'이 브라우저는 이제 통계에서 빠져요.':'이 브라우저도 다시 통계에 들어가요.'),1200);
  requestAnimationFrame(loop);
 }

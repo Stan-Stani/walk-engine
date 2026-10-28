@@ -185,6 +185,9 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - `tests/run.mjs [spec …]`: the engine's own tests. The test games (점심 방송, ことばのむら, 단어 마을) are copied and built with the
   working-copy engine.js, before any sync, and each `tests/specs/*.mjs` runs on them in headless Chrome with real taps (사전 문장,
   찾아본 말 복습, 저장 옮기기). Screenshots in `tests/out/`.
+- **Labs (실험)**: a feature tried out before it belongs to a game lives in that game's `labs/<id>.js`, listed in its `labs.json`
+  (`[{id, name, file}]`), never in the build. Where 디버그 is offered, 설정 · 개발 lists them (시작) and `?lab=<id>` starts one at load;
+  a lab registers `WALK_LABS[id] = {start()}` and may wrap engine functions while it runs. Removing it = deleting its file and entry.
 - `tools/play.mjs`: the playtest runner every game shares (a game's `tests/play.mjs` calls it; or run it from a game's root). In
   `--fast` mode the driver's time limits run on the real clock (`window.__realNow`), so a busy machine doesn't fail a wait.
   `--checkpoints` also writes the walk's 장면 to `<game>/checkpoints.json` (each moment the 목표 changes with no talk open):

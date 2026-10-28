@@ -170,11 +170,10 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - Anki (the Android app with AnkiDroid): the 사전's Anki button adds every word and opened-English line not sent before
   (`KEY('ankiSent')`) to AnkiDroid, deck "Walk Games::<game>": a word's card is the line it was met in with the word in bold, read
   aloud by AnkiDroid; the back has the meaning, the English and the source.
-- 저장 옮기기 (START): every walk game's progress in this browser as text (내보내기, copied), and 가져오기 writes pasted text back (a
-  second tap confirms) and reloads. One text carries every game on the site; `walk-count` stays each browser's own. For moving
-  progress from Chrome into the Android app, or to another phone.
-
-## Tools
+- 저장 옮기기 (START): every walk game's progress in this browser as a file. 내보내기 saves `walk-saves-<date>.json` (a download; in
+  the app, Downloads/WalkGames, beside its backups); 가져오기 picks a file, says what's in it, and on a second tap writes it and
+  reloads (so no open game can save its old state over it). Files, not the clipboard: a big copy can fail silently on a phone. One
+  file carries every game on the site; `walk-count` stays each browser's own. The app's Restore reads the same files.
 - `games.json`: every game in one list (folder, repo, branch, Pages path, public twin, smoke chapter, title). `sync.sh`,
   `tools/ship.sh`, the engine tests and the Android app read it; add a game there first.
 - `tools/grammar_tags.py` (from a Korean game's root, needs kiwipiepy): every line in lines-en.json → its grammar patterns, and each

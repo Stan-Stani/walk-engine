@@ -2,6 +2,7 @@
 //   t.ev(js)     evaluate in the page (awaits promises, returns plain values)
 //   t.tap(sel)   a real tap (mouse press + release) in the middle of a visible element
 //   t.ok(c, m)   one check: prints ok / FAIL; t.fails counts the failures
+//   t.cdp(method, params) raw DevTools; t.out the folder
 //   t.shot(name) a screenshot in outDir;  t.sleep(ms);  t.errors: uncaught page errors;  t.close()
 // The page starts fresh (its own profile) at ?ch=<ch>&listen=0, and 나 꾸미기 is taken as it is.
 import {spawn,execFileSync} from 'node:child_process';import fs from 'node:fs';import path from 'node:path';
@@ -25,7 +26,7 @@ export async function open(html,out,ch){
  const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw new Error(e.slice(0,80)+' → '+(r.exceptionDetails.exception?.description||r.exceptionDetails.text));return r.result.value};
  const tap=async sel=>{const b=await ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)});if(!e||e.offsetParent===null)return null;e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()`);
   if(!b)throw new Error('not visible: '+sel);for(const type of ['mousePressed','mouseReleased'])await send('Input.dispatchMouseEvent',{type,x:b[0],y:b[1],button:'left',clickCount:1});await sleep(250)};
- const t={ev,tap,sleep,errors,fails:0,close,
+ const t={ev,tap,sleep,errors,fails:0,close,cdp:send,out,  // cdp: raw DevTools (downloads, file inputs)
   ok(c,m){console.log((c?'  ok   ':'  FAIL ')+m);if(!c)t.fails++},
   async shot(n){const s=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,n+'.png'),Buffer.from(s.data,'base64'))}};
  await sleep(2500);

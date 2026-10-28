@@ -1992,33 +1992,45 @@ if(window.LINES_EN&&store.get(KEY('enAll'))!==null){const b=document.createEleme
  const upd=()=>b.setAttribute('aria-pressed',String(enAll));upd();menuAdd(b);
  b.addEventListener('click',()=>{enAll=!enAll;store.set(KEY('enAll'),enAll?'1':'0');upd();sfx('ok');
   const d=$('txtEn');if(d&&d.textContent){d.hidden=!enAll;$('enBtn').classList.toggle('on',enAll)}toast(enAll?T('영어 자막을 켰어요.'):T('영어 자막을 껐어요.'))})}
-/* ---------- 저장 옮기기 (START): every walk game's progress in this browser as text, to carry to another browser or the Android app.
-   내보내기 shows it in the box and copies it; 가져오기 reads text pasted there and, on a second tap, writes it over this browser's
-   (keys it doesn't have are left alone), then reloads. All the games share stan-stani.github.io, so one text carries all of them;
-   walk-count (left out of 통계) stays this browser's own. Plain JSON: {walkSaves:1, from, t, data:{key: value}}. ---------- */
+/* ---------- 저장 옮기기 (START): every walk game's progress in this browser as a file, to carry to another browser or the Android app.
+   내보내기 saves walk-saves-<date>.json (a download; in the app, Downloads/WalkGames, where its own backups go); 가져오기 opens the
+   file picker, says what's in the file, and on a second tap writes it over this browser's saves (keys it doesn't have are left
+   alone) and reloads, so no game still open can save its old state over it. A file, not the clipboard: a big text copy can fail
+   silently on a phone. All the games share stan-stani.github.io, so one file carries all of them; walk-count (left out of 통계)
+   stays this browser's own. Plain JSON: {walkSaves:1, from, t, data:{key: value}}, the format of the app's backups. ---------- */
 function savesText(){const data={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k!=='walk-count')data[k]=localStorage.getItem(k)}
  return JSON.stringify({walkSaves:1,from:location.host,t:new Date().toISOString(),data})}
 function readSaves(txt){let o;try{o=JSON.parse(String(txt).trim())}catch(e){return null}
  if(!o||o.walkSaves!==1||!o.data||typeof o.data!=='object')return null;
  const data={};for(const [k,v] of Object.entries(o.data))if(typeof v==='string'&&k!=='walk-count')data[k]=v;return data}
+function savesName(){const x=new Date(),p2=n=>String(n).padStart(2,'0');return `walk-saves-${x.getFullYear()}${p2(x.getMonth()+1)}${p2(x.getDate())}-${p2(x.getHours())}${p2(x.getMinutes())}${p2(x.getSeconds())}.json`}
 function openSaves(){
  let p=$('savePanel');
  if(!p){p=document.createElement('div');p.className='panel';p.id='savePanel';p.hidden=true;
   p.innerHTML=`<div class="sheet talksheet" role="dialog" aria-label="${T('저장 옮기기')}"><h2><span>${T('저장 옮기기')}</span><button class="btn" id="saveClose">${T('닫기')}</button></h2>`
    +`<div class="row tapsort" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn" id="saveOut">${T('내보내기')}</button><button class="btn" id="saveIn">${T('가져오기')}</button></div>`
-   +`<textarea id="saveText" spellcheck="false" autocomplete="off" style="width:100%;height:12em;font:.72rem/1.3 monospace;box-sizing:border-box;margin-top:8px"></textarea></div>`;
+   +`<p class="tl-empty" id="saveMsg" style="margin-top:10px;word-break:keep-all"></p><input type="file" id="saveFile" accept=".json,application/json,text/plain" hidden></div>`;
   $('tapPanel').after(p);
-  const ta=$('saveText');let armT;
+  let pending=null;const msg=t=>{$('saveMsg').textContent=t},inBtn=$('saveIn');
+  const disarm=()=>{pending=null;inBtn.classList.remove('armed');inBtn.textContent=T('가져오기')};
   $('saveClose').addEventListener('click',()=>{p.hidden=true;document.body.classList.remove('talkopen');backToMenu()});
   p.addEventListener('click',e=>{if(e.target===p)$('saveClose').click()});
-  $('saveOut').addEventListener('click',()=>{ta.value=savesText();ta.focus();ta.select();const ok=()=>toast(T('복사했어요!')),old=()=>{try{if(document.execCommand('copy'))ok()}catch(e){}};
-   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(ta.value).then(ok,old);else old()});
-  $('saveIn').addEventListener('click',e=>{const b=e.currentTarget,data=readSaves(ta.value);
-   if(!data){toast(T('저장 글이 아니에요.'));return}
-   if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent=T('한 번 더 누르면 덮어써요');clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent=T('가져오기')},3000);return}
-   for(const [k,v] of Object.entries(data))try{localStorage.setItem(k,v)}catch(err){toast(T('저장할 자리가 모자라요.'));return}
-   store.set=()=>{};location.reload()})}  // nothing of the old game is saved over it before the reload
- $('saveText').value='';p.hidden=false;document.body.classList.add('talkopen');
+  $('saveOut').addEventListener('click',()=>{disarm();const txt=savesText(),name=savesName();
+   if(window.WalkFiles){msg(WalkFiles.save(name,txt)?T('저장했어요')+': Download/WalkGames/'+name:T('저장하지 못했어요.'));return}  // the app: Downloads/WalkGames
+   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=name;document.body.append(a);a.click();a.remove();
+   setTimeout(()=>URL.revokeObjectURL(a.href),10000);msg(T('저장했어요')+': '+name)});
+  inBtn.addEventListener('click',()=>{
+   if(!pending){$('saveFile').value='';$('saveFile').click();return}  // first: pick the file
+   for(const [k,v] of Object.entries(pending))try{localStorage.setItem(k,v)}catch(err){msg(T('저장할 자리가 모자라요.'));return}
+   store.set=()=>{};location.reload()});  // then: written, and reloaded before anything of the old game is saved over it
+  $('saveFile').addEventListener('change',async()=>{const f=$('saveFile').files[0];if(!f)return;
+   let txt='';try{txt=await f.text()}catch(e){}
+   const data=readSaves(txt);if(!data){disarm();msg(T('저장 파일이 아니에요.')+' ('+f.name+')');return}
+   let when='';try{when=new Date(JSON.parse(txt).t).toLocaleString()}catch(e){}
+   pending=data;inBtn.classList.add('armed');inBtn.textContent=T('한 번 더 누르면 덮어써요');
+   msg(`${f.name}: ${unit(Object.keys(data).length,'개')}${when?' · '+when:''}`)});
+ }
+ $('saveMsg').textContent='';p.hidden=false;document.body.classList.add('talkopen');
 }
 {const b=document.createElement('button');b.className='mi';b.id='saveBtn';b.textContent=T('저장 옮기기');b.addEventListener('click',()=>{$('startPanel').hidden=true;openSaves()});menuAdd(b)}
 {const b=document.createElement('button');b.className='mi';b.id='repBtn';b.textContent=T('문제 알리기');b.addEventListener('click',()=>{$('startPanel').hidden=true;openReport()});menuAdd(b)}

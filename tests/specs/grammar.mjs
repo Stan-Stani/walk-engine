@@ -1,6 +1,6 @@
 // 문법: the patterns that the lines you opened English for share (LINE_GRAMMAR), as chips over 사전 · 문장 and in 보내기.
 export default async function(t){
- if(!await t.ev('!!globalThis.LINE_GRAMMAR')){t.ok(true,'(no LINE_GRAMMAR in this game: nothing to show)');t.ok(!(await t.ev('gramGaps()')).length,'and no patterns');return}
+ if(!await t.ev('!!(globalThis.LINE_GRAMMAR&&LINE_GRAMMAR.n)')){t.ok(true,'(no grammar lines in this game: nothing to show)');t.ok(!(await t.ev('gramGaps()')).length,'and no patterns');return}
  const pick=await t.ev(`(()=>{const L=LINE_GRAMMAR,by={};for(const [l,v] of Object.entries(L.lines))if(!l.includes('___')&&LINES_EN[l])for(const i of v)(by[i]=by[i]||[]).push(l);
   const i=Object.keys(by).map(Number).filter(i=>by[i].length>=3&&L.cnt[i]/L.n<0.02).sort((a,b)=>by[b].length-by[a].length)[0];
   return {p:L.pats[i],lines:by[i].slice(0,3),other:Object.keys(LINES_EN).find(l=>!l.includes('___')&&!(L.lines[l]||[]).includes(i))}})()`);

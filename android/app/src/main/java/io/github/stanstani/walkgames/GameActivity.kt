@@ -20,6 +20,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 
@@ -31,6 +32,7 @@ class GameActivity : Activity() {
     private lateinit var web: WebView
     private lateinit var speech: Speech
     private lateinit var cache: OfflineCache
+    private lateinit var rotate: RotateHint
     private val boot by lazy { "<script>" + assets.open("boot.js").use { String(it.readBytes()) } + "</script>" }
 
     override fun onCreate(state: Bundle?) {
@@ -68,7 +70,9 @@ class GameActivity : Activity() {
             }
         }
         web.webViewClient = Client()
-        setContentView(web)
+        val root = FrameLayout(this).apply { addView(web) }
+        rotate = RotateHint(this, root)
+        setContentView(root)
         fullScreen()
         web.loadUrl(game.url + "?count=0")
     }
@@ -207,11 +211,13 @@ class GameActivity : Activity() {
     override fun onResume() {
         super.onResume()
         web.onResume()
+        rotate.start()
         web.postDelayed(backupTick, 10 * 60_000L)
     }
 
     override fun onPause() {
         web.removeCallbacks(backupTick)
+        rotate.stop()
         backup()
         speech.stop()
         web.onPause()

@@ -23,6 +23,9 @@ One app with every published walk game (점심 방송, 성실호, 형제, 단어
 - **Sharing**: a game's 보내기 and 물어보기 open Android's share sheet (WebView has no navigator.share; boot.js adds one).
 - **AnkiDroid**: a game's Anki button sends cards through AnkiDroid's content provider (`Anki.kt`, no library): note type "Walk
   Games (ko)" (front read aloud by AnkiDroid's TTS) and a deck per game, made on first use; AnkiDroid's permission is asked once.
+- **Rotate icon** (`RotateHint.kt`): hold the phone the other way from the game and a rotate icon shows for 3 seconds; a tap
+  turns the game that way and keeps it there whatever auto-rotate says (the games' own 가로 화면 needs page fullscreen, which
+  WebView lacks, so it isn't offered in the app).
 - Links to other sites (문제 알리기, a note's sources) open in the browser.
 
 The list is `Games.kt`: add 소리 엽서 there once it's public.

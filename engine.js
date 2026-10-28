@@ -4,6 +4,9 @@
 const $=id=>document.getElementById(id);
 let C=null,CH=null; // current chapter content (C) and its registry entry (CH)
 let state=null,Z=null,ZID='ship',MAP=[],MW=0,MH=0,NPCS=[];
+/* 다시 보기: a finished chapter played again in its own save (SK(): <save>~replay; KEY('replay') keeps it over a reload), mode 'plain',
+   or 'listen' (듣기: each line read aloud, its text hidden until tapped). The real save, its 일지 and the play counts stay as they were; word levels only go up (award and a missed review never lower one). */
+let RP=null;const SK=()=>CH.save+(RP?'~replay':'');
 const has=w=>!!state&&state.badges.includes(w);
 const now=()=>Date.now();
 
@@ -29,7 +32,7 @@ const isDue=w=>known(w)&&dueL(lv(w))&&!(askedIn[w]>=talkN-1);  // never in the c
 function spaced(b){const bg=SRS().beats;return {b,due:now()+gapAt(b),beat:bg&&bg[b]!=null?beats()+bg[b]:null}}
 function grade(w,ok,held){  // held: right, but with a hint (쓰기 문제): asked again later at the same level
  let L={...lv(w)};const wr=L.wr;  // wr: the word's own 쓰기 rung (the ladder), kept whatever happens to its level
- if(!ok)L={b:0,due:now(),beat:null};
+ if(!ok)L=RP?L:{b:0,due:now(),beat:null};  // 다시 보기 never lowers a word
  else if(dueL(L))L=spaced(held?L.b:Math.min(5,L.b+1));  // a right answer before the word is due doesn't level it up (asking again and again can't max a word)
  if(wr!=null)L.wr=wr;state.lv[w]=L;save();return L.b;
 }
@@ -780,7 +783,7 @@ if($('phonePanel'))$('phonePanel').addEventListener('click',e=>{const q=e.target
    - Keys: A next message / send the selected reply; ↑/↓ scroll the thread, or move between replies (↑ on the top one scrolls); B closes
      word help, then a wrong-answer hint (back to the replies); with no reply pending it puts the phone away and ends the talk. */
 const SHARED_KEY=KEY('shared');let shared={};try{shared=JSON.parse(store.get(SHARED_KEY)||'{}')||{}}catch(e){shared={}}
-const saveShared=()=>store.set(SHARED_KEY,JSON.stringify(shared));
+const saveShared=()=>{if(!RP)store.set(SHARED_KEY,JSON.stringify(shared))};  // a replay's postcard choices and chats don't replace the real ones
 const chatRoom=r=>({...(G.rooms||{}),...(C.ROOMS||{})})[r]||{t:r};
 const chatWho=id=>id==='me'?{name:T('나')}:({...(G.cast||{}),...(C.CAST||{})})[id]||C.NPC[id]||{name:id};
 let curChat=null;  // {c, msgs:[…shown], home:[parent, next] of #choices}
@@ -1024,7 +1027,8 @@ function show(s){
  if(!s.build&&!s.ask)logTalk(s.who||dlg.name,text,s.enKey);  // a question is logged once, as the line it becomes when answered
  typeText(text,()=>{markOk(s.hl);if(s.choose)renderPick(s);else if(s.ask)renderAsk(s);else if(s.build)renderBuild(s);else $('more').hidden=false});
  setPortrait(s,text);
- if(readOn&&!s.listenOnly)speak(s.listen?'':text);
+ const lhide=RP&&RP.mode==='listen'&&!s.ask&&!s.build&&!s.choose&&canSpeak();$('txt').classList.toggle('lhide',!!lhide);if(lhide)rpCss();  // 듣기: heard first, read on a tap
+ if((readOn||lhide)&&!s.listenOnly)speak(s.listen?'':text);
  if(s.listen)setTimeout(()=>speak(s.listenLine||s.listen),readOn?1200:150);
  if(s.take&&!s.set)dlg.questHold=1;else if(s.set)dlg.questHold=0;  // handing an item over: keep the old 목표 until the scene moves the story on (or ends)
  if(!dlg.questHold)updateQuest();
@@ -1089,6 +1093,10 @@ function markOk(hl){
  for(let n;(n=tw.nextNode());){const s0=pos,e0=pos+n.length;pos=e0;if(e0<=k||s0>=end)continue;parts.push([n,Math.max(k,s0)-s0,Math.min(end,e0)-s0])}
  for(const [n,a0,b0] of parts){let m=n;if(a0>0)m=m.splitText(a0);if(b0-a0<m.length)m.splitText(b0-a0);if(!m.textContent.trim())continue;
   const w=document.createElement('span');w.className='okw';m.replaceWith(w);w.append(m)}}
+function rpCss(){if($('rpCss'))return;const st=document.createElement('style');st.id='rpCss';
+ st.textContent='#txt.lhide,#txt.lhide *{color:transparent!important;text-decoration:none!important}#txt.lhide{position:relative}'
+  +'#txt.lhide::before{content:"🔊 …";position:absolute;left:0;top:0;color:var(--muted,#8a8f98)}#dlg:has(#txt.lhide) #enBtn{visibility:hidden}';
+ document.head.appendChild(st)}
 function okCss(){if($('okCss'))return;const st=document.createElement('style');st.id='okCss';
  st.textContent='.okw{color:var(--ok-ink,#8EE3A6);text-decoration:underline 2px;text-underline-offset:3px;text-decoration-color:transparent;animation:okfade 1.2s ease-out}'
   +'@keyframes okfade{0%,25%{text-decoration-color:var(--ok-ink,#8EE3A6)}100%{text-decoration-color:transparent}}'
@@ -1308,7 +1316,7 @@ function askText(){  // the line in the dialogue box, its English, who says it, 
 function hideGloss(){$('gloss').hidden=true}
 /* ---------- conversation log: every line shown, scrollable, words tappable like in the dialogue box ---------- */
 let talk=[];
-const talkKey=()=>CH.save+'-talk';
+const talkKey=()=>SK()+'-talk';
 function loadTalk(){talk=[];try{talk=JSON.parse(localStorage.getItem(talkKey())||'[]')}catch(e){}}
 function logTalk(who,text,enKey){
  if(!text)return;const last=talk[talk.length-1];if(last&&last[0]===who&&last[1]===text)return;
@@ -1771,7 +1779,7 @@ function award(words){
  state.badges.push(...nw);
  const perfect=nw.filter(w=>!dlg.missed.has(w)&&!(state.miss&&state.miss[w]));if(state.miss)nw.forEach(w=>delete state.miss[w]);  // state.miss: a word missed in a talk left early (B) still counts as missed
  const L0=SRS().start??2;  // srs.start: the level of a word answered right every time it was taught (★ is level 3)
- nw.forEach(w=>{state.lv[w]=perfect.includes(w)?spaced(L0):{b:0,due:now()}});
+ nw.forEach(w=>{const L=perfect.includes(w)?spaced(L0):{b:0,due:now()};if(!RP||!state.lv[w]||L.b>state.lv[w].b)state.lv[w]=L});  // 다시 보기: only ever up
  save();updateHud();sfx('badge');
  toast((G.gotToast||T('일지에 추가'))+': '+nw.join(', '));  // GAME.gotToast: the game's word for it (단어 마을: 배지 획득)
  const note=perfect.length===nw.length
@@ -1831,10 +1839,13 @@ function openPanel(){
 
 /* ---------- saving ---------- */
 function fresh(){const st=CH.start;return {v:1,zone:st.zone,x:st.x,y:st.y,dir:st.dir,badges:[],lv:{},items:[],f:{},seenIntro:false}}
-function save(){store.set(CH.save,JSON.stringify(state));if(SRS().shared)store.set(KEY('lv'),JSON.stringify(state.lv))}
+function save(){store.set(SK(),JSON.stringify(state));if(SRS().shared)store.set(KEY('lv'),JSON.stringify(state.lv));else if(RP)liftReal()}
+const higher=(to,from)=>{for(const [w,L] of Object.entries(from||{}))if(!to[w]||to[w].b<L.b)to[w]={...L}};
+function liftReal(){try{const r=JSON.parse(store.get(CH.save)||'null');if(!r)return;r.lv=r.lv||{};higher(r.lv,state.lv);store.set(CH.save,JSON.stringify(r))}catch(e){}}  // a replay's gains reach the real save (games without a shared record)
 function loadState(){
  state=fresh();
- try{const s=JSON.parse(store.get(CH.save)||'null');if(s)Object.assign(state,s)}catch(e){}
+ try{const s=JSON.parse(store.get(SK())||'null');if(s)Object.assign(state,s)}catch(e){}
+ if(RP){state.counted=1;try{higher(state.lv,(JSON.parse(store.get(CH.save)||'null')||{}).lv)}catch(e){}}  // a replay starts from the levels you have and never counts as a play
  if(!C.ZONES[state.zone]){const st=CH.start;Object.assign(state,{zone:st.zone,x:st.x,y:st.y,dir:st.dir})}
  if(CH.migrate)CH.migrate(state);
  refreshCarry();
@@ -1864,7 +1875,8 @@ function dirPress(d){
  for(const t of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(t,off);}
 $('btnA').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
 $('btnB').addEventListener('pointerdown',e=>{e.preventDefault();cancel()});
-$('dlg').addEventListener('click',e=>{const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k,gl);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.dataset.w||w.textContent,w);return}if(e.target.closest('#spk'))return;advance()});
+$('dlg').addEventListener('click',e=>{if($('txt').classList.contains('lhide')&&!e.target.closest('#spk')){$('txt').classList.remove('lhide');return}  // 듣기: the first tap shows the line
+ const gl=e.target.closest('.gl');if(gl){e.stopPropagation();showGloss(gl.dataset.k,gl);return}const w=e.target.closest('.txt .w');if(w){e.stopPropagation();showWord(w.dataset.w||w.textContent,w);return}if(e.target.closest('#spk'))return;advance()});
 $('spk').addEventListener('click',e=>{e.stopPropagation();if(dlg)speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.say||dlg.cur.ask||'')});
 $('gloss').addEventListener('click',e=>{if(e.target.closest('.gx'))hideGloss()});  // × closes; A and B close too
 $('choices').addEventListener('pointerdown',e=>{const b=e.target.closest('.choice');if(b){sel=choiceBtns().indexOf(b);markSel()}});
@@ -2069,7 +2081,7 @@ let debugOn=debugOK&&store.get(KEY('debug'))==='1';
 /* 한 단계 뒤로 (debug: in the 일지, by 처음부터): every talk that moves the story keeps this chapter's save from just before it (the
    last 12). The button puts the last one back and loads the chapter from it, as the chapter menu would, so nothing is undone by hand
    and nothing is left half undone. The talk's own story steps are gone; words you met still count (the shared word memory stays). */
-const backKey=()=>CH.save+'~back';
+const backKey=()=>SK()+'~back';
 function backList(){try{return JSON.parse(store.get(backKey())||'[]')||[]}catch(e){return []}}
 function pushBack(snap){if(!snap)return;const L=backList();L.push({s:snap,b:beats()});store.set(backKey(),JSON.stringify(L.slice(-12)));updBack()}
 function updBack(){const b=$('backBtn');if(!b)return;const n=backList().length;b.hidden=!debugOn;b.disabled=!n;b.textContent='한 단계 뒤로'+(n?` (${n})`:'')}
@@ -2151,7 +2163,7 @@ $('resetBtn').addEventListener('click',()=>{
  const b=$('resetBtn');
  if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent=T('한 번 더 누르면 지워져요');clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent=T('처음부터')},3000);return}
  b.classList.remove('armed');b.textContent=T('처음부터');
- dropTalk();state=fresh();state.seenIntro=true;save();forgetNotes();forgetShared();store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
+ dropTalk();state=fresh();state.seenIntro=true;if(RP)state.counted=1;save();if(!RP){forgetNotes();forgetShared()}store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
  setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);  // starting over replays the intro, like a first start
 });
 document.addEventListener('contextmenu',e=>e.preventDefault());
@@ -2170,8 +2182,11 @@ addEventListener('keyup',e=>{if(KEYS[e.key]===held)held=null});
 
 /* ---------- chapters (each keeps its own save; old chapters are never overwritten) ---------- */
 const BASE_TILES={...TILES};
-function boot(id){
+function boot(id,rp){
  CH=CHAPTERS.find(c=>c.id===id)||CHAPTERS[0];
+ if(RP&&!rp)try{shared=JSON.parse(store.get(SHARED_KEY)||'{}')||{}}catch(e){shared={}}  // leaving a replay: the real shared record again
+ RP=rp&&chapterProgress(CH).done?{mode:rp.mode||'plain'}:null;store.set(KEY('replay'),RP?JSON.stringify({id:CH.id,mode:RP.mode}):'');
+ if(RP&&RP.mode==='listen'&&!canSpeak()){RP.mode='plain';setTimeout(()=>toast(T('이 기기에는 한국어 음성이 없어요.')),600)}
  C=CH.make();mergeLooks();
  Object.keys(TILES).forEach(k=>{if(!(k in BASE_TILES))delete TILES[k]});Object.assign(TILES,C.TILES||{});
  player.look=typeof C.PLAYER==='function'?myLook():myLook(C.PLAYER||CREW_LOOK);  // PLAYER as a function = a disguise, drawn at render time // a chapter may put the player in someone else's shoes (5장: Terence)
@@ -2179,18 +2194,31 @@ function boot(id){
  store.set(KEY('chapter'),CH.id);
  loadState();loadTalk();
  loadZone(state.zone,state.x,state.y,state.dir);
- $('chName').textContent=CH.n;
+ $('chName').textContent=CH.n+(RP?' · '+T('다시 보기'):'');
  updateHud();updateQuest();updBack();
  if(G.onBoot)G.onBoot(CH,C);  // the game's own page parts for this chapter (단어 마을: tips, news sources)
- if(!state.seenIntro){state.seenIntro=true;state.steps=[];save();countPlay('start');countStep();const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
+ if(!state.seenIntro){state.seenIntro=true;state.steps=[];save();if(!RP){countPlay('start');countStep()}const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
  else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over
+ if(RP)setTimeout(()=>toast(T('다시 보기')+' · '+T(RP_MODES[RP.mode])+': '+T('지금까지 한 건 그대로예요.')),700);
 }
+const RP_MODES={plain:'보통',listen:'듣기'};
 function chapterProgress(c){try{const s=JSON.parse(store.get(c.save)||'null');return s?{got:(s.badges||[]).length,done:!!(s.f&&s.f.done)}:{got:0,done:false}}catch(e){return {got:0,done:false}}}
 function openChapters(){
  $('chList').innerHTML=CHAPTERS.map(c=>{const p=chapterProgress(c);
   return `<button class="chap${c===CH?' cur':''}" data-id="${c.id}"><span class="cn" style="background:${c.color}">${c.n}</span><span class="ci"><b>${c.title}</b><small>${c.place||''}${(k=>k==null?'':` · ${T('아는 말')} ${k}%`)(chapterKnown(c.id))}</small></span><span class="cp">${p.done?'끝':p.got+'/'+c.words}</span></button>`}).join('');
- $('chList').querySelectorAll('.chap').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.id;$('chPanel').hidden=true;if(id!==CH.id){boot(id);sfx('door')}}));
+ $('chList').querySelectorAll('.chap').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.id,c=CHAPTERS.find(x=>x.id===id);
+  if(chapterProgress(c).done){replayMenu(c);return}  // finished: play it as it is, or again (다시 보기)
+  $('chPanel').hidden=true;if(id!==CH.id||RP){boot(id);sfx('door')}}));
  $('chPanel').hidden=false;$('chList').querySelector('.cur')?.focus();
+}
+function replayMenu(c){  // 그대로 보기 = the real save; 다시 보기 = a fresh run in its own save, in one of three modes
+ const opts=[['',T('그대로 보기')],...Object.entries(RP_MODES).filter(([m])=>m!=='listen'||canSpeak()).map(([m,l])=>[m,T('다시 보기')+' · '+T(l)])];
+ $('chList').innerHTML=`<div class="chap cur" style="cursor:default"><span class="cn" style="background:${c.color}">${c.n}</span><span class="ci"><b>${c.title}</b><small>${T('지금까지 한 건 그대로예요.')}</small></span></div>`
+  +opts.map(([m,l])=>`<button class="mi rpo" data-m="${m}" style="width:100%;margin-top:6px">${l}</button>`).join('')
+  +`<button class="mi rpo" data-m="back" style="width:100%;margin-top:6px">${T('뒤로')}</button>`;
+ $('chList').querySelectorAll('.rpo').forEach(b=>b.addEventListener('click',()=>{const m=b.dataset.m;if(m==='back'){openChapters();return}
+  $('chPanel').hidden=true;const want=m?{mode:m}:null;if(c.id!==CH.id||!!RP!==!!want||(RP&&want&&RP.mode!==want.mode)){boot(c.id,want);sfx('door')}}));
+ $('chList').querySelector('.rpo')?.focus();
 }
 $('chBtn').addEventListener('click',openChapters);
 $('chPanel').addEventListener('click',e=>{if(e.target.id==='chPanel')$('chPanel').hidden=true});
@@ -2201,7 +2229,8 @@ function start(){
  if(TTS){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
  updateSound();updateRead();
  const want=new URLSearchParams(location.search).get('ch')||store.get(KEY('chapter'));
- boot(CHAPTERS.some(c=>c.id===want)?want:CHAPTERS[0].id); // first visit starts at chapter 1; after that, the last chapter played
+ let rp=null;try{rp=JSON.parse(store.get(KEY('replay'))||'null')}catch(e){}
+ boot(CHAPTERS.some(c=>c.id===want)?want:CHAPTERS[0].id,rp&&rp.id===want?rp:null); // first visit starts at chapter 1; after that, the last chapter played (a replay goes on)
  const upd=store.get(KEY('updated'));if(upd)store.set(KEY('updated'),'');
  if(upd&&upd===VER.v)setTimeout(()=>toast('새 버전으로 업데이트했어요.'),1500);else countPlay('open');  // our own reload isn't a new visit
  if(window.LINES_EN&&(enQ==='0'||enQ==='1'))setTimeout(()=>toast(enAll?'English under every line (tester link).':'영어 자동 보기를 껐어요.'),2600);

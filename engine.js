@@ -884,9 +884,14 @@ function cardHTML(x,i,n){
   +(V.lines||[]).map(([w,t])=>`<div class="pcl"><span class="pcw">${esc(T(w))}</span><span class="txt">${glossHTML(t)}</span>${en(t)}</div>`).join('')+`</div>`;
 }
 function drawCardPics(root){root.querySelectorAll('canvas.pcpic').forEach(cv=>{const P=(C.PICS||G.pics||{})[cv.dataset.pic];if(P)try{P(cv)}catch(e){}})}
+// a reply option's words, each held for help; an authored {form|key} pin keeps its sense (data-k → showGloss)
+const choiceWords=t=>t.split(/(\{[^|}]+\|[^}]+\})/).map(x=>{const m=x.match(/^\{([^|}]+)\|([^}]+)\}$/),e=y=>y.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+ return m?`<span class="cw" data-k="${e(m[2])}">${e(m[1])}</span>`:e(x).replace(/[가-힣]+/g,w=>`<span class="cw">${w}</span>`)}).join('');
+// word help inside the 일지 (postcards, bag descriptions): pins and words, shown above the journal
+const panelWordTap=e=>{const gl=e.target.closest('.gl'),w=e.target.closest('.w');if(!gl&&!w)return false;e.stopPropagation();document.body.classList.add('talkopen');gl?showGloss(gl.dataset.k,gl):showWord(w.dataset.w||w.textContent,w);return true};
 function renderPostcards(){const el=$('pcards');if(!el)return;const cs=pcCards();
  el.innerHTML=cs.length?cs.map(x=>cardHTML(x)).join(''):`<p class="none">${T('아직 없어요.')}</p>`;drawCardPics(el);
- el.onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();const t=q.nextElementSibling;if(t)t.hidden=!t.hidden;lineQOpened(q,t);return}const w=e.target.closest('.w');if(w){e.stopPropagation();showWord(w.textContent,w)}}}
+ el.onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();const t=q.nextElementSibling;if(t)t.hidden=!t.hidden;lineQOpened(q,t);return}panelWordTap(e)}}
 let curSlides=null;
 function slideSteps(){const cs=pcCards();return cs.map((x,i)=>({slide:i,slideAll:cs,...(i===0?{slideOpen:1}:{})}))}
 function showSlide(s){
@@ -1353,10 +1358,10 @@ function renderChoices(s){
  writeKbOff();  // 보기 after a 쓰기 문제: the controls come back
  const box=$('choices');box.hidden=false;
  const order=shuffle(s.opts.map((_,i)=>i));
- box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${G.choiceHTML?G.choiceHTML(plain(String(s.opts[i][0]))):plain(String(s.opts[i][0])).replace(/[가-힣]+/g,w=>`<span class="cw">${w}</span>`)}</button>`).join('');
+ box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${G.choiceHTML?G.choiceHTML(plain(String(s.opts[i][0]))):choiceWords(String(s.opts[i][0]))}</button>`).join('');
  let pressT=null,defined=false;  // long-press a word on a choice = its definition (doesn't answer)
  box.querySelectorAll('.choice').forEach(b=>{
-  b.addEventListener('pointerdown',e=>{const w=e.target.closest('.cw');defined=false;clearTimeout(pressT);if(w)pressT=setTimeout(()=>{defined=true;showWord(w.dataset.w||w.textContent,w)},450)});
+  b.addEventListener('pointerdown',e=>{const w=e.target.closest('.cw');defined=false;clearTimeout(pressT);if(w)pressT=setTimeout(()=>{defined=true;w.dataset.k?showGloss(w.dataset.k,w):showWord(w.dataset.w||w.textContent,w)},450)});
   for(const t of ['pointerup','pointerleave','pointercancel'])b.addEventListener(t,()=>clearTimeout(pressT));
   b.addEventListener('click',e=>{e.stopPropagation();if(defined){defined=false;return}choose(s,+b.dataset.i)})});
  sel=-1;choicesAt=performance.now();markSel();  // nothing selected: A can't answer by accident
@@ -1843,7 +1848,7 @@ function openPanel(){
  $('items').querySelectorAll('li[data-k]').forEach(li=>li.addEventListener('click',()=>{const name=state.items[+li.dataset.k],ph=(C.PHOTOS||{})[name];
   if(ph){$('panel').hidden=true;openPhone(ph);return}
   $('items').querySelectorAll('li').forEach(x=>x.classList.toggle('sel',x===li));
-  let ic=$('itemCard');if(!ic){ic=document.createElement('div');ic.id='itemCard';ic.className='card';$('items').after(ic)}  // right under the bag, not in the word card at the top (out of view)
+  let ic=$('itemCard');if(!ic){ic=document.createElement('div');ic.id='itemCard';ic.className='card';$('items').after(ic);ic.addEventListener('click',panelWordTap)}  // right under the bag, not in the word card at the top (out of view)
   ic.innerHTML=`<div class="top"><span class="big">${String(name).replace(/</g,'&lt;')}</span></div><span class="def txt">${glossHTML(String(C.ITEMS[name]||''))}</span>`;ic.hidden=false;ic.scrollIntoView({block:'nearest'})}));
  $('panel').hidden=false;
 }

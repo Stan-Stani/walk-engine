@@ -7,11 +7,14 @@ open) and writes src/grammar-tags.json, which build.py puts in as globalThis.LIN
   cnt: how many lines have each pattern, n: lines in all (the game's baseline: a pattern counts as a stumble when it is more common
   in the lines you opened English for than in the game);  chw: {chapter file: {dictionary form: times}} (content words only), the
   words each chapter uses, for the "about N% known" estimate. Run it after the lines or lines-en.json change; the build only reads.
+A game without lines-en.json (단어 마을: English only per word) gets just chw, from every Korean string in its chapter files
+(dialogue, quiz options, definitions: all read on screen); with no ? to open there's nothing for the 문법 summary.
 Endings a TOPIK 3 learner has (-어요, -고, -었-, -(으)면…) are left out: they would top every list without saying anything."""
 import json,re,sys,pathlib
 from kiwipiepy import Kiwi
 repo=pathlib.Path(sys.argv[1] if len(sys.argv)>1 else '.')
-en=json.loads((repo/'src/lines-en.json').read_text(encoding='utf-8'))
+en_p=repo/'src/lines-en.json'
+en=json.loads(en_p.read_text(encoding='utf-8')) if en_p.exists() else None
 plain=lambda t:re.sub(r'\{([^|}]+)\|[^}]+\}',r'\1',t)
 norm=lambda t:re.sub(r'\s+',' ',plain(t)).strip()
 kiwi=Kiwi()
@@ -49,7 +52,34 @@ def words(toks):
         elif t.tag in ('VV','VA'): out.append(t.form+'다')
         else: out.append(t.form)
     return out
+def strings(js):  # the string literals of a JS file (comments skipped, so an English "don't" can't pair up quotes)
+    out=[];i=0;n=len(js)
+    while i<n:
+        c=js[i]
+        if js.startswith('//',i): i=js.find('\n',i);i=n if i<0 else i;continue
+        if js.startswith('/*',i): i=js.find('*/',i+2);i=n if i<0 else i+2;continue
+        if c in '\'"`':
+            j=i+1;buf=[]
+            while j<n and js[j]!=c:
+                if js[j]=='\\': j+=1
+                elif c=='`' and js.startswith('${',j): j=js.find('}',j);buf.append(' ')
+                else: buf.append(js[j])
+                j+=1
+            out.append(''.join(buf));i=j+1;continue
+        i+=1
+    return out
 files={p.stem:norm(p.read_text(encoding='utf-8')) for p in sorted((repo/'src/chapters').glob('*.js'))}
+if en is None:
+    chw={}
+    for p in sorted((repo/'src/chapters').glob('*.js')):
+        d=chw.setdefault(p.stem,{})
+        for t in strings(p.read_text(encoding='utf-8')):
+            t=norm(t).replace('___','')
+            if not re.search(r'[가-힣]',t): continue
+            for w in words(kiwi.tokenize(t)): d[w]=d.get(w,0)+1
+    (repo/'src/grammar-tags.json').write_text(json.dumps({'pats':[],'lines':{},'cnt':[],'n':0,'chw':chw},ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
+    print(f"{repo.resolve().name}: no lines-en.json, chapter words only: "+', '.join(f"{k} {len(v)} words" for k,v in chw.items()))
+    sys.exit()
 pats=[];idx={};lines={};chw={}
 for key in en:
     line=norm(key).replace('___','')

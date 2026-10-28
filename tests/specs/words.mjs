@@ -26,7 +26,7 @@ export default async function(t){
   t.ok(await t.ev('chapterKnown(CH.id)')===null||await t.ev('Object.keys(seen).length')>=50,'little reading: no estimate');
   await t.ev(`Object.keys(LINE_GRAMMAR.chw[CH.id]).slice(0,80).forEach(w=>{seen[w]=[6,0,6]}),1`);
   const k=await t.ev('chapterKnown(CH.id)');t.ok(k>0&&k<=100,`chapter estimate: about ${k}% known`);
-  await t.ev(`openChapters?openChapters():0,1`);
+  await t.ev(`openChapters(),1`);t.ok(await t.ev(`$('chList').textContent.includes(T('아는 말')+' '+chapterKnown(CH.id)+'%')`),'the chapter list shows it');
  }
  t.ok(await t.ev(`JSON.parse(localStorage.getItem('walk-seen-'+lang2())||'{}')&&new Promise(r=>setTimeout(()=>r(!!JSON.parse(localStorage.getItem('walk-seen-'+lang2())||'{}')[${JSON.stringify(w)}]),1800))`),'saved for every game in this language (walk-seen-'+await t.ev('lang2()')+')');
 }

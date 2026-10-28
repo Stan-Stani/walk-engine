@@ -1935,7 +1935,10 @@ addEventListener('visibilitychange',()=>{if(!document.hidden)checkVersion()});
 setInterval(checkVersion,30*60e3);setTimeout(checkVersion,60e3);setInterval(updateNow,1000);
 const buildDate=()=>{const d=new Date(VER.t||'');return isNaN(d)?'':d.toLocaleString(G.lang||'ko-KR',{month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})};
 if(VER.v){const p=document.createElement('p');p.id='verLine';p.style.cssText='font-size:.72rem;opacity:.55;margin:12px 0 0;text-align:center';
- p.textContent=(buildDate()?T('업데이트')+' '+buildDate()+' · ':'')+VER.v;$('startPanel').querySelector('.sheet').append(p)}
+ p.textContent=(buildDate()?T('업데이트')+' '+buildDate()+' · ':'')+VER.v;$('startPanel').querySelector('.sheet').append(p)
+ /* 디버그 on or off in any browser or the app: tap the version line 5 times within 2 s (the same switch ?debug=1 / ?debug=0 sets), then a reload */
+ let n=0,t0=0;p.addEventListener('click',()=>{const t=Date.now();n=t-t0<2000?n+1:1;t0=t;if(n<5)return;n=0;
+  const on=store.get('walk-debug-ok')!=='1';store.set('walk-debug-ok',on?'1':'0');toast(on?'디버그 켬 · 다시 불러와요':'디버그 끔 · 다시 불러와요');setTimeout(()=>location.reload(),900)})}
 /* 통계: anonymous counts go to the same server: the game opened (each page load), a chapter started (its first time in this
    browser), each objective reached in it (how far players get; once each, in the order reached), finished, and the first real
    tap or key in a visit (so the dashboard counts people, not bots that only load the page). No ID and no cookie: the server only keeps the day and a tag that changes every day (people per

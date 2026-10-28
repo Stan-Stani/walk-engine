@@ -32,10 +32,16 @@ The list is `Games.kt`: add 소리 엽서 there once it's public.
 ```sh
 cd android
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"   # or any JDK 17+
-./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+export WALK_KEYSTORE=~/.config/walk/walk-release.jks                             # the release key, never in the repo
+read -rs WALK_KEYSTORE_PASSWORD && export WALK_KEYSTORE_PASSWORD                 # typed, kept out of shell history
+./gradlew assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-It is signed with the build machine's debug key (`~/.android/debug.keystore`). Android only updates an app with the key it
-was installed with, so build updates on the same machine; an APK from another machine has to be installed after uninstalling
-(which deletes the saves). A release key of your own (kept out of the repo) would make every machine's build an update.
+Every machine that has the same `walk-release.jks` (and its password) builds APKs that update each other's installs. Make the
+key once with `keytool -genkeypair -v -keystore walk-release.jks -alias walk -keyalg RSA -keysize 4096 -validity 10000`, keep
+the file and password in a password manager, and copy the file to the other machine yourself. Lose it and the next install
+has to uninstall first (export saves beforehand: 저장 옮기기 → 내보내기, then Restore… after).
+
+Without `WALK_KEYSTORE`, `assembleRelease` makes `app-release-unsigned.apk`, which won't install; `assembleDebug` still builds
+one signed with the machine's debug key (`~/.android/debug.keystore`), which only updates installs from that same machine.

@@ -1633,12 +1633,13 @@ function closeDialog(){
  if(pending){const c=pending;pending=null;setTimeout(()=>{if(!dlg)openDialog(LOGNAME,c)},400)}
 }
 function cancel(){
- if(phoneOpen&&curSlides){if(!$('gloss').hidden){hideGloss();return}if(dlg&&dlg.cur&&dlg.cur.slide<curSlides.n-1){advance();return}if(dlg)advance();else closePhone();return}  // B goes on through the cards; after the last it puts the postcard away (the talk goes on)
- if(phoneOpen&&curChat){if(!$('gloss').hidden){hideGloss();return}
+ const over=panelOpen();  // the journal, START, the talk log etc. sit above the phone: B closes them first
+ if(!over&&phoneOpen&&curSlides){if(!$('gloss').hidden){hideGloss();return}if(dlg&&dlg.cur&&dlg.cur.slide<curSlides.n-1){advance();return}if(dlg)advance();else closePhone();return}  // B goes on through the cards; after the last it puts the postcard away (the talk goes on)
+ if(!over&&phoneOpen&&curChat){if(!$('gloss').hidden){hideGloss();return}
   if(dlg&&dlg.cur&&dlg.cur.fb&&dlg.next&&dlg.next.chatReply){advance();return}  // a wrong-answer hint: back to the replies
   if(choosing())return;  // a reply is waiting: B never throws it away
   if(dlg)closeDialog();else closePhone();return}  // the phone goes away and the talk ends
- if(phoneOpen){if(!$('gloss').hidden){hideGloss();return}closePhone();if(dlg&&dlg.cur&&dlg.cur.phone&&!(dlg.cur.say||'').trim())advance();return}
+ if(!over&&phoneOpen){if(!$('gloss').hidden){hideGloss();return}closePhone();if(dlg&&dlg.cur&&dlg.cur.phone&&!(dlg.cur.say||'').trim())advance();return}
  if(CREATOR&&!$('mePanel').hidden){if(me)closeMe(false);return}  // first time: you must pick (no B)
  if(!$('startPanel').hidden){$('startPanel').hidden=true;return}
  if($('setPanel')&&!$('setPanel').hidden){closeSettings();return}  // B: back to START

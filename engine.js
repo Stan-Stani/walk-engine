@@ -2188,6 +2188,7 @@ addEventListener('keyup',e=>{if(KEYS[e.key]===held)held=null});
 /* ---------- chapters (each keeps its own save; old chapters are never overwritten) ---------- */
 const BASE_TILES={...TILES};
 function boot(id,rp){
+ window.__labActive=null;  // any boot leaves a lab; a lab sets this again right after its own boot
  CH=CHAPTERS.find(c=>c.id===id)||CHAPTERS[0];
  if(RP&&!rp)try{shared=JSON.parse(store.get(SHARED_KEY)||'{}')||{}}catch(e){shared={}}  // leaving a replay: the real shared record again
  RP=rp&&(chapterProgress(CH).done||(rp.force&&debugOK))?{mode:rp.mode||'plain',force:!!rp.force}:null;store.set(KEY('replay'),RP?JSON.stringify({id:CH.id,mode:RP.mode,force:RP.force}):'');
@@ -2319,7 +2320,9 @@ function reworkMenu(){
 }
 /* 실험 (labs): a feature tried out before it belongs to the game, in its own file next to the game (labs.json lists them:
    [{id, name, file}]), never in the build. Only where 디버그 is offered: 설정 · 개발 lists them, ?lab=<id> starts one at load. A lab
-   registers WALK_LABS[id] = {start()} and may wrap engine functions while it runs; taking it out = deleting its file and entry. */
+   registers WALK_LABS[id] = {start()} and may wrap engine functions while it runs; taking it out = deleting its file and entry.
+   window.__labActive names the lab that's on: a lab sets it after its own boot, every boot clears it, and the one that was on when
+   the page went away starts again on the next load (a reload keeps you in the lab). */
 window.WALK_LABS=window.WALK_LABS||{};
 let labsP=null;const loadLabs=()=>labsP||(labsP=fetch('labs.json',{cache:'no-cache'}).then(r=>r.ok?r.json():[]).catch(()=>[]));
 function startLab(l){
@@ -2341,7 +2344,8 @@ function start(){
  const upd=store.get(KEY('updated'));if(upd)store.set(KEY('updated'),'');
  if(upd&&upd===VER.v)setTimeout(()=>toast('새 버전으로 업데이트했어요.'),1500);else countPlay('open');  // our own reload isn't a new visit
  if(window.LINES_EN&&(enQ==='0'||enQ==='1'))setTimeout(()=>toast(enAll?'English under every line (tester link).':'영어 자동 보기를 껐어요.'),2600);
- {const q=new URLSearchParams(location.search).get('lab');if(q&&debugOK)loadLabs().then(L=>{const l=L.find(x=>x.id===q);if(l)setTimeout(()=>startLab(l),900)})}  // ?lab=<id>: straight into a lab
+ {const q=new URLSearchParams(location.search).get('lab')||store.get(KEY('lab'));if(q&&debugOK)loadLabs().then(L=>{const l=L.find(x=>x.id===q);if(l)setTimeout(()=>startLab(l),900)})}  // ?lab=<id>, or the lab that was on when the page went away: straight into it
+ addEventListener('pagehide',()=>store.set(KEY('lab'),debugOK&&window.__labActive||''));
  if(countQ==='0'||countQ==='1')setTimeout(()=>toast(countQ==='0'?'이 브라우저는 이제 통계에서 빠져요.':'이 브라우저도 다시 통계에 들어가요.'),1200);
  requestAnimationFrame(loop);
 }

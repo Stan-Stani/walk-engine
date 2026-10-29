@@ -1358,7 +1358,7 @@ function renderChoices(s){
  writeKbOff();  // 보기 after a 쓰기 문제: the controls come back
  const box=$('choices');box.hidden=false;
  const order=shuffle(s.opts.map((_,i)=>i));
- box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}">${G.choiceHTML?G.choiceHTML(plain(String(s.opts[i][0]))):choiceWords(String(s.opts[i][0]))}</button>`).join('');
+ box.innerHTML=order.map(i=>`<button class="choice" data-i="${i}"><span>${G.choiceHTML?G.choiceHTML(plain(String(s.opts[i][0]))):choiceWords(String(s.opts[i][0]))}</span></button>`).join('');  // one inner span: the shells lay .choice out as a flex row, which would space each word span and its punctuation apart
  let pressT=null,defined=false;  // long-press a word on a choice = its definition (doesn't answer)
  box.querySelectorAll('.choice').forEach(b=>{
   b.addEventListener('pointerdown',e=>{const w=e.target.closest('.cw');defined=false;clearTimeout(pressT);if(w)pressT=setTimeout(()=>{defined=true;w.dataset.k?showGloss(w.dataset.k,w):showWord(w.dataset.w||w.textContent,w)},450)});

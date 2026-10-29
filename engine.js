@@ -743,15 +743,36 @@ let dlg=null,typing=null,pending=null,sel=0;
    globalThis.GRAMMAR_NOTES ({id:{t, lines:[[korean, english, [source numbers]]…], ex:[[korean, english]…], src:[[title, url]…]}}):
    the grammar of the line it's on, a few lines and then its examples, every line tied to its sources like a 문화 노트's, read in the
    journal under its own heading (#gnotesH), after the 문화 노트. Each kind keeps its own seen/read lists; without GRAMMAR_NOTES the
-   문법 노트 heading and list are taken out of the journal. */
+   문법 노트 heading and list are taken out of the journal.
+   Attachments: photo:{look,face,caption,mic,old} is an album portrait; capture:{caption,lines:[text,…]} is a static captured
+   screen, with a header and independently tappable/translated lines (glossHTML / lineEn). A capture can also be a chat message's
+   attachment, beside its text, instead of pic. It has no live buttons, counts or login. Chat transcripts retain captures. */
 let phoneOpen=false,curPhone=null;
 /* English on the phone (when the game has lines-en): a ? by each post, comment and caption that has English shows it under the line
    (the phone's own .tq/.ten); with 영어 자막 on it is already showing */
 const pEnQ=t=>lineEn(t)?`<button class="tq${enAll?' on':''}" type="button" aria-label="영어로 보기">?</button>`:'';
 const pEn=t=>{const e=lineEn(t);return e?`<span class="ten"${enAll?'':' hidden'}>${e.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</span>`:''};
+const captureHTML=p=>`<section class="pcapture">${[p.caption,...(p.lines||[])].map(t=>`<div class="pcapture-line"><span class="txt">${glossHTML(t||'')}</span>${pEnQ(t)}${pEn(t)}</div>`).join('')}</section>`;
+// Only new attachment/card classes use these styles; existing shells keep their presentation.
+{const st=document.createElement('style');st.textContent=`
+.pcapture{background:#F0E7D1;color:#263C42;padding:7px;border:1px solid #A3967B;border-radius:4px;font-size:.8rem;line-height:1.45;display:flex;flex-direction:column;gap:5px}
+.pcapture .pcapture-line:first-child{font:600 .68rem var(--mono,monospace);border-bottom:1px solid #A3967B;padding-bottom:3px}
+.pcapture .pcapture-line:nth-child(3){color:#405E59;font-size:.72rem}
+.pcapture .ten{font-size:.74rem;display:block}.pcapture .ten[hidden]{display:none}
+.pclabel{font:600 .75rem var(--body,sans-serif);color:var(--muted);display:flex;flex-direction:column;gap:3px}
+.pcbonus-strip{border-top:1px dashed var(--seam);padding-top:10px}
+.pcard.pcbonus{max-width:240px;margin:0 auto;border-style:dashed;background:var(--hull);font-size:.82rem;padding:9px}
+.pcard.pcbonus .pcpic{width:96px;max-width:44%;align-self:center}
+.pcard.pcbonus .pccap{font-size:.9rem}.pcard.pcbonus .pcl{font-size:.78rem}
+.pcard.pcbonus .pchead{font-size:.66rem}.pcard.pcbonus .pchead>span:nth-child(2){display:none}
+@media(max-height:500px) and (orientation:landscape){.pcapture{padding:4px;gap:3px;font-size:.74rem}.pcard.pcbonus .pcpic{width:64px}}
+`;document.head.appendChild(st)}
 function openPhone(p){
  if(!$('phonePanel'))return;curPhone=p;
  const bars='<i class="sig"><b></b><b></b><b></b><b class="off"></b></i>',bat=p.battery??60;
+ if(p.capture){
+  $('pscr').innerHTML=`<div class="pstat"><span>${p.time||''}</span></div><div class="pbar"><span class="txt">${glossHTML(p.app||'')}</span></div><div class="plist">${captureHTML(p.capture)}</div>`;
+  $('phonePanel').hidden=false;phoneOpen=true;return}
  if(p.photo){  // an album photo: a pixel picture (a look's portrait, made old) with its caption
   $('pscr').innerHTML=`<div class="pstat"><span>${p.time||'12:30'}</span><span class="pst">LTE${bars}${bat}%<i class="bat"><i style="width:${bat}%"></i></i></span></div>`
    +`<div class="pbar"><span>${p.app||'사진'}</span><span>●●●</span></div><div class="pphoto${p.photo.old?' old':''}"><canvas width="48" height="48"></canvas><div class="pcap txt">${glossHTML(p.photo.caption||'')}</div>${p.photo.caption&&lineEn(p.photo.caption)?`<div class="pcapen">${pEnQ(p.photo.caption)}${pEn(p.photo.caption)}</div>`:''}</div>`;
@@ -791,7 +812,7 @@ function chatSteps(c){  // a chat step → its dialogue steps
  const rec=(shared.chats||{})[c.id];
  if(rec&&rec.done)return [{chatOpen:c,chatAll:rec.msgs}];  // done before: the transcript, nothing else happens
  const msg=m=>({chatMsg:m}),list=[...(c.msgs||[]).map(msg)];
- if(c.reply)list.push(c.reply.choose?{chatChoose:c.reply.choose,chatReply:c.reply.id,ask:c.reply.ask||''}:{...c.reply,chatReply:c.reply.id,ask:c.reply.ask||''});
+ if(c.reply)list.push(c.reply.choose?{chatChoose:c.reply.choose,chatReply:c.reply.id,ask:c.reply.ask||'',time:c.reply.time,now:c.reply.now}:{...c.reply,chatReply:c.reply.id,ask:c.reply.ask||''});
  list.push(...(c.after||[]).map(msg));
  if(!list.length)return [];
  list[0].chatOpen=c;
@@ -833,6 +854,7 @@ function chatPush(m,quiet){
  row.innerHTML=(mine?'':`<canvas class="cface" width="48" height="48"></canvas>`)
   +`<div class="cb">${mine?'':`<span class="cn">${esc(T(who.name||''))}</span>`}`
   +(m.pic?`<canvas class="cpic" width="96" height="64"></canvas>`:'')
+  +(m.capture?captureHTML(m.capture):'')
   +`<span class="ct txt">${glossHTML(m.text||m.caption||'')}</span>`
   +(en?`<button class="tq${enAll?' on':''}" type="button" aria-label="영어로 보기">?</button><span class="ten"${enAll?'':' hidden'}>${esc(en)}</span>`:'')
   +`</div>`+(m.time?`<span class="ctime">${esc(m.time)}</span>`:'');
@@ -840,7 +862,7 @@ function chatPush(m,quiet){
  if(!mine&&who.look){try{drawPortrait(row.querySelector('.cface'),who.look,m.face||'happy',false)}catch(e){}}
  if(m.pic){const P=(C.PICS||G.pics||{})[m.pic];if(P)try{P(row.querySelector('.cpic'))}catch(e){}}
  if(!quiet)setNow(m.now||m.time);  // the phone's clock: the story's time now (m.now), else the message's send time
- curChat.msgs.push({from:m.from,text:m.text||m.caption||'',time:m.time,id:m.id,pic:m.pic});
+ curChat.msgs.push({from:m.from,text:m.text||m.caption||'',time:m.time,id:m.id,pic:m.pic,...(m.capture?{capture:m.capture}:{})});
  if(!quiet)logTalk(chatRoom(curChat.c.room).t+' · '+(mine?T('나'):who.name),m.text||m.caption||'',key&&lineEn(key)?key:undefined);
  if(near||mine||curChat.msgs.length<=1)L.scrollTop=L.scrollHeight;  // new messages don't pull you back down if you scrolled up to read
 }
@@ -861,27 +883,45 @@ function renderChatChoose(s){
 }
 /* ---------- the postcard (opt-in; 소리 엽서): cards the player makes across the chapters, kept in the shared record ----------
    GAME.postcard (the game's shared.js): [{id, ch, place, def, v:{a:{pic, caption, lines:[[who, text]…]}, b:{…}}}] in story order.
+   Optional variant fields: chosen:true = featured, chosen:false (or bonus:true) = small bonus, after the full cards in both the
+   journal and slides. Missing fields keep the original full card. label prints above it; bonusCaption prints below a small card.
+   footer is a separate printed credit, never a voiced transcript line; footerLabel optionally names that row. All printed text
+   uses glossHTML and lineEn. snapshot:1 freezes pic/caption/lines/footer, presentation and voice at recording time. voice is an
+   authored provenance tag (not permission). card:{id,v,provenance:{…}} optionally stores additional JSON provenance, e.g. the
+   earlier consent version used. Records retain the existing {v,ch,t,lines?,voice?,chosen?} shape; old records remain readable.
    A step card:{id, v} puts version v of that card on the postcard (a toast says so); the choice lives in the shared record, so a
    later chapter's slideshow and the 일지 see it. In the 일지 (#pcards, when the shell has it) the cards up to this chapter show: one
    not made (the chapter skipped, entered directly) shows its default version, marked 기본, without counting anything as seen.
    A step slides:1 plays the postcard on the phone, a card per A (B goes on too; after the last card B puts it away).
+   slides:{kind:'main'|'bonus',at:0,one:true} optionally filters, starts at an index and shows only one card; authored choices can
+   pause between panels without assembling slideAll. With no kind it includes both, main cards first.
    처음부터 in a chapter takes its cards and chats out of the shared record. */
 const PC=()=>G.postcard||globalThis.POSTCARD||[];  // GAME.postcard, or a POSTCARD the game's shared.js sets
 const pcIdx=id=>CHAPTERS.findIndex(c=>c.id===id);
+const PC_FIELDS=['pic','caption','lines','footer','footerLabel','chosen','bonus','label','bonusCaption','voice'];
+const cardVariant=x=>{const v={...x.e.v[x.k]};for(const k of PC_FIELDS)if(x.record&&Object.hasOwn(x.record,k))v[k]=x.record[k];return v};
+const cardBonus=x=>{const v=cardVariant(x);return v.chosen===false||(v.chosen!==true&&!!v.bonus)};
 function pcCards(){  // the cards up to this chapter: [{e, v (the version shown), made}]
  const cur=pcIdx(CH.id),got=shared.postcard||{};
- return PC().filter(e=>{const i=pcIdx(e.ch);return i>=0&&(i<cur||(i===cur&&got[e.id]))}).map(e=>{const m=got[e.id];return {e,k:m?m.v:e.def,made:!!m}}).filter(x=>x.e.v[x.k]);  // this chapter's cards once made; earlier chapters' (a default for one skipped)
+ const cs=PC().filter(e=>{const i=pcIdx(e.ch);return i>=0&&(i<cur||(i===cur&&got[e.id]))}).map(e=>{const m=got[e.id];return {e,k:m?m.v:e.def,made:!!m,record:m}}).filter(x=>x.e.v[x.k]);
+ return [...cs.filter(x=>!cardBonus(x)),...cs.filter(cardBonus)];  // this chapter's cards once made; earlier chapters' defaults
 }
-function putCard(c){const e=PC().find(x=>x.id===c.id);if(!e||!e.v[c.v])return;(shared.postcard||(shared.postcard={}))[c.id]={v:c.v,ch:CH.id,t:Date.now()};saveShared();
+function putCard(c){const e=PC().find(x=>x.id===c.id);if(!e||!e.v[c.v])return;const v=e.v[c.v],r={v:c.v,ch:CH.id,t:Date.now()};
+ if(v.snapshot)for(const k of PC_FIELDS)if(Object.hasOwn(v,k))r[k]=JSON.parse(JSON.stringify(v[k]));
+ if(c.provenance)r.provenance=JSON.parse(JSON.stringify(c.provenance));
+ (shared.postcard||(shared.postcard={}))[c.id]=r;saveShared();
  sfx('item');setTimeout(()=>toast(T('엽서에 추가')+': '+plain(e.v[c.v].caption||e.place||'')),200)}
 function forgetShared(){let n=0;for(const k of ['postcard','chats'])for(const [id,r] of Object.entries(shared[k]||{}))if(r.ch===CH.id){delete shared[k][id];n++}if(n)saveShared()}
 function cardHTML(x,i,n){
- const esc=t=>String(t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])),V=x.e.v[x.k];
+ const esc=t=>String(t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])),V=cardVariant(x),bonus=cardBonus(x);
  const en=t=>{const e=lineEn(t);return e?`<button class="tq${enAll?' on':''}" type="button" aria-label="영어로 보기">?</button><span class="ten"${enAll?'':' hidden'}>${esc(e)}</span>`:''};
- return `<div class="pcard"><div class="pchead"><span>${esc(T(x.e.place||''))}</span>${n?`<span>${i+1}/${n}</span>`:''}${x.made?'':`<span class="pcdef">${T('기본')}</span>`}</div>`
+ const label=t=>`<div class="pclabel"><div><span class="txt">${glossHTML(t)}</span>${en(t)}</div></div>`;
+ return `<div class="pcard${bonus?' pcbonus':''}">${V.label?label(V.label):''}<div class="pchead"><span>${esc(T(x.e.place||''))}</span>${n?`<span>${i+1}/${n}</span>`:''}${x.made?'':`<span class="pcdef">${T('기본')}</span>`}</div>`
   +(V.pic?`<canvas class="pcpic" width="96" height="64" data-pic="${V.pic}"></canvas>`:'')
   +`<div class="pccap"><span class="txt">${glossHTML(V.caption||'')}</span>${en(V.caption||'')}</div>`
-  +(V.lines||[]).map(([w,t])=>`<div class="pcl"><span class="pcw">${esc(T(w))}</span><span class="txt">${glossHTML(t)}</span>${en(t)}</div>`).join('')+`</div>`;
+  +(V.lines||[]).map(([w,t])=>`<div class="pcl"><span class="pcw">${esc(T(w))}</span><span class="txt">${glossHTML(t)}</span>${en(t)}</div>`).join('')
+  +(V.footer?`<div class="pcl pcfooter">${V.footerLabel?`<span class="pcw">${esc(T(V.footerLabel))}</span>`:''}<span class="txt">${glossHTML(V.footer)}</span>${en(V.footer)}</div>`:'')
+  +(bonus&&V.bonusCaption?label(V.bonusCaption):'')+`</div>`;
 }
 function drawCardPics(root){root.querySelectorAll('canvas.pcpic').forEach(cv=>{const P=(C.PICS||G.pics||{})[cv.dataset.pic];if(P)try{P(cv)}catch(e){}})}
 // a reply option's words, each held for help; an authored {form|key} pin keeps its sense (data-k → showGloss)
@@ -890,10 +930,12 @@ const choiceWords=t=>t.split(/(\{[^|}]+\|[^}]+\})/).map(x=>{const m=x.match(/^\{
 // word help inside the 일지 (postcards, bag descriptions): pins and words, shown above the journal
 const panelWordTap=e=>{const gl=e.target.closest('.gl'),w=e.target.closest('.w');if(!gl&&!w)return false;e.stopPropagation();document.body.classList.add('talkopen');gl?showGloss(gl.dataset.k,gl):showWord(w.dataset.w||w.textContent,w);return true};
 function renderPostcards(){const el=$('pcards');if(!el)return;const cs=pcCards();
- el.innerHTML=cs.length?cs.map(x=>cardHTML(x)).join(''):`<p class="none">${T('아직 없어요.')}</p>`;drawCardPics(el);
+ const main=cs.filter(x=>!cardBonus(x)),bonus=cs.filter(cardBonus);
+ el.innerHTML=cs.length?main.map(x=>cardHTML(x)).join('')+(bonus.length?`<div class="pcbonus-strip">${bonus.map(x=>cardHTML(x)).join('')}</div>`:''):`<p class="none">${T('아직 없어요.')}</p>`;drawCardPics(el);
  el.onclick=e=>{const q=e.target.closest('.tq');if(q){e.stopPropagation();const t=q.nextElementSibling;if(t)t.hidden=!t.hidden;lineQOpened(q,t);return}panelWordTap(e)}}
 let curSlides=null;
-function slideSteps(){const cs=pcCards();return cs.map((x,i)=>({slide:i,slideAll:cs,...(i===0?{slideOpen:1}:{})}))}
+function slideSteps(opts={}){const cs=pcCards().filter(x=>opts.kind==='bonus'?cardBonus(x):opts.kind==='main'?!cardBonus(x):true),at=opts.at||0;
+ return cs.map((x,i)=>({slide:i,slideAll:cs})).slice(at,opts.one?at+1:undefined).map((s,i)=>({...s,...(i===0?{slideOpen:1}:{})}))}
 function showSlide(s){
  if(!$('phonePanel'))return;
  if(s.slideOpen||!curSlides){closePhone();curSlides={n:s.slideAll.length};curPhone={slides:1};$('phonePanel').hidden=false;phoneOpen=true;document.body.classList.add('chatting')}
@@ -974,7 +1016,7 @@ function greet(){
 function openDialog(name,steps,opts={}){
  steps=(steps||[]).filter(s=>s&&(!s.when||s.when()));
  if(!steps.length)return;  // nothing to say: never an empty box
- talkN++;dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review,snap:opts.snap||JSON.stringify(state)};
+ talkN++;dlg={name,steps:steps.map(s=>({...s})),i:0,cur:null,next:null,missed:new Set(),npc:opts.npc||null,review:!!opts.review,intro:!!opts.intro,snap:opts.snap||JSON.stringify(state)};
  $('tag').hidden=!opts.review;$('dlg').hidden=false;$('zone').classList.add('dim');show(dlg.steps[0]);placeBox(talkRows());  // the room label never shows through a box at the top
 }
 /* a black line can show a small scene instead of plain black (a lift ride, a launch): step scene:'name' plays the chapter's
@@ -995,7 +1037,7 @@ function show(s){
  readEnd();  // the line before this one: read long enough, its words count as seen
  if(!s||!dlg){if(dlg)closeDialog();return}  // a step that isn't there closes the talk instead of leaving a blank box
  if(s&&(s.set||s.award||s.give||s.take||s.go)&&dlg)dlg.moved=1;  // a story beat (spaced review counts them)
- if(s&&s.slides&&s.slide===undefined){const more=slideSteps();dlg.steps.splice(dlg.i,1,...more);if(!more.length||dlg.i>=dlg.steps.length){closeDialog();return}return show(dlg.steps[dlg.i])}  // the postcard on the phone, a card per step
+ if(s&&s.slides&&s.slide===undefined){const more=slideSteps(s.slides);dlg.steps.splice(dlg.i,1,...more);if(!more.length||dlg.i>=dlg.steps.length){closeDialog();return}return show(dlg.steps[dlg.i])}  // the postcard on the phone, a card per step
  if(s&&s.chat&&!s.chatMsg){const more=chatSteps(s.chat);dlg.steps.splice(dlg.i,1,...more);if(!more.length||dlg.i>=dlg.steps.length){closeDialog();return}return show(dlg.steps[dlg.i])}  // a phone chat: its messages, reply and commit as steps
  if(s&&s.expand){const more=says(s.expand()||[]);dlg.steps.splice(dlg.i,1,...more);if(dlg.i>=dlg.steps.length){closeDialog();return}return show(dlg.steps[dlg.i])}  // expand:()=>steps, made when it's reached (class time picks words you have by then)
  dlg.cur=s;hideGloss();
@@ -1626,7 +1668,7 @@ function advance(){
  if(dlg.next){const n=dlg.next;dlg.next=null;if(n!=='advance'){show(n);return}}
  if(dlg.cur.finale){const p=pending;pending=null;closeDialog();finish(p);return}  // a note still waiting (20/20 words!) goes before the ending, not under its fade
  dlg.i++;
- if(dlg.i>=dlg.steps.length){closeDialog();return}
+ if(dlg.i>=dlg.steps.length){if(dlg.intro){state.seenIntro=true;state.introPending=false;save()}closeDialog();return}
  show(dlg.steps[dlg.i]);
 }
 let closedAt=0;
@@ -1664,7 +1706,7 @@ function cancel(){
   $('panel').hidden=true;$('chPanel').hidden=true;document.body.classList.remove('talkopen');return}
  if(!$('gloss').hidden){hideGloss();return}
  if(choosing()||building()){speak(dlg.cur.listenLine||dlg.cur.listen||dlg.cur.ask||'');return} // B never throws away a question; it replays it
- if(dlg&&dlg.black){if(typing&&!typing.finished)typing.fin();else advance();return}  // over a black time cut B goes on like A: closing there skipped the cut's end (the bell, the move, the day's flag) and once locked a 교시
+ if(dlg&&(dlg.black||dlg.intro)){if(typing&&!typing.finished)typing.fin();else advance();return}  // a resumable intro, like a black time cut, finishes before returning control
  if(dlg&&dlg.cur&&dlg.cur.fb&&dlg.next&&(dlg.next.ask||dlg.next.build||dlg.next.listen)){if(typing&&!typing.finished)typing.fin();advance();return}  // B on a wrong-answer hint dismisses the hint: back to the question, not out of the talk
  if(dlg)closeDialog();
 }
@@ -1726,9 +1768,9 @@ function terminal(){
  const due=dueWords(),lk=lookDue();
  if(!state.badges.length&&!due.length&&!lk.length)return [{who:TERM.name,say:TERM.empty}];  // empty only when there's nothing at all: earlier chapters' due words count (srs.shared)
  if(!due.length&&!lk.length){const n=nextDue();return [{who:TERM.name,say:TERM.idle+(n?` ${TERM.next}: ${fmtWait(n-now())} 후.`:'')}]}
- const pick=shuffle(due.slice()).slice(0,4),steps=[];
- if(pick.length){steps.push({who:TERM.name,say:TERM.due(due.length,pick.length)});pick.forEach(w=>steps.push(reviewFor([w])))}  // due(n,k): n words due, k asked this round (at most 4)
- if(lk.length){steps.push({who:TERM.name,say:T('찾아본 말도 볼까요?')});lk.slice(0,pick.length>=4?1:2).forEach(h=>steps.push(lookQ(h)))}  // 찾아본 말 복습
+ const size=Number.isInteger(TERM.batchSize)&&TERM.batchSize>0?TERM.batchSize:4,pick=shuffle(due.slice()).slice(0,size),steps=[];  // term.batchSize: positive integer, default 4
+ if(pick.length){steps.push({who:TERM.name,say:TERM.due(due.length,pick.length)});pick.forEach(w=>steps.push(reviewFor([w])))}  // due(n,k): n words due, k asked this round
+ if(lk.length){steps.push({who:TERM.name,say:T('찾아본 말도 볼까요?')});lk.slice(0,pick.length>=size?1:2).forEach(h=>steps.push(lookQ(h)))}  // 찾아본 말 복습
  steps.push({who:TERM.name,say:TERM.end});
  return steps;
 }
@@ -1837,11 +1879,12 @@ function openPanel(){
  $('wlist').querySelectorAll('button.wd').forEach(b=>b.addEventListener('click',()=>{logSel=b.dataset.w;showEn=false;openPanel();speak(logSel)}));
  if(logSel){const d=C.DICT[logSel],L=lv(logSel);
   $('card').innerHTML=`<div class="top"><span class="big">${logSel}</span>${d.r&&d.r!==logSel?`<span class="rd">${d.r}</span>`:''}<button class="spk${canSpeak()?'':' '}" id="cardSpk" aria-label="듣기" ${canSpeak()?'':'hidden'}>${$('spk').innerHTML}</button></div>
-   <span class="def">${d.k}</span>${d.reg?`<span class="rg">${T('말투')}: ${d.reg}</span>`:''}${d.note?`<span class="rg note">${T('참고')}: ${d.note}</span>`:''}<span class="ex">${T('예')}: ${plain(d.ex)}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
+   <span class="def">${d.k}</span>${d.reg?`<span class="rg">${T('말투')}: ${d.reg}</span>`:''}${d.note?`<span class="rg note">${T('참고')}: ${d.note}</span>`:''}<span class="ex${G.tappableExamples?' txt':''}">${T('예')}: ${G.tappableExamples?glossHTML(d.ex):plain(d.ex)}</span>${d.hj?`<span class="hj">${d.hj}</span>`:''}
    <span class="hj">${T('기억 레벨')} ${L.b}/5 · ${isDue(logSel)?T('지금 복습할 수 있어요'):T('다음 복습: ')+fmtWait(L.due-now())+T(' 후')}</span>
    ${showEn?`<span class="en">${d.e}${d.reg&&lineEn(d.reg)?' · '+lineEn(d.reg):''}</span>`:'<button class="enb" id="cardEn" aria-label="영어로 보기">?</button>'}`;
   $('cardSpk')?.addEventListener('click',()=>speak(logSel+'. '+plain(d.ex)));
   $('cardEn')?.addEventListener('click',()=>{showEn=true;openPanel()});  // its own id: it once shared the dialogue's #enBtn, so this handler went onto the line's ? (re-rendering the 일지 on every tap)
+  if(G.tappableExamples)$('card').onclick=e=>{if(e.target.closest('.ex'))panelWordTap(e)};
  }else $('card').innerHTML='<span class="def">'+T('아직 단어가 없어요.')+'</span><span class="ex">'+T('사람들한테 말을 걸면 일지에 단어가 생겨요.')+'</span>';
  $('items').innerHTML=state.items.length?state.items.map((i,k)=>`<li data-k="${k}" title="${String(C.ITEMS[i]||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(i).replace(/</g,'&lt;')}</li>`).join(''):'<li class="none">'+T('비어 있어요.')+'</li>';
  /* tap an item to read it again (the 복숭아 쪽지 that starts it all): its description in the card; an item with a photo (C.PHOTOS) opens it */
@@ -1855,6 +1898,17 @@ function openPanel(){
 
 /* ---------- saving ---------- */
 function fresh(){const st=CH.start;return {v:1,zone:st.zone,x:st.x,y:st.y,dir:st.dir,badges:[],lv:{},items:[],f:{},seenIntro:false}}
+/* CH.resumeIntro:true opts in: save a pending introduction, mark seen only after the last line is advanced. Reload replays the
+   unfinished introduction; author its effects idempotently. Legacy seenIntro:true saves remain complete unless CH.migrate clears
+   it using a chapter-specific old checkpoint. introPending:false distinguishes native completed saves from legacy ones.
+   B advances a pending intro. Other chapters retain their original intro behavior. */
+function beginIntro(){
+ const resumable=!!CH.resumeIntro;
+ if(resumable){state.introPending=true;state.seenIntro=false}else state.seenIntro=true;
+ save();const ch=CH;
+ setTimeout(()=>{if(CH!==ch)return;if(!(C.INTRO||[]).length){if(resumable){state.seenIntro=true;state.introPending=false;save()}return}
+  openDialog(CH.introWho||G.title||T('이야기'),C.INTRO,{intro:resumable})},300);
+}
 function save(){store.set(SK(),JSON.stringify(state));if(SRS().shared)store.set(KEY('lv'),JSON.stringify(state.lv));else if(RP)liftReal()}
 const higher=(to,from)=>{for(const [w,L] of Object.entries(from||{}))if(!to[w]||to[w].b<L.b)to[w]={...L}};
 function liftReal(){try{const r=JSON.parse(store.get(CH.save)||'null');if(!r)return;r.lv=r.lv||{};higher(r.lv,state.lv);store.set(CH.save,JSON.stringify(r))}catch(e){}}  // a replay's gains reach the real save (games without a shared record)
@@ -2183,8 +2237,8 @@ $('resetBtn').addEventListener('click',()=>{
  const b=$('resetBtn');
  if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent=T('한 번 더 누르면 지워져요');clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent=T('처음부터')},3000);return}
  b.classList.remove('armed');b.textContent=T('처음부터');
- $('chPanel').hidden=true;dropTalk();state=fresh();state.seenIntro=true;if(RP)state.counted=1;save();if(!RP){forgetNotes();forgetShared()}store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
- setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);  // starting over replays the intro, like a first start
+ $('chPanel').hidden=true;dropTalk();state=fresh();if(RP)state.counted=1;save();if(!RP){forgetNotes();forgetShared()}store.set(backKey(),'[]');updBack();loadZone(state.zone,state.x,state.y,state.dir);updateHud();updateQuest();$('panel').hidden=true;
+ beginIntro();  // starting over replays the intro, like a first start
 });
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.querySelector('.pad').addEventListener('touchstart',e=>{if(e.cancelable)e.preventDefault()},{passive:false});
@@ -2219,7 +2273,10 @@ function boot(id,rp){
  $('chName').textContent=CH.n+(RP?' · '+T('다시 보기'):'');
  updateHud();updateQuest();updBack();
  if(G.onBoot)G.onBoot(CH,C);  // the game's own page parts for this chapter (단어 마을: tips, news sources)
- if(!state.seenIntro){state.seenIntro=true;state.steps=[];save();if(!RP){countPlay('start');countStep()}const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}  // first time ever: make your character first
+ if(!state.seenIntro){
+  if(CH.resumeIntro){if(!state.introPending){state.steps=[];if(!RP){countPlay('start');countStep()}}if(me||!CREATOR)beginIntro();else openMe(beginIntro)}
+  else{state.seenIntro=true;state.steps=[];save();if(!RP){countPlay('start');countStep()}const intro=()=>setTimeout(()=>openDialog(CH.introWho||G.title||T('이야기'),C.INTRO),300);if(me||!CREATOR)intro();else openMe(intro)}
+ }  // first time ever: make your character first; legacy chapters keep their original seenIntro timing
  else setTimeout(()=>{if(!dlg&&!panelOpen())greet()},400);  // loaded in a room whose greeting hasn't happened (reloaded mid-scene): it starts over
  if(RP){const m=RP.mode;setTimeout(()=>toast(T('다시 보기')+' · '+T(RP_MODES[m])+': '+T('지금까지 한 건 그대로예요.')),700)}  // the mode now: it may have ended by then
 }

@@ -1,7 +1,7 @@
 # walk-engine
 
-The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (expert-brother), 점심 방송 (sora-vocab) and 단어 마을
-(daneo-maul, drawn in its own style through the look.draw and GAME.marker hooks).
+The shared engine of the walk-around language games 성실호 (exodus-a), 형제 (expert-brother), 점심 방송 (sora-vocab), 단어 마을
+(daneo-maul, drawn in its own style through the look.draw and GAME.marker hooks), ことばのむら (kotoba-mura) and 소리 엽서 (sori-yeopseo).
 - `engine.js` is the one engine. Each game has `src/game.js` (`var GAME={prefix, title, log, term, player}`), and its page decides
   the optional parts: talk portraits need `#face` in the dialogue box, and 나 꾸미기 needs `#mePanel`.
 - `./sync.sh` copies `engine.js` into every game's `src/engine.js` (generated, with a header saying so). Then run each game's
@@ -53,6 +53,28 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
 - Phone screen (opt-in: shell has `#phonePanel` with `#pscr` inside `#screen`): a step's `phone:{app, post, by, when, count,
   comments:[[name,text],…], time, battery, culture, grammar}` shows an app on someone's phone filling the game view on that line. The D-pad
   scrolls it, A finishes the line and then closes it, B closes it; its words are tappable; it closes with the conversation.
+- Captured screen attachment: `phone:{app,time,capture:{caption,lines:[text,…]}}` shows a static header and text rows. Each row
+  goes through `glossHTML` and has its own English ? from `lineEn`; it has no live app controls. A chat message may also have
+  `capture:{caption,lines}` beside its `text`, instead of a raster `pic`; the capture is saved in the completed transcript.
+  Chat `reply.choose` carries the reply's authored `time` (sent bubble) and `now` (phone clock), just like a graded reply.
+- Postcards (opt-in, `GAME.postcard` or `globalThis.POSTCARD`): `[{id,ch,place,def,v:{a:{pic,caption,lines:[[who,text],…]}}}]`.
+  `{card:{id,v}}` records a variant; the journal's `#pcards` and `{slides:1}` show installed chapters' cards. A skipped earlier
+  chapter uses `def`, marked 기본. Optional variant fields `chosen:true` feature a full card; `chosen:false` or `bonus:true` put a
+  small bonus after the full cards, in a journal strip and in the slideshow. Unmarked variants keep the original full size/order.
+  `label` prints above the card, `bonusCaption` below a bonus. `footer` is a separate unvoiced printed credit (`footerLabel` is an
+  optional row label). All these rows support word taps and English. `snapshot:1` freezes the variant's picture key, caption,
+  lines, footer, presentation fields and `voice` tag in its record. `voice` documents provenance, never grants permission.
+  `{card:{id,v,provenance:{…}}}` also saves arbitrary JSON provenance, e.g. the consent card/version used. Existing version keys
+  and `{v,ch,t,lines?,voice?,chosen?}` records remain valid. See the postcard comment in `engine.js` for all fields.
+  `{slides:{kind:'main'|'bonus',at:0,one:true}}` optionally selects a group, starts at an index and shows a single card so an
+  author can place real response pauses between panels. Omit `kind` for all cards; omit `one` for the rest of the group.
+- Resumable introductions: a chapter registry entry's `resumeIntro:true` keeps `seenIntro` false until the last introductory
+  line is advanced. `introPending:true` records an unfinished intro; reload replays that sequence, so introductory effects must
+  be idempotent. B advances it like A. Completion writes `seenIntro:true,introPending:false`. Legacy saves with `seenIntro:true`
+  remain complete; `CH.migrate(st)` can clear it if an old chapter-specific checkpoint proves the intro was interrupted.
+  Chapters without this setting keep their original behavior.
+- Journal word examples: `GAME.tappableExamples:true` renders `DICT[w].ex` through `glossHTML`, with pins shown as their visible
+  form and word help above the journal. The speaker still reads `plain(ex)`. Without the setting examples keep their plain display.
 - 문화 노트 (opt-in: shell has `#notes` and `#noteCard` in the journal; data in `globalThis.CULTURE_NOTES`): real-world culture behind a
   story moment, `{id:{t, lines:[[korean, english, [source numbers]]…], src:[[title, url]…]}}`. A step's `culture:'id'` (or a phone's,
   when it closes) adds it with a toast; the journal lists them; each line shows its source numbers and the sources are links.
@@ -127,7 +149,8 @@ The shared engine of the walk-around Korean games 성실호 (exodus-a), 형제 (
   unless its legend names one. Zones without `floor` are drawn exactly as before.
 - Review computer: the `terminal` tile, or any legend entry with `term:1` (so a laptop can look different and still open review).
   Its name and lines come from the game's `term`; a chapter's own `term:{name,…}` overrides them (a paper 복습 노트 in one chapter,
-  the 방송실's 복습 노트북 in the next). A round asks at most 4 words; `due(n,k)` gets the number due and the number asked.
+  the 방송실's 복습 노트북 in the next). `GAME.term.batchSize` or a chapter's `C.term.batchSize` sets a round's maximum word count
+  (positive integer; default 4, also used for invalid values). `due(n,k)` gets the number due and the actual number asked.
 - Grammar questions: a question step with `gram:1` tests a pattern (척, -대, -다 보니) asked under some word, not the word itself.
   It is asked in conversations as usual; review asks a word's own questions and skips these, so they never give that word a ★.
 - Step `move:{npc:'id', to:[x,y], dir}` (or a list): mid-conversation, on that line, the NPC walks from where it stands to `to` and

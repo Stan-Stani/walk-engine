@@ -13,6 +13,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebViewDatabase
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -43,23 +44,26 @@ class StatsActivity : Activity() {
     }
 
     private inner class Client : WebViewClient() {
-        private var triedSaved = false  // the saved login was sent once this visit; asked again means it was rejected
+        private val sent = mutableSetOf<String>()  // realms a login was sent for this visit; asked again for one means it was rejected
 
         override fun onReceivedHttpAuthRequest(view: WebView, handler: HttpAuthHandler, host: String, realm: String) {
             val db = WebViewDatabase.getInstance(this@StatsActivity)
+            val key = "$host $realm"
             val saved = db.getHttpAuthUsernamePassword(host, realm)
-            if (!triedSaved && saved != null && saved.size == 2 && saved[0] != null && saved[1] != null) {
-                triedSaved = true
+            val rejected = key in sent || !handler.useHttpAuthUsernamePassword()
+            if (!rejected && saved != null && saved.size == 2 && saved[0] != null && saved[1] != null) {
+                sent += key
                 handler.proceed(saved[0], saved[1])
                 return
             }
-            askLogin(host, retry = saved != null) { user, pass ->
+            if (rejected) db.clearHttpAuthUsernamePassword()  // a wrong login isn't kept for next time
+            askLogin(host, retry = key in sent) { user, pass ->
                 if (user == null || pass == null) {
                     handler.cancel()
                     finish()
                 } else {
                     db.setHttpAuthUsernamePassword(host, realm, user, pass)
-                    triedSaved = true
+                    sent += key
                     handler.proceed(user, pass)
                 }
             }
@@ -83,18 +87,29 @@ class StatsActivity : Activity() {
 
     /** The login dialog; [then] gets nulls on Cancel. */
     private fun askLogin(host: String, retry: Boolean, then: (String?, String?) -> Unit) {
-        val user = EditText(this).apply { hint = "Username"; inputType = InputType.TYPE_CLASS_TEXT; setSingleLine() }
-        val pass = EditText(this).apply { hint = "Password"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD; setSingleLine() }
+        // No suggestions or auto-capitals: a phone keyboard's "Stan " for "stan" is a wrong login. Visible-password text is the one
+        // variation every keyboard leaves alone.
+        val plain = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        val user = EditText(this).apply { hint = "Username"; inputType = plain or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD; setSingleLine() }
+        val pass = EditText(this).apply { hint = "Password"; inputType = plain or InputType.TYPE_TEXT_VARIATION_PASSWORD; setSingleLine() }
+        val show = CheckBox(this).apply {
+            text = "Show password"
+            setOnCheckedChangeListener { _, on ->
+                pass.inputType = plain or (if (on) InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD else InputType.TYPE_TEXT_VARIATION_PASSWORD)
+                pass.setSelection(pass.text.length)
+            }
+        }
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             val p = (20 * resources.displayMetrics.density).toInt()
             setPadding(p, p / 2, p, 0)
             addView(user)
             addView(pass)
+            addView(show)
         }
         AlertDialog.Builder(this).setTitle(if (retry) "통계 login didn't work — try again" else "통계 login")
             .setMessage(host).setView(form).setCancelable(false)
-            .setPositiveButton("Log in") { _, _ -> then(user.text.toString(), pass.text.toString()) }
+            .setPositiveButton("Log in") { _, _ -> then(user.text.toString().trim(), pass.text.toString()) }
             .setNegativeButton("Cancel") { _, _ -> then(null, null) }
             .show()
     }

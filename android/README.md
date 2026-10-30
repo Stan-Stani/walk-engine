@@ -26,6 +26,9 @@ One app with every published walk game (점심 방송, 성실호, 형제, 단어
 - **Rotate icon** (`RotateHint.kt`): hold the phone the other way from the game and a rotate icon shows for 3 seconds; a tap
   turns the game that way and keeps it there whatever auto-rotate says (the games' own 가로 화면 needs page fullscreen, which
   WebView lacks, so it isn't offered in the app).
+- **통계** (`StatsActivity.kt`): a button under the games opens the play-count dashboard (`https://seldoncortex.com/stats/`) full
+  screen. The server's login is asked the first time and kept in WebView's own store on the phone (never in the repo); a rejected
+  login asks again. Viewing it isn't counted (the dashboard isn't a game).
 - Links to other sites (문제 알리기, a note's sources) open in the browser.
 
 The list is `Games.kt`: add 소리 엽서 there once it's public.

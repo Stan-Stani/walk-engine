@@ -22,7 +22,7 @@ import java.util.concurrent.Executors
 
 /**
  * Every game in one list. Opening the app brings each game's offline copy up to date (when there's internet); tap one to play.
- * Under the games: the saves backup (see [Backups]) and Restore, from a backup file or from text copied from a game's 저장 옮기기.
+ * Under the games: the 통계 dashboard ([StatsActivity]), the saves backup (see [Backups]) and Restore, from a backup file or from text copied from a game's 저장 옮기기.
  */
 class MainActivity : Activity() {
     private lateinit var cache: OfflineCache
@@ -60,6 +60,17 @@ class MainActivity : Activity() {
             card.addView(text("", 12f, 0xFF8EE3A6).apply { setPadding(0, dp(6), 0, 0); status[g.slug] = this })
             list.addView(card, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) })
         }
+        val stats = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = GradientDrawable().apply { setColor(0xFF181B26.toInt()); setStroke(dp(1), 0xFF2E3448.toInt()); cornerRadius = dp(12).toFloat() }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { startActivity(Intent(this@MainActivity, StatsActivity::class.java)) }
+        }
+        stats.addView(text("통계", 18f, 0xFFFFFFFF, bold = true))
+        stats.addView(text("Play counts on seldoncortex.com (login needed the first time)", 13f, 0xFF9AA3B5).apply { setPadding(0, dp(4), 0, 0) })
+        list.addView(stats, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8); bottomMargin = dp(12) })
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(14))

@@ -37,5 +37,10 @@
             android:name=".GameActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
             android:exported="false" />
+
+        <!-- 통계: the play-count dashboard on seldoncortex.com -->
+        <activity
+            android:name=".StatsActivity"
+            android:exported="false" />
     </application>
 </manifest>

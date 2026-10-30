@@ -10,6 +10,7 @@ import android.text.InputType
 import android.webkit.HttpAuthHandler
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebViewDatabase
@@ -17,13 +18,15 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 
 /**
- * The 통계 dashboard (https://seldoncortex.com/stats/), full screen. It sits behind the server's login (HTTP basic auth): asked the
+ * The 통계 dashboard (https://seldoncortex.com/kgame), full screen. It sits behind the server's login (HTTP basic auth): asked the
  * first time, then kept in WebView's own store on this phone (never in the repo); a rejected login asks again.
  */
 class StatsActivity : Activity() {
     private lateinit var web: WebView
+    private var lastSent: Pair<String, String>? = null  // the login typed last, for the "didn't work" note
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(state: Bundle?) {
@@ -79,6 +82,12 @@ class StatsActivity : Activity() {
             return true
         }
 
+        /** A login that's accepted can still be refused another way (403, 500…): say so instead of leaving a bare error page. */
+        override fun onReceivedHttpError(view: WebView, req: WebResourceRequest, res: WebResourceResponse) {
+            if (!req.isForMainFrame || res.statusCode == 401) return
+            Toast.makeText(this@StatsActivity, "통계: the server answered ${res.statusCode} ${res.reasonPhrase.orEmpty()}", Toast.LENGTH_LONG).show()
+        }
+
         override fun onReceivedError(view: WebView, req: WebResourceRequest, error: WebResourceError) {
             if (!req.isForMainFrame) return
             view.loadDataWithBaseURL(null, OFFLINE_PAGE, "text/html", "utf-8", null)
@@ -90,8 +99,9 @@ class StatsActivity : Activity() {
         // No suggestions or auto-capitals: a phone keyboard's "Stan " for "stan" is a wrong login. Visible-password text is the one
         // variation every keyboard leaves alone.
         val plain = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-        val user = EditText(this).apply { hint = "Username"; inputType = plain or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD; setSingleLine() }
-        val pass = EditText(this).apply { hint = "Password"; inputType = plain or InputType.TYPE_TEXT_VARIATION_PASSWORD; setSingleLine() }
+        // setSingleLine() before inputType: it swaps in its own transformation and would undo the password's dots
+        val user = EditText(this).apply { hint = "Username"; setSingleLine(); inputType = plain or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD }
+        val pass = EditText(this).apply { hint = "Password"; setSingleLine(); inputType = plain or InputType.TYPE_TEXT_VARIATION_PASSWORD }
         val show = CheckBox(this).apply {
             text = "Show password"
             setOnCheckedChangeListener { _, on ->
@@ -107,9 +117,20 @@ class StatsActivity : Activity() {
             addView(pass)
             addView(show)
         }
+        // After a rejection, say what was sent (the password only by its shape), so a stray space or an autofilled old
+        // password shows.
+        val sentNote = lastSent?.takeIf { retry }?.let { (u, p) ->
+            user.setText(u)
+            "\n\nSent: username “$u”, a password of ${p.length} characters" +
+                (if (p != p.trim()) ", with a space at the start or end" else "") +
+                (if (p.any { it.code > 126 }) ", with non-ASCII characters" else "") + "."
+        }.orEmpty()
         AlertDialog.Builder(this).setTitle(if (retry) "통계 login didn't work — try again" else "통계 login")
-            .setMessage(host).setView(form).setCancelable(false)
-            .setPositiveButton("Log in") { _, _ -> then(user.text.toString().trim(), pass.text.toString()) }
+            .setMessage(host + sentNote).setView(form).setCancelable(false)
+            .setPositiveButton("Log in") { _, _ ->
+                lastSent = user.text.toString().trim() to pass.text.toString()
+                then(lastSent!!.first, lastSent!!.second)
+            }
             .setNegativeButton("Cancel") { _, _ -> then(null, null) }
             .show()
     }
@@ -126,7 +147,7 @@ class StatsActivity : Activity() {
 
     companion object {
         private const val STATS_HOST = "seldoncortex.com"
-        private const val STATS_URL = "https://$STATS_HOST/stats/"
+        private const val STATS_URL = "https://$STATS_HOST/kgame"
         private const val OFFLINE_PAGE = """<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
 <body style="background:#111;color:#ddd;font:16px/1.5 sans-serif;padding:24px">
 <p>통계 needs internet.</p></body>"""
